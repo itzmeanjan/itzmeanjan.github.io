@@ -18,14 +18,14 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('articleButton').addEventListener('click', () => {
         document.getElementById('articleButton').style = 'background: violet;';
         setTimeout(() => {
-            window.open('https://github.com/itzmeanjan?tab=repositories');
+            window.open('https://dev.to/itzmeanjan');
             document.getElementById('articleButton').style = 'background: linear-gradient(to bottom right,#ddeeff, #11bb11);';
         }, 100);
     });
     document.getElementById('projectButton').addEventListener('click', () => {
         document.getElementById('projectButton').style = 'background: violet;';
         setTimeout(() => {
-            window.open('https://dev.to/itzmeanjan');
+            window.open('https://github.com/itzmeanjan?tab=repositories');
             document.getElementById('projectButton').style = 'background: linear-gradient(to bottom left,#ddeeff, #11bb11);';
         }, 100);
     });
