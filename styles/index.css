@@ -31,3 +31,18 @@ p{
   margin: 12px;
   font-family: 'Courier New', Courier, monospace;
 }
+
+a:link{
+  color: white;
+}
+a:visited{
+  color: green;
+}
+
+a:hover{
+  color: yellow;
+}
+
+a:active{
+  color: crimson;
+}
