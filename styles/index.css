@@ -20,18 +20,6 @@ body{
   margin-bottom: 30px;
 }
 
-#aboutDiv{
-  display: flex;
-}
-
-#aboutText{
-  flex: 4.5;
-}
-
-#aboutImage{
-  flex: 0.5;
-  border-radius: 50%;
-}
 
 h1{
   color: #BCF5A9;
