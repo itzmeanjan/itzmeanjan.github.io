@@ -1,2 +1,2 @@
 # itzmeanjan.github.io
-A website show casing my portfolio.
+A simple website, show casing some information regarding me and my work.
