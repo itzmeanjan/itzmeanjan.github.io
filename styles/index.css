@@ -10,30 +10,14 @@ body{
   background-color: darkslategrey;
 }
 
+p{
+  color: bisque;
+  font-size: 20px;
+}
+
 #parentDiv{
   padding: 12px;
   margin: 12px;
-}
-
-.childDiv{
-  width: 95%;
-  margin-left: 12px;
-  margin-right: 12px;
-  margin-top: 30px;
-  margin-bottom: 30px;
-}
-
-
-h1{
-  color: #BCF5A9;
-  font-family: Arial, Helvetica, sans-serif;
-  font-style: italic;
-}
-
-p{
-  color: #A9F5F2;
-  margin: 12px;
-  font-family: 'Courier New', Courier, monospace;
 }
 
 a:link{
@@ -44,7 +28,7 @@ a:visited{
 }
 
 a:hover{
-  color: yellow;
+  color: aqua;
 }
 
 a:active{
