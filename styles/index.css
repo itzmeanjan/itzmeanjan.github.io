@@ -1,6 +1,7 @@
 /*
-Author: Anjan Roy<anjanroy@yandex.com>
+  Author: Anjan Roy <anjanroy@yandex.com>
 */
+
 html, body {
   margin: 0;
   padding: 0;
@@ -10,27 +11,120 @@ body{
   background-color: darkslategrey;
 }
 
-p{
-  color: bisque;
-  font-size: 20px;
-}
-
 #parentDiv{
-  padding: 12px;
-  margin: 12px;
+  padding: 1.5vmax;
+  margin: 1.5vmax;
 }
 
-a:link{
+.childDiv{
+  background-color: #373e45;
+  border-radius: 2vmin;
+  width: 92%;
+  padding-top: .1vmax;
+  padding-bottom: .1vmax;
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: 1.4vmax;
+  margin-bottom: 1.4vmax;
+}
+
+h1 {
+  margin-left: 1vmax;
+  color: #BCF5A9;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+p, li{
+  font-size: 1.4vmax;
+  color: powderblue;
+  margin: 2vmin;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.simpleLink:link{
+  color: #BCF5A9;
+  font-size: 1.3vmax;
+  outline: none;
+}
+
+.simpleLink:visited{
+  color: #BCF5A9;
+  font-size: 1.3vmax;
+  outline: none;
+}
+
+.simpleLink:hover{
+  color: yellow;
+  font-size: 1.5vmax;
+  outline: none;
+}
+
+#navBar{
+  background-color: #437070;
+  width: 90%;
+  margin-left: auto;
+  margin-right: auto;
+  border-radius: 2vmax;
+  padding-left: 2vmax;
+  padding-top: 1vmax;
+  padding-bottom: 1vmax;
+  padding-right: 2vmax;
+  position: sticky;
+  top: .4vmax;
+  text-align: center;
+}
+
+.navLink:link{
+  font-size: 2.5vmax;
+  color: #9fc69f;
+  outline: none;
+}
+
+.navLink:visited{
+  font-size: 2.5vmax;
+  color: #9fc69f;
+  outline: none;
+}
+
+.navLink:hover{
+  font-size: 2.6vmax;
+  color: greenyellow;
+  outline: none;
+}
+
+#footerDiv {
+  margin-top: 2vmin;
+  margin-bottom: 1vmin;
+  display: block;
+  text-align: center;
+}
+
+#footerText {
+  font-size: 1vmax;
   color: white;
 }
-a:visited{
-  color: darksalmon;
+
+#footerLink {
+	color: white;
+	outline: none;
 }
 
-a:hover{
-  color: aqua;
+.imgCenter {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: 1.5vmin;
+  margin-bottom: 1.5vmin;
+  width: 69%;
+  border-radius: 1.2vmin;
 }
 
-a:active{
-  color: crimson;
+.noteText {
+    font-size: 1.4vmax;
+    color:greenyellow;
+    background-color: black;
+    font-family: fantasy;
+    border-radius: 1vmin;
+    padding-left: 0.5vmin;
+    padding-right: 0.5vmin;
 }
