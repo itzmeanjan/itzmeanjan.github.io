@@ -38,6 +38,7 @@ p, li{
   color: powderblue;
   margin: 2vmin;
   font-family: 'Courier New', Courier, monospace;
+  font-size: 1.2vmax;
 }
 
 .simpleLink:link{
