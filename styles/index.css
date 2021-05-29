@@ -59,6 +59,27 @@ p, li{
   outline: none;
 }
 
+.blogLink:link{
+  color: #BCF5A9;
+  font-size: 1.3vmax;
+  text-decoration: none;
+  outline: none;
+}
+
+.blogLink:visited{
+  color: #BCF5A9;
+  font-size: 1.3vmax;
+  text-decoration: none;
+  outline: none;
+}
+
+.blogLink:hover{
+  color: greenyellow;
+  font-size: 1.3vmax;
+  text-decoration: none;
+  outline: none;
+}
+
 #navBar{
   background-color: #437070;
   width: 90%;
