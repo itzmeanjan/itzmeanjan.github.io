@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<!--
+  Author: Anjan Roy<anjanroy@yandex.com>
+-->
+<html>
+
+<head>
+  <title>
+    Anjan Roy, Software Engineer, India
+  </title>
+  <meta property="og:type" content="website">
+  <meta name="og:title" content="Anjan Roy, Software Engineer, India">
+  <meta name="og:description" content="My Thoughts, Experiments & Experiences">
+  <meta name="og:url" content="https://itzmeanjan.in">
+  <meta name="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
+  <meta name="og:image:secure_url" content="https://itzmeanjan.in/images/myImage.jpg">
+  <meta name="og:image:width" content="950">
+  <meta name="og:image:height" content="735">
+  <meta property="twitter:card" content="summary_large_image">
+  <meta property="twitter:url" content="https://itzmeanjan.in/">
+  <meta property="twitter:title" content="Anjan Roy, Software Engineer, India">
+  <meta property="twitter:description" content="My Thoughts, Experiments & Experiences">
+  <meta property="twitter:image" content="https://itzmeanjan.in/images/myImage.jpg">
+  <meta name="description" content="My Thoughts, Experiments & Experiences">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="author" content="Anjan Roy">
+  <meta name="keywords" 
+    content="anjan, roy, itzmeanjan, software, engineer, india, portfolio, skills, projects, thoughts, experiments, experiences">
+  <meta name="theme-color" content="darkslategrey">
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="stylesheet" type="text/css" href="../styles/index.css">
+  <script src="../styles/code.js"></script>
+</head>
+
+<body>
+  <div id="parentDiv">
+    <div id="navBar">
+      <nav>
+        <a class = "navLink" href="/"><big>H</big>ome</a> |
+        <a class = "navLink" href="https://github.com/itzmeanjan" target="_blank"><big>P</big>rojects</a> | 
+        <a class = "navLink" href="/pages/blog.html"><big>B</big>log</a> |
+        <a class = "navLink" href="/pages/contact.html"><big>C</big>ontact</a>
+      </nav>
+    </div>
+    <div class="childDiv">
+      <article>
+        <h1 class="blogHeader">
+            Designing Distributed Pub/Sub
+        </h1>
+        <h3>Created : June 01, 2021</h3>
+      </article>
+    </div>
+    <div class="childDiv">
+        <article>
+          <p class="blogText">
+            Sometime ago I started working on <span class="highlight">pub0sub - Fast, Light-weight, Ordered Pub/Sub
+            System</span> --- built on top of async I/O, leveraging power of kernel event loop.
+            <br>
+            The main idea behind it was to write a software ( along with SDK ) which can be used for publishing arbitrary length messages to N-many
+            topics; subscribing to N-many topics -- listening for messages published on each of them; and last but not least
+            one powerful Pub/Sub Hub ( i.e. Router ) which will easily solve C10K by leveraging power of async I/O.
+            <br>
+            <br>
+            The aforementioned problem statement is solved, which is why I decided to update problem statement.
+            Now it looks like <span class="highlight">pub0sub - Distributed, Fast, Light-weight, Ordered Pub/Sub System</span> --- solving
+            C1M easily while leveraging power of kernel event loop & p2p networking.
+            <br>
+            <br>
+            By making <span class="highlight">pub0sub</span> distributed, I get to handle 1M concurrent connection
+            where nodes form a mesh network for chatting about topic interest(s) & forward messages when need to.
+            I choose to use <span class="highlight">libp2p</span> for networking purpose, for being so modular --- enabling easy horizontal
+            scalability, while taking care of stream multiplexing, security, peer-discovery etc.
+            <br>
+            <br>
+            Here I propose primary design of system !
+          </p>
+          <br>
+          <p class="blogText">
+              Multiple <span class="highlight">pub0sub</span> nodes can discover each other using DHT ( distributed hash table )
+              powered peer discovery mechanism, built right into <span class="highlight">libp2p</span>
+              and eventually form a mesh network. If network has N participant(s), each participant is going to maintain
+              connection with other N-1 peer(s), where N > 0. These participants of p2p network are going to chat with each
+              other over bi-directional stream. Things nodes need to talk about 👇
+          </p>
+          <ul>
+              <li>Topic subscription ( also ACK )</li>
+              <li>Topic unsubscription ( also ACK )</li>
+              <li>Message forwarding</li>
+              <li>Periodic heartbeat</li>
+          </ul>
+          <p class="blogText">
+              As each of aforementioned operations require to pass different message formats, I'm going to define
+              respective wire format. But before I get into wire format, writing to stream, reading from stream
+              I'd like to spend some time in going through high level overview of network operation.
+          </p>
+          <br>
+          <img class="imgCenter" src="../images/pub0sub-high-level-arch-2.jpg">
+          <br>
+          <p class="blogText">
+              Say, two nodes form a cluster --- one node has a <i>topic_1</i> subscriber connected to it while
+              other one has a publisher connected to it, willing to publish message on <i>topic_1</i>. After
+              first node finds out, it has one subscriber interested in messages from <i>topic_1</i>, it decides
+              to ask its peer <span class="highlight">0hub</span> node, if it sees any message targetted to
+              <i>topic_1</i>, it should inform requester. Publisher sends publish intent to network, which triggers
+              event saying network has received some message on <i>topic_1</i> for which first node has interested subscriber.
+              Two nodes will chat over p2p network, resulting into message forwarding, which will enable first node
+              to deliver message published on <i>topic_1</i> to its subscriber.
+              <br>
+              <br>
+              When noticed carefully, network follows certain protocols
+          </p>
+          <ul>
+              <li>When subscriber shows interest in <i>topic_1</i>, it needs to be broadcast to peers</li>
+              <li>When publisher publishes message on <i>topic_1</i> & node finds some peer showed interest
+                in this topic, it'll forward that message to that peer</li>
+          </ul>
+          <br>
+          <p class="blogText">
+              Let's take another scenario.
+          </p>
+          <img class="imgCenter" src="../images/pub0sub-high-level-arch-3.jpg">
+          <br>
+          <p class="blogText">
+              Continuing previous scenario, after sometime subscriber doesn't anymore want to receive
+              messages published on <i>topic_1</i>, so it sends unsubscription intent to network. As a result
+              of it, this node decides to broadcast same to network, because it found it doesn't have any other
+              subscriber who're interested in messages of <i>topic_1</i>. All peers who kept record of this node
+              being interested in <i>topic_1</i>, updates their respective interest table, ensuring when in future
+              it receives message published on <i>topic_1</i>, it won't forward to first peer.
+              <br>
+              <br>
+              This way of showing interest to topics when peers has some subscribers to feed or 
+              announcing not interested anymore when all subscribers of certain topic unsubscribes --- allows
+              network to pass messages only when needed, eventually consuming lower bandwidth.
+            </p>
+            <br>
+            <p class="blogText">
+                With more peers, network interaction may look like 👇 from high level
+            </p>
+            <img class="imgCenter" src="../images/pub0sub-high-level-arch-1.jpg">
+            <br>
+            <p class="blogText">
+                Say, one subscriber shows interest in receiving messages from <i>{topic_1, topic_2, topic_3}</i>
+                but the <span class="highlight">0hub</span> node it's connected to doesn't have any publisher
+                of any of those topics. As soon as <span class="highlight">0hub</span> node learns it has subscriber to feed messages of 
+                <i>{topic_1, topic_2, topic_3}</i>, following protocol it announces that intent to other peers.
+                Each of other peers record it & as soon as it receives any message published on any of these topics
+                it forwards those to respective peers.
+            </p>
+            <br>
+            <br>
+            <p class="blogText">
+                I'll now spend some time in specifying wire-format of messages exchanged between peers.
+            </p>
+            <img class="imgCenter" src="../images/pub0sub-high-level-arch-4.jpg">
+            <br>
+        </article>
+    </div>
+  </div>
+  <div id="footerDiv">
+    <footer>
+      <p id="footerText">
+        &copy <a href="https://github.com/itzmeanjan/itzmeanjan.github.io" id="footerLink" target="_blank"><big>A</big>njan Roy</a> ( <big>M</big>IT Licensed )
+      </p>
+    </footer>
+  </div>
+</body>
+
+</html>
