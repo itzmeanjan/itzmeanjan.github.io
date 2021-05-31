@@ -154,6 +154,70 @@
             </p>
             <img class="imgCenter" src="../images/pub0sub-high-level-arch-4.jpg">
             <br>
+            <p class="blogText">
+                Each message exchanged between peers over p2p layer, needs to have two parts
+            </p>
+            <ol>
+                <li>Header ( 5 bytes )</li>
+                <li>Body ( N bytes )</li>
+            </ol>
+            <p class="blogText">
+                Just by reading header part receiver must be able to understand two things
+            </p>
+            <ol>
+                <li>What kind of operation is it ?</li>
+                <li>How many more bytes to read from stream for consuming message body ?</li>
+            </ol>
+            <p class="blogText">
+                First question can be answered by checking very first byte of message. Each operation
+                is denoted by unique opcode. There're 255 possible opcodes, though only 6 of them are in use as of now.
+            </p>
+            <ul>
+                <li>Heartbeat : <b>1</b></li>
+                <li>Topic subscription : <b>2</b></li>
+                <li>Topic subscription ACK : <b>3</b></li>
+                <li>Topic unsubscription : <b>4</b></li>
+                <li>Topic unsubscription ACK : <b>5</b></li>
+                <li>Message Forward : <b>6</b></li>
+            </ul>
+            <p class="blogText">
+                By reading next 4 bytes receiver understands how many more bytes it should now read from stream
+                so that it can successfully deserialise message, depending upon opcode. Each opcode denotes different
+                message wire-format, resulting into different deserialisation logic upon reception.
+                <br>
+                <br>
+                This is a very high level wire-format, which is applicable for each of messages. But I'd like
+                to define how <b>BODY</b> of message is serialised/ deserialised for different opcodes. Starting with
+                how it looks like when announcing interest of listening to some topics.
+            </p>
+            <img class="imgCenter" src="../images/pub0sub-high-level-arch-5.jpg">
+            <br>
+            <p class="blogText">
+                Note, above image is nothing but magnification of message <b>BODY</b> when opcode ∈ {2, 4}. Requirement
+                is peer needs to announce it wants to receive all messages published on topics, because it has
+                some subscribers interested in those. Receiver side when reading from stream, knows how many
+                bytes it needs to read from stream for completely consuming <b>BODY</b>.
+                <br>
+                <br>
+                It starts by reading first 1-byte, where it has instruction encoded how many next bytes it should
+                read for making one meaningful topic name. Now it has either consumed all bytes of <b>BODY</b>
+                or some of them are left. If left, it'll again consume 1-byte, carrying instruction for it for
+                figuring out what's new topic name. This way, it'll keep reading until it has exhausted all bytes
+                of <b>BODY</b>. By the end it must have successfully constructed structured object in respective
+                environment, containing topics some peer want to get notified of.
+                <br>
+                <br>
+                Similar wire-format is followed for serialising <b>BODY</b> when announcing lack of interest in some topics.
+                <br>
+                <br>
+                Both of aforementioned opcodes, expect to hear back with ACK messages i.e. opcode ∈ {3, 5}, where
+                <b>BODY</b> can be encoded by putting binary value denoting success/ failure.
+                <br>
+                <br>
+                Finally I'll cover how to serialise/ deserialise forwarded message to/ from stream.
+            </p>
+            <img class="imgCenter" src="../images/pub0sub-high-level-arch-6.jpg">
+            <br>
         </article>
     </div>
   </div>
