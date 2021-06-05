@@ -17,24 +17,24 @@ body::-webkit-scrollbar {
 }
 
 #parentDiv{
-  padding: 1.5vmax;
-  margin: 1.5vmax;
+  padding: 1.5vw;
+  margin: 1.5vw;
 }
 
 .childDiv{
   background-color: #373e45;
-  border-radius: 2vmin;
+  border-radius: 2vw;
   width: 92%;
-  padding-top: .1vmax;
-  padding-bottom: .1vmax;
+  padding-top: .1vw;
+  padding-bottom: .1vw;
   margin-left: auto;
   margin-right: auto;
-  margin-top: 1.4vmax;
-  margin-bottom: 1.4vmax;
+  margin-top: 1.4vw;
+  margin-bottom: 1.4vw;
 }
 
 h1 {
-  margin-left: 1vmax;
+  margin-left: 1vw;
   color: #BCF5A9;
   font-family: Arial, Helvetica, sans-serif;
 }
@@ -55,46 +55,46 @@ p, li{
 
 .simpleLink:link{
   color: #BCF5A9;
-  font-size: 1.3vmax;
+  font-size: 1.3vw;
   outline: none;
 }
 
 .simpleLink:visited{
   color: #BCF5A9;
-  font-size: 1.3vmax;
+  font-size: 1.3vw;
   outline: none;
 }
 
 .simpleLink:hover{
   color: yellow;
-  font-size: 1.5vmax;
+  font-size: 1.5vw;
   outline: none;
 }
 
 .blogLink:link{
   color: #BCF5A9;
-  font-size: 1.3vmax;
+  font-size: 1.3vw;
   text-decoration: none;
   outline: none;
 }
 
 .blogLink:visited{
   color: #BCF5A9;
-  font-size: 1.3vmax;
+  font-size: 1.3vw;
   text-decoration: none;
   outline: none;
 }
 
 .blogLink:hover{
   color: greenyellow;
-  font-size: 1.3vmax;
+  font-size: 1.3vw;
   text-decoration: none;
   outline: none;
 }
 
 .blogHeader {
   text-align: center;
-  font-size: 2.0vmax;
+  font-size: 2.0vw;
 }
 
 .blogText {
@@ -134,43 +134,43 @@ table, th, td {
   width: 90%;
   margin-left: auto;
   margin-right: auto;
-  border-radius: 2vmax;
-  padding-left: 2vmax;
-  padding-top: 1vmax;
-  padding-bottom: 1vmax;
-  padding-right: 2vmax;
+  border-radius: 2vw;
+  padding-left: 2vw;
+  padding-top: 1vw;
+  padding-bottom: 1vw;
+  padding-right: 2vw;
   position: sticky;
-  top: .4vmax;
+  top: .4vw;
   text-align: center;
 }
 
 .navLink:link{
-  font-size: 2.5vmax;
+  font-size: 2.5vw;
   color: #9fc69f;
   outline: none;
 }
 
 .navLink:visited{
-  font-size: 2.5vmax;
+  font-size: 2.5vw;
   color: #9fc69f;
   outline: none;
 }
 
 .navLink:hover{
-  font-size: 2.6vmax;
+  font-size: 2.6vw;
   color: greenyellow;
   outline: none;
 }
 
 #footerDiv {
-  margin-top: 2vmin;
-  margin-bottom: 1vmin;
+  margin-top: 2vw;
+  margin-bottom: 1vw;
   display: block;
   text-align: center;
 }
 
 #footerText {
-  font-size: 1vmax;
+  font-size: 1vw;
   color: white;
 }
 

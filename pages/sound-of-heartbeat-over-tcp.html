@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<!--
+  Author: Anjan Roy<hello@itzmeanjan.in>
+-->
+<html>
+
+<head>
+    <title>
+        Anjan Roy, Software Engineer, India
+    </title>
+    <meta property="og:type" content="website">
+    <meta name="og:title" content="Anjan Roy, Software Engineer, India">
+    <meta name="og:description" content="My Thoughts, Experiments & Experiences">
+    <meta name="og:url" content="https://itzmeanjan.in">
+    <meta name="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta name="og:image:secure_url" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta name="og:image:width" content="950">
+    <meta name="og:image:height" content="735">
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://itzmeanjan.in/">
+    <meta property="twitter:title" content="Anjan Roy, Software Engineer, India">
+    <meta property="twitter:description" content="My Thoughts, Experiments & Experiences">
+    <meta property="twitter:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta name="description" content="My Thoughts, Experiments & Experiences">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="author" content="Anjan Roy">
+    <meta name="keywords"
+        content="anjan, roy, itzmeanjan, software, engineer, india, portfolio, skills, projects, thoughts, experiments, experiences">
+    <meta name="theme-color" content="darkslategrey">
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" type="text/css" href="../styles/index.css">
+    <script src="../styles/code.js"></script>
+</head>
+
+<body>
+    <div id="parentDiv">
+        <div id="navBar">
+            <nav>
+                <a class="navLink" href="/"><big>H</big>ome</a> |
+                <a class="navLink" href="https://github.com/itzmeanjan" target="_blank"><big>P</big>rojects</a> |
+                <a class="navLink" href="/pages/blog.html"><big>B</big>log</a> |
+                <a class="navLink" href="/pages/contact.html"><big>C</big>ontact</a>
+            </nav>
+        </div>
+        <div class="childDiv">
+            <article>
+                <h1 class="blogHeader">
+                    Sound of Heartbeat over TCP
+                </h1>
+                <h3>Created : June 05, 2021</h3>
+            </article>
+        </div>
+        <div class="childDiv">
+            <article>
+                <p class="blogText">
+                    Few weeks back I started working on <span class="highlight">pub0sub - Fast, Light-weight, Ordered Pub/Sub System</span>
+                    leveraging power of kernel event loop, addressing C10K while running on a consumer grade machine.
+                    <br>
+                    <br>
+                    <span class="highlight">pub0sub</span> can easily handle > 10k concurrent connections even on consumer grade
+                    machine, because it doesn't follow conventional way of writing TCP servers in Go. Generally, one
+                    go-routine accepts TCP connection & spawns new go-routine for handling connection life-cycle. This way if objective
+                    is to handle > 10k concurrent connections, there're > 10k go-routines. Go scheduler needs
+                    to perform expensive context switching for running go-routines on underlying OS threads. For > 10k concurrent
+                    connections cost of context switching is pretty high, when no useful task gets accomplished. Also stack memory requirement
+                    for > 10k go-routines is not something neglectable.
+                    <br>
+                    <br>
+                    Avoiding aforementioned path helps in discovering another potential way, where I can ask kernel event loop to watch
+                    file descriptors of interest & only inform when some action need to be taken. At a time any of two events can happen on socket
+                    { <b>READ</b>, <b>WRITE</b> } --- either pre-scheduled reading or writing from socket has been completed,
+                    giving opportunity to act on it & schedule next operation. There's no more > 10k go-routines, rather only 2 go-routines ---
+                    one used for listening & accepting TCP connections; another for watching & responding to I/O events.
+                    <br>
+                    <br>
+                    As a result, lesser time spent in context switching more time spent doing actual work. As soon as new connection
+                    is accepted, it's delegated to watcher. On the other hand watcher waits for I/O completion events & 
+                    as soon as some of them are available to act on; it starts looping over them one-by-one ---
+                    processing each & scheduling next action on socket.
+                </p>
+                <img class="imgCenter" src="../images/sound-of-heartbeat-kernel-event-loop.jpg">
+                <p class="blogText">
+                    This model of writing TCP server is performant, but brings in some complexities. Previously I could
+                    manage each connection's whole life-cycle in its own go-routine --- seperation of concern was well respected.
+                    As a result implementation was easier to reason about.
+                    <br>
+                    <br>
+                    Say in first model, server has two clients --- each being managed in its own go-routine
+                </p>
+                <ul>
+                    <li>Envelope ( 5 bytes )</li>
+                    <li>Body ( N bytes )</li>
+                </ul>
+                <p class="blogText">
+                    For one client, envelope is being read and for another one body is being read after envelope reading
+                    is done. Also I'd like to highlight, messages are seperated in two components because it helps
+                    in determining what's length of variable sized body, where envelope length is fixed at 5-bytes.
+                </p>
+                <img class="imgCenter" src="../images/sound-of-heartbeat-go-routine-reading-message.jpg">
+                <p class="blogText">
+                    But attaining same behaviour when delegating reading/ writing from sockets to watcher is little more involved. 
+                    <br>
+                    <br>
+                    For reading message envelope, request is issued; watcher informs when envelope is read. Then envelope is deserialised to
+                    figure out how many more bytes to read from socket for consuming message body. N-bytes body reading is
+                    again delegated to watcher, which informs us as soon as it's done. Now if there're N-clients connected at this moment
+                    each of them may stay in any of possible two reading stages. There could be also different kinds of messages --- where opcode is
+                    encoded in envelope along with body length. Reading handler function needs to remember where it left off
+                    last time, so that it can keep processing later part of message. This calls for additional state keeping --- resulting into
+                    more memory allocation than first model.
+                </p>
+                <img class="imgCenter" src="../images/sound-of-heartbeat-watcher-reading-message.jpg">
+                <p class="blogText">
+                    In <span class="highlight">pub0sub</span> there're two kinds of clients i.e. { publisher, subscriber }. Each
+                    of them interact with Pub/Sub server i.e. <span class="highlight">0hub</span> with different intention
+                    resulting into different message format, which calls for placing opcode in message envelope. Opcode helps
+                    read handler function to understand how to actually deserialise message body or what kind of actions to take on deserialised, structured message
+                    & how to eventually respond back to client.
+                </p>
+                <img class="imgCenter" src="../images/sound-of-heartbeat-message-format.jpg">
+                <p class="blogText">
+                    All these are already in place and working as expected in <span class="highlight">0hub</span>. What I
+                    propose is for long lived TCP connections between server & publisher/ subscriber, there's a need
+                    to periodically check health of each connection. This health checking is going to be lazy --- if some
+                    interaction has happened over connection in last 15s, then periodic health check scheduled at t + 13 can be
+                    avoided and scheduled at t + 30.
+                </p>
+            </article>
+        </div>
+    </div>
+    <div id="footerDiv">
+        <footer>
+            <p id="footerText">
+                &copy <a href="https://github.com/itzmeanjan/itzmeanjan.github.io" id="footerLink"
+                    target="_blank"><big>A</big>njan Roy</a> ( <big>M</big>IT Licensed )
+            </p>
+        </footer>
+    </div>
+</body>
+
+</html>
