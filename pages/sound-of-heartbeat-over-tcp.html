@@ -138,10 +138,10 @@
                     It's like when first time envelope is read, reading handler function understands what's intention of client
                     and how many more bytes it needs to read from socket to construct message. It puts an entry in <b>ongoing reading
                     table</b>, <i>indexed by socket</i>, along with OPCODE so that appropriate deserialisation
-                    handler can be invoked when body reading will be completed; issues N-bytes body reading request; moves on to next processing step. 
+                    handler can be invoked when body reading will be completed; issues N-bytes body reading request; moves on to next event processing step.
                     After sometime when body reading is done on this socket, watcher informs, socket is looked up in <b>ongoing reading table</b>
                     to understand what has happened till now & what to do next with body. And finally intended action is taken
-                    on received message.
+                    on received message and socket entry from <b>ongoing reading table</b> is removed.
                 </p>
                 <img class="imgCenter" src="../images/sound-of-heartbeat-watcher-reading-message.jpg">
                 <p class="blogText">
