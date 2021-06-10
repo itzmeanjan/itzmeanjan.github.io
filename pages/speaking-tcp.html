@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<!--
+  Author: Anjan Roy<hello@itzmeanjan.in>
+-->
+<html>
+
+<head>
+    <title>
+        Anjan Roy, Software Engineer, India
+    </title>
+    <meta prefix="og: http://ogp.me/ns#" property="og:type" content="website">
+    <meta prefix="og: http://ogp.me/ns#" property="og:title" content="Anjan Roy, Software Engineer, India">
+    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="My Thoughts, Experiments & Experiences">
+    <meta prefix="og: http://ogp.me/ns#" property="og:url" content="https://itzmeanjan.in">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url"
+        content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:width" content="950">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:height" content="735">
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://itzmeanjan.in/">
+    <meta property="twitter:title" content="Anjan Roy, Software Engineer, India">
+    <meta property="twitter:description" content="My Thoughts, Experiments & Experiences">
+    <meta property="twitter:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta property="twitter:site" content="@meanjanry">
+    <meta name="description" content="My Thoughts, Experiments & Experiences">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="author" content="Anjan Roy">
+    <meta name="keywords"
+        content="anjan, roy, itzmeanjan, software, engineer, india, portfolio, skills, projects, thoughts, experiments, experiences">
+    <meta name="theme-color" content="darkslategrey">
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" type="text/css" href="../styles/index.css">
+    <script src="../styles/code.js"></script>
+</head>
+
+<body>
+    <div id="parentDiv">
+        <div id="navBar">
+            <nav>
+                <a class="navLink" href="/"><big>H</big>ome</a> |
+                <a class="navLink" href="https://github.com/itzmeanjan" target="_blank"><big>P</big>rojects</a> |
+                <a class="navLink" href="/pages/blog.html"><big>B</big>log</a> |
+                <a class="navLink" href="/pages/contact.html"><big>C</big>ontact</a>
+            </nav>
+        </div>
+        <div class="childDiv">
+            <article>
+                <h1 class="blogHeader">
+                    Speaking TCP
+                </h1>
+                <h3>Created : June 13, 2021</h3>
+            </article>
+        </div>
+        <div class="childDiv">
+            <article>
+                <p class="blogText">
+                    For last few months I've been working at TCP level more often than I generally do.
+                    During this period I designed and implemented few systems where multiple participants
+                    talk to each other over TCP while following custom application level protocol.
+                    I learned the way most of TCP applications written in ( specifically ) Golang
+                    can be done in a slight different way so that applications don't end up spawning one go-routine
+                    per accepted connection --- resulting into thousands of active go-routines when talking to thousands
+                    of concurrent peers. Rather than handling each peer in its own go-routine,
+                    proactively attempting to read from socket; keeping only one socket watcher
+                    go-routine which is responsible for informing any READ/ WRITE completion
+                    event happening on any of delegated sockets --- consumes way lesser resources.
+                    It excels at reducing scope of context switching by bringing possible
+                    go-routine count to minimal. As a result of it, Golang scheduler only needs
+                    to manage handful of go-routines now. Previously scheduler had to orchetrate
+                    thousands of go-routines on <b>N</b> system threads. I ran some experiments
+                    and result was promising --- TCP servers able to easily handle <b>100k</b> concurrent connections
+                    when following second approach.
+                </p>
+                <p class="blogText">
+                    Following 3 different approaches, I develop key-value database where clients can send read/ write requests
+                    over TCP. I challenge each implementation with <b>100k</b> concurrent connections
+                    and figure out their performance, resource consumption etc. under high load;
+                    all running on a consumer-grade GNU/Linux machine.
+                </p>
+                <ol>
+                    <li>One go-routine per connection</li>
+                    <li>One watcher for all sockets</li>
+                    <li>N ( >1 ) watchers for all sockets</li>
+                </ol>
+            </article>
+        </div>
+    </div>
+    <div id="footerDiv">
+        <footer>
+            <p id="footerText">
+                &copy <a href="https://github.com/itzmeanjan/itzmeanjan.github.io" id="footerLink"
+                    target="_blank"><big>A</big>njan Roy</a> ( <big>M</big>IT Licensed )
+            </p>
+        </footer>
+    </div>
+</body>
+
+</html>
