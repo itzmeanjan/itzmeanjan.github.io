@@ -67,7 +67,7 @@
                     event happening on any of delegated sockets --- consumes way lesser resources.
                     It excels at reducing scope of context switching by bringing possible
                     go-routine count to minimal. As a result of it, Golang scheduler only needs
-                    to manage handful of go-routines now. Previously scheduler had to orchetrate
+                    to manage a few go-routines now. Previously scheduler had to orchestrate
                     thousands of go-routines on <b>N</b> system threads. I ran some experiments
                     and result was promising --- TCP servers able to easily handle <b>100k</b> concurrent connections
                     when following second approach.
@@ -75,14 +75,111 @@
                 <p class="blogText">
                     Following 3 different approaches, I develop key-value database where clients can send read/ write requests
                     over TCP. I challenge each implementation with <b>100k</b> concurrent connections
-                    and figure out their performance, resource consumption etc. under high load;
-                    all running on a consumer-grade GNU/Linux machine.
+                    and collect statistics of their performance, resource consumption etc. under high load;
+                    all running on a consumer-grade GNU/Linux machine in containerised environment i.e. Docker.
                 </p>
                 <ol>
                     <li>One go-routine per connection</li>
                     <li>One watcher for all sockets</li>
                     <li>N ( >1 ) watchers for all sockets</li>
                 </ol>
+                <p class="blogText">
+                    The application I develop is quite simple but it captures the essence.
+                    It's a remote <i>( not necessarily geographically )</i> in-memory KV database, to which clients connect
+                    over TCP & maintain that connection throughout their life time. During their life time they do
+                    any of two possible operations in a randomised manner.
+                </p>
+                <ol>
+                    <li><b>READ</b> - Attempt to read VALUE associated with supplied KEY</li>
+                    <li><b>WRITE</b> - Attempt to associate VALUE with KEY</li>
+                </ol>
+                <p class="blogText">
+                    In both of the cases clients expect to hear back from server. In response frame
+                    VALUE associated with KEY is returned. For WRITE request, VALUE in response frame
+                    must be equal to what's sent in request frame. On server side all reading/ writing
+                    is done in concurrent safe manner --- by acquiring mutex locks. Only for write request
+                    RWMutex lock is held i.e. <i>critical section of code</i>, otherwise normal read-only lock is held.
+                </p>
+                <img class="imgCenter" src="../images/speaking-tcp-kv-store.jpg">
+                <p class="blogText">
+                    For performing desired operations, clients send structured data frames
+                    over TCP; server extracts that out from socket; performs action as specified
+                    in message envelope i.e. opcode field; responds back with response frame.
+                    <br>
+                    <br>
+                    Each message sent over wire is two-parts, where envelope carries operation kind i.e. {READ, WRITE} &
+                    how many more bytes server need to be read from stream to construct a structured message. Clients
+                    always expect to receive only one kind of frame in response.
+                </p>
+                <ol>
+                    <li>Envelope - 3 bytes</li>
+                    <li>Body - N ( < 65536 ) bytes</li>
+                </ol>
+                <p class="blogText">
+                    For a READ frame, sent when client is interested in looking up VALUE associated
+                    with KEY, body just holds key, preceded with key length in 1 byte field. Notice, body length
+                    field in envelope is 2 bytes, allowing at max 65535 bytes of body, but in body actually
+                    256 bytes can be written due to key length field in body being of 1 byte. This is done intensionally
+                    for keeping illustration simple.
+                    <br>
+                    <br>
+                    Practically max READ frame size over wire will be
+                </p>
+                <table class="centeredTable">
+                    <tr>
+                        <th>Field</th>
+                        <th>Max Thoeretical Size ( in bytes )</th>
+                        <th>Max Practical Size ( in bytes )</th>
+                    </tr>
+                    <tr>
+                        <td>Envelope</td>
+                        <td>3</td>
+                        <td>3</td>
+                    </tr>
+                    <tr>
+                        <td>Body</td>
+                        <td>65535</td>
+                        <td>256</td>
+                    </tr>
+                    <tr>
+                        <td>Total</td>
+                        <td>65538</td>
+                        <td><b>259</b></td>
+                    </tr>
+                </table>
+                <img class="imgCenter" src="../images/speaking-tcp-read-frame.jpg">
+                <p class="blogText">
+                    WRITE frame carries little more data, which is sent when client is interested
+                    in associating VALUE with some KEY, because it carries both key, value & each of them are preceded
+                    with respective length in 1 byte field. Same scene here, practically WRITE frame's body will be at max 512 bytes
+                    though it's allowed to be at max 65535 bytes theoretically, as written in body length field in stream.
+                    <br>
+                    <br>
+                    Limits WRITE frame size will be
+                </p>
+                <table class="centeredTable">
+                    <tr>
+                        <th>Field</th>
+                        <th>Max Thoeretical Size ( in bytes )</th>
+                        <th>Max Practical Size ( in bytes )</th>
+                    </tr>
+                    <tr>
+                        <td>Envelope</td>
+                        <td>3</td>
+                        <td>3</td>
+                    </tr>
+                    <tr>
+                        <td>Body</td>
+                        <td>65535</td>
+                        <td>512</td>
+                    </tr>
+                    <tr>
+                        <td>Total</td>
+                        <td>65538</td>
+                        <td><b>515</b></td>
+                    </tr>
+                </table>
+                <img class="imgCenter" src="../images/speaking-tcp-write-frame.jpg">
             </article>
         </div>
     </div>
