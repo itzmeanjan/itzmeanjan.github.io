@@ -262,6 +262,148 @@
                     delegates accepted connection to some watcher. This brings in management flexibility.
                 </p>
                 <img class="imgCenter" src="../images/speaking-tcp-model-v3.jpg">
+                <p class="blogText">
+                    It's time to run these models on real mahine and collect statistics. I've prepared parallel
+                    benchmarking testcases, where in each round of benchmarking one client connects to TCP server
+                    and sends two frames in order. First frame is read request for some KEY, waits for response, consumes
+                    it <i>( if some other client has already set VALUE for that KEY )</i>; then it sends write request
+                    with a KEY, VALUE pair, waits for response, expecting to see VALUE in response matching what it sent
+                    in write request. Each benchmark is performed 8 times, to get average statistics.
+                    <br>
+                    <br>
+                    I do parallel benchmark of model <b>v1</b> on two machines running GNU/Linux & MacOS
+                    where for each round takes ~34k ns on GNU/Linux, but it's relatively on higher side
+                    when run on MacOS ~45k ns.
+                </p>
+                <div class="microlight">
+                    // v1 on GNU/Linux
+
+                    $ go test -v -run=xxx -bench V1 -count 8
+                    goos: linux
+                    goarch: amd64
+                    pkg: github.com/itzmeanjan/tseep/v1
+                    cpu: Intel(R) Xeon(R) Platinum 8124M CPU @ 3.00GHz
+                    BenchmarkServerV1
+                    BenchmarkServerV1-4   	   34150	     34866 ns/op	  29.63 MB/s	    3750 B/op	      52 allocs/op
+                    BenchmarkServerV1-4   	   34316	     34922 ns/op	  29.58 MB/s	    3750 B/op	      52 allocs/op
+                    BenchmarkServerV1-4   	   33979	     35035 ns/op	  29.48 MB/s	    3750 B/op	      52 allocs/op
+                    BenchmarkServerV1-4   	   33944	     35518 ns/op	  29.08 MB/s	    3750 B/op	      52 allocs/op
+                    BenchmarkServerV1-4   	   33795	     35610 ns/op	  29.01 MB/s	    3750 B/op	      52 allocs/op
+                    BenchmarkServerV1-4   	   33493	     35604 ns/op	  29.01 MB/s	    3749 B/op	      52 allocs/op
+                    BenchmarkServerV1-4   	   33490	     35473 ns/op	  29.12 MB/s	    3749 B/op	      52 allocs/op
+                    BenchmarkServerV1-4   	   33523	     35338 ns/op	  29.23 MB/s	    3749 B/op	      52 allocs/op
+                    PASS
+                    ok  	github.com/itzmeanjan/tseep/v1	12.452s
+                </div>
+                <div class="microlight">
+                    // v1 on MacOS
+
+                    $ go test -v -run=xxx -bench V1 -count 8
+                    goos: darwin
+                    goarch: amd64
+                    pkg: github.com/itzmeanjan/tseep/v1
+                    cpu: Intel(R) Core(TM) i5-8279U CPU @ 2.40GHz
+                    BenchmarkServerV1
+                    BenchmarkServerV1-8   	   27030	     47430 ns/op	  21.78 MB/s	    3751 B/op	      52 allocs/op
+                    BenchmarkServerV1-8   	   26208	     44778 ns/op	  23.07 MB/s	    3752 B/op	      52 allocs/op
+                    BenchmarkServerV1-8   	   27098	     43486 ns/op	  23.75 MB/s	    3752 B/op	      52 allocs/op
+                    BenchmarkServerV1-8   	   27368	     44496 ns/op	  23.22 MB/s	    3753 B/op	      52 allocs/op
+                    BenchmarkServerV1-8   	   25234	     49744 ns/op	  20.77 MB/s	    3753 B/op	      52 allocs/op
+                    BenchmarkServerV1-8   	   24418	     49292 ns/op	  20.96 MB/s	    3752 B/op	      52 allocs/op
+                    BenchmarkServerV1-8   	   24998	     47754 ns/op	  21.63 MB/s	    3751 B/op	      52 allocs/op
+                    BenchmarkServerV1-8   	   24969	     47495 ns/op	  21.75 MB/s	    3751 B/op	      52 allocs/op
+                    PASS
+                    ok  	github.com/itzmeanjan/tseep/v1	14.223s
+                </div>
+                <p class="blogText">
+                    For model <b>v2</b>, MacOS takes lesser time for each round than it took in model <b>v1</b>. But that's not
+                    true for GNU/Linux --- rather it almost doubled up.
+                </p>
+                <div class="microlight">
+                    // v2 on GNU/Linux
+
+                    $ go test -v -run=xxx -bench V2 -count 8
+                    goos: linux
+                    goarch: amd64
+                    pkg: github.com/itzmeanjan/tseep/v2
+                    cpu: Intel(R) Xeon(R) Platinum 8124M CPU @ 3.00GHz
+                    BenchmarkServerV2
+                    BenchmarkServerV2-4   	   19852	     60069 ns/op	  34.39 MB/s	    6113 B/op	      71 allocs/op
+                    BenchmarkServerV2-4   	   20102	     60362 ns/op	  34.23 MB/s	    6108 B/op	      71 allocs/op
+                    BenchmarkServerV2-4   	   19983	     59815 ns/op	  34.54 MB/s	    6107 B/op	      71 allocs/op
+                    BenchmarkServerV2-4   	   20096	     59202 ns/op	  34.90 MB/s	    6107 B/op	      71 allocs/op
+                    BenchmarkServerV2-4   	   20307	     59099 ns/op	  34.96 MB/s	    6107 B/op	      71 allocs/op
+                    BenchmarkServerV2-4   	   19944	     60038 ns/op	  34.41 MB/s	    6107 B/op	      71 allocs/op
+                    BenchmarkServerV2-4   	   20209	     58666 ns/op	  35.22 MB/s	    6107 B/op	      71 allocs/op
+                    BenchmarkServerV2-4   	   20170	     58852 ns/op	  35.11 MB/s	    6105 B/op	      71 allocs/op
+                    PASS
+                    ok  	github.com/itzmeanjan/tseep/v2	14.448s                    
+                </div>
+                <div class="microlight">
+                    // v2 on MacOS
+
+                    $ go test -v -run=xxx -bench V2 -count 8
+                    goos: darwin
+                    goarch: amd64
+                    pkg: github.com/itzmeanjan/tseep/v2
+                    cpu: Intel(R) Core(TM) i5-8279U CPU @ 2.40GHz
+                    BenchmarkServerV2
+                    BenchmarkServerV2-8   	   35652	     32646 ns/op	  63.29 MB/s	    6191 B/op	      72 allocs/op
+                    BenchmarkServerV2-8   	   39087	     30548 ns/op	  67.63 MB/s	    6178 B/op	      72 allocs/op
+                    BenchmarkServerV2-8   	   39044	     30425 ns/op	  67.91 MB/s	    6173 B/op	      72 allocs/op
+                    BenchmarkServerV2-8   	   39390	     30321 ns/op	  68.14 MB/s	    6175 B/op	      72 allocs/op
+                    BenchmarkServerV2-8   	   39427	     30540 ns/op	  67.65 MB/s	    6175 B/op	      72 allocs/op
+                    BenchmarkServerV2-8   	   37016	     34478 ns/op	  59.92 MB/s	    6177 B/op	      72 allocs/op
+                    BenchmarkServerV2-8   	   35229	     36566 ns/op	  56.50 MB/s	    6186 B/op	      72 allocs/op
+                    BenchmarkServerV2-8   	   33456	     35525 ns/op	  58.16 MB/s	    6184 B/op	      72 allocs/op
+                    PASS
+                    ok  	github.com/itzmeanjan/tseep/v2	12.866s
+                </div>
+                <p class="blogText">
+                    In case of model <b>v3</b>, GNU/Linux and MacOS both of them has kept their trends
+                    intact --- for one average benchmark round completion timespan increases, for other
+                    it's decreasing, respectively.
+                </p>
+                <div class="microlight">
+                    // v3 on GNU/Linux
+
+                    $ go test -v -run=xxx -bench V3 -count 8
+                    goos: linux
+                    goarch: amd64
+                    pkg: github.com/itzmeanjan/tseep/v3
+                    cpu: Intel(R) Xeon(R) Platinum 8124M CPU @ 3.00GHz
+                    BenchmarkServerV3
+                    BenchmarkServerV3-4   	   15162	     79368 ns/op	  26.03 MB/s	    5713 B/op	      73 allocs/op
+                    BenchmarkServerV3-4   	   15229	     78720 ns/op	  26.24 MB/s	    5715 B/op	      73 allocs/op
+                    BenchmarkServerV3-4   	   14929	     81184 ns/op	  25.45 MB/s	    5713 B/op	      73 allocs/op
+                    BenchmarkServerV3-4   	   15290	     79059 ns/op	  26.13 MB/s	    5713 B/op	      73 allocs/op
+                    BenchmarkServerV3-4   	   14955	     79231 ns/op	  26.08 MB/s	    5713 B/op	      73 allocs/op
+                    BenchmarkServerV3-4   	   15013	     78480 ns/op	  26.33 MB/s	    5713 B/op	      73 allocs/op
+                    BenchmarkServerV3-4   	   14869	     79838 ns/op	  25.88 MB/s	    5713 B/op	      73 allocs/op
+                    BenchmarkServerV3-4   	   15498	     80839 ns/op	  25.56 MB/s	    5713 B/op	      73 allocs/op
+                    PASS
+                    ok  	github.com/itzmeanjan/tseep/v3	15.678s
+                </div>
+                <div class="microlight">
+                    // v3 on MacOS
+
+                    $ go test -v -run=xxx -bench V3 -count 8
+                    goos: darwin
+                    goarch: amd64
+                    pkg: github.com/itzmeanjan/tseep/v3
+                    cpu: Intel(R) Core(TM) i5-8279U CPU @ 2.40GHz
+                    BenchmarkServerV3
+                    BenchmarkServerV3-8   	   41614	     28501 ns/op	  72.49 MB/s	    5715 B/op	      74 allocs/op
+                    BenchmarkServerV3-8   	   41720	     28395 ns/op	  72.76 MB/s	    5717 B/op	      74 allocs/op
+                    BenchmarkServerV3-8   	   43344	     27378 ns/op	  75.46 MB/s	    5716 B/op	      74 allocs/op
+                    BenchmarkServerV3-8   	   43896	     28022 ns/op	  73.73 MB/s	    5712 B/op	      74 allocs/op
+                    BenchmarkServerV3-8   	   42164	     30386 ns/op	  67.99 MB/s	    5713 B/op	      74 allocs/op
+                    BenchmarkServerV3-8   	   37576	     32728 ns/op	  63.13 MB/s	    5718 B/op	      74 allocs/op
+                    BenchmarkServerV3-8   	   37152	     32555 ns/op	  63.46 MB/s	    5714 B/op	      74 allocs/op
+                    BenchmarkServerV3-8   	   36784	     31925 ns/op	  64.71 MB/s	    5714 B/op	      74 allocs/op
+                    PASS
+                    ok  	github.com/itzmeanjan/tseep/v3	12.792s
+                </div>
             </article>
         </div>
     </div>
