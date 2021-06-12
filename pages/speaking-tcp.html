@@ -404,6 +404,81 @@
                     PASS
                     ok  	github.com/itzmeanjan/tseep/v3	12.792s
                 </div>
+                <p class="blogText">
+                    Now I plan to stress test 3 models on both of GNU/Linux & MacOS platform with 8k
+                    concurrent connections, where each client connects to TCP server, sends
+                    read & write requests in order while waiting for their response
+                    in both of the cases.
+                    <br>
+                    <br>
+                    When model <b>v1</b> is stress tested, it completes lot faster on GNU/Linux, given
+                    it enjoys benefit of faster CPU.
+                </p>
+                <div class="microlight">
+                    // stress testing v1 on GNU/Linux
+
+                    $ go test -v -tags stress -run=8k
+                    === RUN   TestServerV1_Stress_8k
+                    --- PASS: TestServerV1_Stress_8k (0.50s)
+                    PASS
+                    ok  	github.com/itzmeanjan/tseep/v1	0.542s
+
+
+
+                    // stress testing v1 on MacOS
+
+                    $ go test -v -tags stress -run=8k
+                    === RUN   TestServerV1_Stress_8k
+                    --- PASS: TestServerV1_Stress_8k (2.41s)
+                    PASS
+                    ok  	github.com/itzmeanjan/tseep/v1	2.714s
+                </div>
+                <p class="blogText">
+                    With 8k concurrent connections model <b>v2</b> takes almost same time to complete
+                    on both GNU/Linux & MacOS platform.
+                </p>
+                <div class="microlight">
+                    // stress testing v2 on GNU/Linux
+
+                    $ go test -v -tags stress -run=8k
+                    === RUN   TestServerV2_Stress_8k
+                    --- PASS: TestServerV2_Stress_8k (0.60s)
+                    PASS
+                    ok  	github.com/itzmeanjan/tseep/v2	0.645s
+
+
+
+                    // stress testing v2 on MacOS
+
+                    $ go test -v -tags stress -run=8k
+                    === RUN   TestServerV2_Stress_8k
+                    --- PASS: TestServerV2_Stress_8k (2.50s)
+                    PASS
+                    ok  	github.com/itzmeanjan/tseep/v2	3.201s
+                </div>
+                <p class="blogText">
+                    Time required for completing stress testing with model <b>v3</b>
+                    is almost unchanged for MacOS, but for GNU/Linux it's slightly increasing.
+                </p>
+                <div class="microlight">
+                    // stress testing v3 on GNU/Linux
+
+                    $ go test -v -tags stress -run=8k
+                    === RUN   TestServerV3_Stress_8k
+                    --- PASS: TestServerV3_Stress_8k (0.73s)
+                    PASS
+                    ok  	github.com/itzmeanjan/tseep/v3	0.757s
+
+
+
+                    // stress testing v3 on MacOS
+
+                    $ go test -v -tags stress -run=8k
+                    === RUN   TestServerV3_Stress_8k
+                    --- PASS: TestServerV3_Stress_8k (2.48s)
+                    PASS
+                    ok  	github.com/itzmeanjan/tseep/v3	3.095s
+                </div>
             </article>
         </div>
     </div>
