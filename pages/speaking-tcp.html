@@ -62,7 +62,7 @@
                     can be done in a slight different way so that applications don't end up spawning one go-routine
                     per accepted connection --- resulting into thousands of active go-routines when talking to thousands
                     of concurrent peers. Rather than handling each peer in its own go-routine,
-                    proactively attempting to read from socket; keeping only one socket watcher
+                    proactively attempting to read from socket & spending most of its time in blocked mode; keeping only one socket watcher
                     go-routine which is responsible for informing any READ/ WRITE completion
                     event happening on any of delegated sockets --- consumes way lesser resources.
                     It excels at reducing scope of context switching by bringing possible
@@ -84,7 +84,7 @@
                     <li>N ( >1 ) watchers for all sockets</li>
                 </ol>
                 <p class="blogText">
-                    The application I develop is quite simple but it captures the essence.
+                    The application I develop is quite simple but it captures the essence of a TCP application.
                     It's a remote <i>( not necessarily geographically )</i> in-memory KV database, to which clients connect
                     over TCP & maintain that connection throughout their life time. During their life time they do
                     any of two possible operations in a randomised manner.
@@ -98,7 +98,8 @@
                     VALUE associated with KEY is returned. For WRITE request, VALUE in response frame
                     must be equal to what's sent in request frame. On server side all reading/ writing
                     is done in concurrent safe manner --- by acquiring mutex locks. Only for write request
-                    RWMutex lock is held i.e. <i>critical section of code</i>, otherwise normal read-only lock is held.
+                    r/w lock is held i.e. <i>critical section of code</i>, otherwise normal read-only lock is held --- allowing
+                    fulfilment of multiple READ requests concurrently.
                 </p>
                 <img class="imgCenter" src="../images/speaking-tcp-kv-store.jpg">
                 <p class="blogText">
@@ -112,8 +113,8 @@
                     always expect to receive only one kind of frame in response.
                 </p>
                 <ol>
-                    <li>Envelope - 3 bytes</li>
-                    <li>Body - N ( < 65536 ) bytes</li>
+                    <li>Envelope : 3 bytes</li>
+                    <li>Body : N ( < 65536 ) bytes</li>
                 </ol>
                 <p class="blogText">
                     For a READ frame, sent when client is interested in looking up VALUE associated
@@ -180,6 +181,87 @@
                     </tr>
                 </table>
                 <img class="imgCenter" src="../images/speaking-tcp-write-frame.jpg">
+                <p class="blogText">
+                    In response of READ/ WRITE request client expects to receive one RESPONSE frame, where VALUE
+                    associated with KEY is encoded, where length of VALUE precedes it, encoded 1 byte --- signaling
+                    client how many more bytes to read from stream to construct response. Good thing about 
+                    response frame, it doesn't waste any space, just allows sending 255 bytes VALUE at max.
+                </p>
+                <table class="centeredTable">
+                    <tr>
+                        <th>Field</th>
+                        <th>Max Theoretical Size ( in bytes )</th>
+                        <th>Max Practical Size ( in bytes )</th>
+                    </tr>
+                    <tr>
+                        <td>Envelope</td>
+                        <td>2</td>
+                        <td>2</td>
+                    </tr>
+                    <tr>
+                        <td>Body</td>
+                        <td>255</td>
+                        <td>255</td>
+                    </tr>
+                    <tr>
+                        <td>Total</td>
+                        <td>257</td>
+                        <td>257</td>
+                    </tr>
+                </table>
+                <img class="imgCenter" src="../images/speaking-tcp-response-frame.jpg">
+                <p class="blogText">
+                    Now I'd like to spend some time in specifying how each of 3 approaches work. 
+                    For ease of addressing, I'll refer to them from now on as <i>{<b>v1</b> => 1, <b>v2</b> => 2, <b>v3</b> => 3}</i>.
+                    <br>
+                    <br>
+                    Model <b>v1</b> is popular way of writing TCP servers in Go, where one listener go-routine
+                    keep listening on a <i>host:port</i>; accepts connection & spawns new go-routine for handling
+                    connection throughout its life time. This model respects seperation of concern well & operations
+                    happening on socket are easier to reason about due to clean structure. But one thing to notice, each go-routine
+                    alive for handling concurrent connections, spends a lot of its time in blocked state --- proactively waiting to read
+                    from socket.
+                </p>
+                <img class="imgCenter" src="../images/speaking-tcp-model-v1.jpg">
+                <p class="blogText">
+                    Model <b>v2</b> is slightly different than <b>v1</b>, where rather than spawning
+                    one go-routine per accepted connection, all accepted connections are delegated to
+                    one watcher go-routine, which runs one kernel event loop and learns about READ/ WRITE
+                    completion events on sockets being watched. Every now and then event loop informs
+                    watcher go-routine of READ/ WRITE completion events, providing with opportunity to 
+                    take action on accomplished task and schedule next operation on socket asynchronously.
+                    <br>
+                    <br>
+                    This mode of operation has some similarity with <i>libuv</i> --- which powers NodeJS's event loop.
+                </p>
+                <img class="imgCenter" src="../images/speaking-tcp-model-v2.jpg">
+                <p class="blogText">
+                    I'd call model <b>v3</b> a generic version of model <b>v2</b>, where N-watcher go-routines
+                    run N-many kernel event loops and each accepted connection is delegated to one of these
+                    available watchers for rest of their life time. Whenever READ/ WRITE completion event ocurrs on
+                    some socket, event loop notifies respective watcher go-routine, which invokes <i>handle{READ,WRITE}</i> method
+                    to take action on completed event and schedule next operation on socket, to be completed asynchronously.
+                    <br>
+                    <br>
+                    Using this model calls for socket orchestrating technique --- connections are fairly
+                    distributed among all available watcher go-routines. Goal of orchestration is not creating hot-spots i.e.
+                    some watcher go-routine managing lots of sockets while some has got few. This defeats whole purpose
+                    of model <b>v3</b>. One naive orchestration technique will be using modular arithmetic, where
+                    M-th accepted connection is delegated to M % N -th watcher go-routine, where M > 0, N > 0, N = #-of watcher go-routines.
+                    <br>
+                    <br>
+                    One problem I see with this scheme is, assuming peer connections are generally long-lived
+                    some watcher might end-up managing all those long-lived peers while some other watcher go-routine
+                    probably received those sockets which were unfortunately not long-lived, will manage few sockets --- creating
+                    imbalance in socket watching delegation i.e. hotspot resulting into bad performance.
+                    What I think can be done, rather than blindly orchestrating sockets using naive round-robin technique, 
+                    better to keep one feedback loop from watcher go-routines, so that they can inform
+                    listener go-routine of their current status i.e. how many delegated sockets are they managing
+                    now ?, how many of them are active in terms of READ/ WRITE operation frequency --- rolling average
+                    over finite timespan ? etc., allowing listener go-routine to make more informed decision before it
+                    delegates accepted connection to some watcher. This brings in management flexibility.
+                </p>
+                <img class="imgCenter" src="../images/speaking-tcp-model-v3.jpg">
             </article>
         </div>
     </div>
