@@ -482,7 +482,7 @@
                 <p class="blogText">
                     Go's trace tool is helpful in getting deeper insight into what happened
                     when program was running. So I collect program execution trace when running
-                    program testing. These are collected from MacOS machine.
+                    test cases. These are collected on MacOS machine with Intel i5 CPU @ 2.4Ghz.
                     <br>
                     <br>
                     While looking for how major go-routines spent their time model <b>v1</b>,
@@ -558,17 +558,24 @@
                     Similarly model <b>v2</b> and <b>v3</b> are simulated, where one TCP server manages
                     ~100k concurrent connections, each client attempting to randomly read/ write some
                     randomly generated key & respective value is returned back to them in response.
+                    <br>
+                    <br>
+                    I notice, in model <b>v1</b>, PID count for <i>v1_server</i> container i.e. TCP server
+                    is 33, denoting 33 OS threads created in this containerised environment, which is due to
+                    handling 100k active go-routines require lots of underlying OS threads --- sign of context
+                    switching. Now I look at same field for model <b>v{2, 3}</b>, requiring ~11 OS threads
+                    for serving 100k concurrent connections --- seemily saving some context switching cost.
                 </p>
                 <img class="imgCenter" src="../images/speaking-tcp-docker-v2.png">
                 <img class="imgCenter" src="../images/speaking-tcp-docker-v3.png">
                 <p class="blogText">
-                    I note, each model is capable in handling 100k concurrent connection in simulated
+                    I note, each model is capable of handling 100k concurrent connection in simulated
                     environment. Each of these models has its own benefits or downsides such using model <b>v1</b>
                     program structuring is easier to understand, also it's natual & familiar way of
                     writing TCP applications in Golang; while using model <b>v2</b>, chance of context switching
                     can be avoided by drastically reducing #-of active go-routines, but it's no silver bullet. On the other hand model <b>v3</b> which is a generic
-                    version of model <b>v2</b>, is able to leverage more than one event loop, each managing subset of accepted
-                    connections --- sharded architecture, resulting into less lock contention, given orchestration
+                    version of model <b>v2</b>, is able to leverage power of more than one event loop, each managing subset of accepted
+                    connections --- sharded architecture, resulting into less mutex lock contention, given orchestration
                     technique fits well.
                     <br>
                     <br>
