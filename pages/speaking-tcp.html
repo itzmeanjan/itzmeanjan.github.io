@@ -479,6 +479,57 @@
                     PASS
                     ok  	github.com/itzmeanjan/tseep/v3	3.095s
                 </div>
+                <p class="blogText">
+                    Go's trace tool is helpful in getting deeper insight into what happened
+                    when program was running. So I collect program execution trace when running
+                    program testing. These are collected from MacOS machine.
+                    <br>
+                    <br>
+                    While looking for how major go-routines spent their time model <b>v1</b>,
+                    I found listener go-routine <i>which accepts connections and spawns new go-routine
+                        for handling it</i>, spends a major portion of time in blocked state --- which is understandable
+                    because it's waiting for new connection to arrive.
+                </p>
+                <img class="imgCenter" src="../images/speaking-tcp-v1-listener-trace.png">
+                <p class="blogText">
+                    If I now look at how its spawned connection handler go-routine spent its time,
+                    I see it has also spent most of its time in waiting for network IO. This also
+                    makes sense given the fact, in model <b>v1</b> each connection is handled in its
+                    own go-routine, resulting into each of those go-routines proactively waiting
+                    to read from socket --- waiting for network IO event.
+                </p>
+                <img class="imgCenter" src="../images/speaking-tcp-v1-handle-connection-trace.png">
+                <p class="blogText">
+                    I look at model <b>v2</b>'s execution trace. It has two major go-routines i.e. {listener, watcher}.
+                    Listener does same job in all 3 models --- wait for incoming connection; accept it; prepare connection
+                    handling phase <i>( different in each model )</i>; keep looping, which is why network IO based blocking is evident in its trace.
+                </p>
+                <img class="imgCenter" src="../images/speaking-tcp-v2-listener-trace.png">
+                <p class="blogText">
+                    When I look at model <b>v2</b>'s watcher go-routine trace, it doesn't spend any time in waiting
+                    for network IO --- it makes a blocking call where it waits for accumulation of a few READ/ WRITE
+                    completion event from underlying kernel event loop, as soon as it's done, it starts looping over them and takes necessary actions.
+                    This single function is equivalent of what N-many handleConnection go-routine does in model <b>v1</b>.
+                    When scheduler wait column is checked in each of these traces, it's well understandable each go-routine
+                    spawned needs to be scheduled on underlying OS threads to actually run, and scheduling is not cheap
+                    when having 100k go-routines.
+                </p>
+                <img class="imgCenter" src="../images/speaking-tcp-v2-watcher-trace.png">
+                <p class="blogText">
+                    At last I take a look at trace of model <b>v3</b>, where I run 4 watcher go-routines
+                    each managing a subset of accepted connections. Listener go-routine's trace is similar
+                    to what I found in other models.
+                </p>
+                <img class="imgCenter" src="../images/speaking-tcp-v3-listener-trace.png">
+                <p class="blogText">
+                    Downside of having more go-routines is scheduling cost --- here I run 4 go-routines
+                    with 4 different kernel event loop, subset of sockets are delegated to them, resulting
+                    into spending more time in scheduler wait stage. Also notice though there're 4 watcher go-routines
+                    ready to do their job, not all being used. It's because of the fact during test, 
+                    when trace is collected, only one connection request is sent from client side, resulting
+                    into only one socket being managed by one of available watcher go-routines.
+                </p>
+                <img class="imgCenter" src="../images/speaking-tcp-v3-watcher-trace.png">
             </article>
         </div>
     </div>
