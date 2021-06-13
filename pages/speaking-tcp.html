@@ -75,8 +75,8 @@
                 <p class="blogText">
                     Following 3 different approaches, I develop key-value database where clients can send read/ write requests
                     over TCP. I challenge each implementation with <b>100k</b> concurrent connections
-                    and collect statistics of their performance, resource consumption etc. under high load;
-                    all running on a consumer-grade GNU/Linux machine in containerised environment i.e. Docker.
+                    and collect statistics of their performance, resource consumption, execution trace etc. under load;
+                    all running on consumer-grade machines in containerised environment i.e. Docker.
                 </p>
                 <ol>
                     <li>One go-routine per connection</li>
@@ -530,6 +530,58 @@
                     into only one socket being managed by one of available watcher go-routines.
                 </p>
                 <img class="imgCenter" src="../images/speaking-tcp-v3-watcher-trace.png">
+                <p class="blogText">
+                    Finally it's time for <b>100k</b> concurrent connection challenge.
+                    <br>
+                    <br>
+                    The problem I face is how to run 100k clients on my machine ? Given the fact
+                    network port identifier is of 16 bits, which allows me to run 65536 <i>( 1 << 16 )</i>
+                    clients at max. Leaving lower 1024 port numbers, I still need ~40k clients. It's all happening
+                    because I've only one IP address i.e. <i>127.0.0.1</i> . I can make use of some virtual
+                    networking technique, where I get a different subnet and multiple virtual machines are
+                    allocated IP address from that subnet. Each of those virtual machines run one copy of client
+                    application, actually to be more specific each of them run N <i>( < 65536 )</i>-clients. This way
+                    I can easily get to 100k client target.
+                    <br>
+                    <br>
+                    I choose Docker for its virtual networking capability, where each client container runs 16k clients,
+                    requiring only 6 containers together hitting another server container i.e. <i>{v1, v2, v3}_server</i>
+                    able to simulate 100k concurrent connection scenario.
+                    <br>
+                    <br>
+                    I start with model <b>v1</b> --- total 7 containers to run, one for server, others for clients.
+                    I see CPU usage ~60%, suddenly it moves to ~100%. The memory usage is due to high number of key value lookup
+                    happening concurrently.
+                </p>
+                <img class="imgCenter" src="../images/speaking-tcp-docker-v1.png">
+                <p class="blogText">
+                    Similarly model <b>v2</b> and <b>v3</b> are simulated, where one TCP server manages
+                    ~100k concurrent connections, each client attempting to randomly read/ write some
+                    randomly generated key & respective value is returned back to them in response.
+                </p>
+                <img class="imgCenter" src="../images/speaking-tcp-docker-v2.png">
+                <img class="imgCenter" src="../images/speaking-tcp-docker-v3.png">
+                <p class="blogText">
+                    I note, each model is capable in handling 100k concurrent connection in simulated
+                    environment. Each of these models has its own benefits or downsides such using model <b>v1</b>
+                    program structuring is easier to understand, also it's natual & familiar way of
+                    writing TCP applications in Golang; while using model <b>v2</b>, chance of context switching
+                    can be avoided by drastically reducing #-of active go-routines, but it's no silver bullet. On the other hand model <b>v3</b> which is a generic
+                    version of model <b>v2</b>, is able to leverage more than one event loop, each managing subset of accepted
+                    connections --- sharded architecture, resulting into less lock contention, given orchestration
+                    technique fits well.
+                    <br>
+                    <br>
+                    For almost all standard TCP applications, model <b>v1</b> is good fit, model <b>v2</b> or model <b>v3</b> <i>( with better orchestrator )</i>
+                    can be used when extreme performance is required, while paying relatively lesser cost.
+                    <br>
+                    <br>
+                    I keep implementation powering these findings in <a class="blogLink" href="https://github.com/itzmeanjan/tseep">this repository</a>
+                    for future reference.
+                    <br>
+                    I plan to impose C1M challenge <i>( i.e. managing 1M concurrent connections )</i> on these models ---
+                    some other day I'll talk about it. Have a great time !
+                </p>
             </article>
         </div>
     </div>
