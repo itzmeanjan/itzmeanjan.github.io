@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<!--
+  Author: Anjan Roy<hello@itzmeanjan.in>
+-->
+<html>
+
+<head>
+    <title>
+        Anjan Roy, Software Engineer, India
+    </title>
+    <meta prefix="og: http://ogp.me/ns#" property="og:type" content="website">
+    <meta prefix="og: http://ogp.me/ns#" property="og:title" content="Anjan Roy, Software Engineer, India">
+    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="My Thoughts, Experiments & Experiences">
+    <meta prefix="og: http://ogp.me/ns#" property="og:url" content="https://itzmeanjan.in">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url"
+        content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:width" content="950">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:height" content="735">
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://itzmeanjan.in/">
+    <meta property="twitter:title" content="Anjan Roy, Software Engineer, India">
+    <meta property="twitter:description" content="My Thoughts, Experiments & Experiences">
+    <meta property="twitter:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta property="twitter:site" content="@meanjanry">
+    <meta name="description" content="My Thoughts, Experiments & Experiences">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="author" content="Anjan Roy">
+    <meta name="keywords"
+        content="anjan, roy, itzmeanjan, software, engineer, india, portfolio, skills, projects, thoughts, experiments, experiences">
+    <meta name="theme-color" content="darkslategrey">
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" type="text/css" href="../styles/index.css">
+    <script src="../styles/code.js"></script>
+</head>
+
+<body>
+    <div id="parentDiv">
+        <div id="navBar">
+            <nav>
+                <a class="navLink" href="/"><big>H</big>ome</a> |
+                <a class="navLink" href="https://github.com/itzmeanjan" target="_blank"><big>P</big>rojects</a> |
+                <a class="navLink" href="/pages/blog.html"><big>B</big>log</a> |
+                <a class="navLink" href="/pages/contact.html"><big>C</big>ontact</a>
+            </nav>
+        </div>
+        <div class="childDiv">
+            <article>
+                <h1 class="blogHeader">
+                    Perceiving P2P Network Topology
+                </h1>
+                <h3>Created : June 20, 2021</h3>
+            </article>
+        </div>
+        <div class="childDiv">
+            <article>
+                <p class="blogText">
+                    I asked, <b>how does the world look like from p2p node's perspective ?</b>
+                    <br>
+                    <br>
+                    I decorated one experiment so that I can view world from a p2p node's perspective. First I'd like
+                    to clarify what I mean by world view. A p2p network is a graph i.e. a mathematical structure
+                    which I write as G; useful when representing relationship between few entities. I represent
+                    those entities as V i.e. vertex/ node set. Elements of V are connected via some edges --- V x V ∈ E. 
+                    In p2p network set up, an entity is some process & connection between two of them is ( say ) TCP,
+                    using which two processes perform some meaningful conversation. TCP being bidirectional, reliable, streaming
+                    protocol, network is undirected graph though each data flow has direction associated. Each process ( read p2p node ) 
+                    runs two I/O subprocesses for each peer it maintains a connection to --- one for reading messages
+                    sent by peer, other one for sending messages to peer. One peer always knows it's neighbourhood i.e. which
+                    nodes it's directly connected to, but may not see whole picture of network it's a part of. A p2p network can
+                    have N ( > 0 ) participants where each participant may know M-many others directly, where M < N. For gaining
+                    a global view of network i.e. not only to whom node itself is connected to, but also how are other network participants
+                    helping in structuring network topology, nodes need to follow certain protocol. The protocol requires participant to send
+                    messages to others it's directly connected to. Message sending is no doubt costly, sending as less as possible is the goal.
+                    How much data to be sent over wire while following protocol, is influenced by degree of nodes i.e. how many connections
+                    each peer maintains with other nodes.
+                    <br>
+                    <br>
+                    I design one protocol which each participant process follows, where synthetic network topology is imposed
+                    on participants, while running simulations. Afterwards I analyse collected log for viewing world around
+                    from each network participant's telescope, while inspecting price paid for it i.e. in terms of bytes of data
+                    carried over wire while following protocol.
+                </p>
+            </article>
+        </div>
+    </div>
+    <div id="footerDiv">
+        <footer>
+            <p id="footerText">
+                &copy <a href="https://github.com/itzmeanjan/itzmeanjan.github.io" id="footerLink"
+                    target="_blank"><big>A</big>njan Roy</a> ( <big>M</big>IT Licensed )
+            </p>
+        </footer>
+    </div>
+</body>
+
+</html>
