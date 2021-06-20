@@ -60,27 +60,254 @@
                     <br>
                     I decorated one experiment so that I can view world from a p2p node's perspective. First I'd like
                     to clarify what I mean by world view. A p2p network is a graph i.e. a mathematical structure
-                    which I write as G; useful when representing relationship between few entities. I represent
+                    which I write as G = (V, E); useful when representing relationship between few entities. I represent
                     those entities as V i.e. vertex/ node set. Elements of V are connected via some edges --- V x V ∈ E. 
                     In p2p network set up, an entity is some process & connection between two of them is ( say ) TCP,
-                    using which two processes perform some meaningful conversation. TCP being bidirectional, reliable, streaming
+                    using which two processes carry out some meaningful conversation. TCP being bidirectional, reliable, streaming
                     protocol, network is undirected graph though each data flow has direction associated. Each process ( read p2p node ) 
                     runs two I/O subprocesses for each peer it maintains a connection to --- one for reading messages
                     sent by peer, other one for sending messages to peer. One peer always knows it's neighbourhood i.e. which
                     nodes it's directly connected to, but may not see whole picture of network it's a part of. A p2p network can
                     have N ( > 0 ) participants where each participant may know M-many others directly, where M < N. For gaining
                     a global view of network i.e. not only to whom node itself is connected to, but also how are other network participants
-                    helping in structuring network topology, nodes need to follow certain protocol. The protocol requires participant to send
-                    messages to others it's directly connected to. Message sending is no doubt costly, sending as less as possible is the goal.
+                    helping in structuring network topology, nodes need to follow certain protocol. The protocol requires participant to forward
+                    messages to others it's directly connected, where some messages are received from subset of peers. 
+                    Message sending is no doubt costly, sending as less as possible is the goal.
                     How much data to be sent over wire while following protocol, is influenced by degree of nodes i.e. how many connections
                     each peer maintains with other nodes.
                     <br>
                     <br>
-                    I design one protocol which each participant process follows, where synthetic network topology is imposed
-                    on participants, while running simulations. Afterwards I analyse collected log for viewing world around
-                    from each network participant's telescope, while inspecting price paid for it i.e. in terms of bytes of data
+                    I design one protocol that each participant process follows, where synthetic network topology is imposed
+                    on participants, for running simulation. Afterwards I analyse collected log for viewing world around
+                    from each network participant's eyes, while inspecting price paid for it i.e. in terms of bytes of data
                     carried over wire while following protocol.
                 </p>
+                <div class="microlight">
+ begin:
+    msg = author_own_message()
+    propagate_to_peers(msg, :all)
+
+    while(true):
+        msg = receive_message()
+        forward_to = inspect_header(msg)
+        if empty(forward_to):
+            continue
+        endif
+        msg = append_hop(msg)
+        propagate_to_peers(msg, forward_to)
+    endwhile
+ end
+                </div>
+                <p class="blogText">
+                    Each network participant is identified uniquely & authors one message uniquely identifiable message. It propagates that
+                    to all peers it's directly connected to. On reception of message from other peer, it first inspects message
+                    for absence of any of its directly connected peer's ids. If found any, forwards message to them, while appending
+                    unique self id in hop field, which will be again inspected in respective recepient node. If peer authored
+                    message is received again, it's not forwarded, because this is very first step of protocol, which has already passed.
+                    Protocol ends in finite time due to two termination properties.
+                </p>
+                <ol>
+                    <li>Peer doesn't forward received message when all of neighbours are found to be present in hop field</li>
+                    <li>Peer authored message is never forwarded, it's only propagated at very beginning of protocol</li>
+                </ol>
+                <p class="blogText">
+                    I create one setup with 3 nodes, where each node follows aforementioned protocol. Each node maintains
+                    connections with other 2 peers i.e. satisfying criteria for forming both <b>Cycle</b> & <b>Mesh</b> topology.
+                </p>
+                <img class="imgCenter" src="../images/network-topology-perception-protocol-flow.jpg">
+                <p class="blogText">
+                    In first step each peer propagates its authored message to others. I denote those messages with <i>Message i</i>, where 0 <= i < 3.
+                    A received message can be of two kinds.
+                </p>
+                <ol>
+                    <li>Received from peer who authored it</li>
+                    <li>Received from some hop ( read peer ), who just forwarded it, while appending self id at end</li>
+                </ol>
+                <p class="blogText">
+                    Peer keeps receiving messages from others; learns about who is connected to whom directly; helps
+                    others in learning same by appending unique self id to received message & forwarding. At end of
+                    each step, <i>as marked in above flow diagram</i>, peer has a better picture of network.
+                    I try to find out what messages each peer is keeping track of.
+                </p>
+                <table class="centeredTable">
+                    <tr>
+                        <th>Step</th>
+                        <th>Peer 0</th>
+                        <th>Peer 1</th>
+                        <th>Peer 2</th>
+                    </tr>
+                    <tr>
+                        <td>1</td>
+                        <td>{Message 0}</td>
+                        <td>{Message 0}</td>
+                        <td>{Message 0}</td>
+                    </tr>
+                    <tr>
+                        <td>2</td>
+                        <td>{Message 0}</td>
+                        <td>{Message 0; Message 0,2}</td>
+                        <td>{Message 0}</td>
+                    </tr>
+                    <tr>
+                        <td>3</td>
+                        <td>{Message 0}</td>
+                        <td>{Message 0; Message 0,2}</td>
+                        <td>{Message 0; Message 0,1}</td>
+                    </tr>
+                    <tr>
+                        <td>4</td>
+                        <td>{Message 0; Message 1}</td>
+                        <td>{Message 0; Message 0,2; Message 1}</td>
+                        <td>{Message 0; Message 0,1; Message 1}</td>
+                    </tr>
+                    <tr>
+                        <td>5</td>
+                        <td>{Message 0; Message 1; Message 1,2}</td>
+                        <td>{Message 0; Message 0,2; Message 1}</td>
+                        <td>{Message 0; Message 0,1; Message 1}</td>
+                    </tr>
+                    <tr>
+                        <td>6</td>
+                        <td>{Message 0; Message 1; Message 1,2}</td>
+                        <td>{Message 0; Message 0,2; Message 1}</td>
+                        <td>{Message 0; Message 0,1; Message 1; Message 1,0}</td>
+                    </tr>
+                    <tr>
+                        <td>7</td>
+                        <td>{Message 0; Message 1; Message 1,2; Message 2}</td>
+                        <td>{Message 0; Message 0,2; Message 1; Message 2}</td>
+                        <td>{Message 0; Message 0,1; Message 1; Message 1,0; Message 2}</td>
+                    </tr>
+                    <tr>
+                        <td>8</td>
+                        <td>{Message 0; Message 1; Message 1,2; Message 2; Message 2,1}</td>
+                        <td>{Message 0; Message 0,2; Message 1; Message 2}</td>
+                        <td>{Message 0; Message 0,1; Message 1; Message 1,0; Message 2}</td>
+                    </tr>
+                    <tr>
+                        <td>9</td>
+                        <td>{Message 0; Message 1; Message 1,2; Message 2; Message 2,1}</td>
+                        <td>{Message 0; Message 0,2; Message 1; Message 2; Message 2,0}</td>
+                        <td>{Message 0; Message 0,1; Message 1; Message 1,0; Message 2}</td>
+                    </tr>
+                </table>
+                <p class="blogText">
+                    At very beginning, each peer knows about its local neighbourhood i.e. peer 0 knows
+                    it's directly connected to peer (1,2). But it has no idea whether peer 1 & peer 2
+                    are also neighbours or not. For learning that peer 0, has to wait till step 5, where it
+                    receives <i>Message 1,2</i> from its neighbour peer 2. Following protocol it inspects
+                    message & figures out this message is authored by peer 1 & has hopped via peer 2. Then it's
+                    evident peer 1 & peer 2 are neighbours.
+                    <br>
+                    <br>
+                    Similarly peer 1 learns peer 0 & peer 2 are neighbours in step 2, while peer 2 starts seeing full
+                    picture in step 3. Seen picture becomes clearer when peer 0 receives <i>Message 2,1</i>, in step 8,
+                    asserting its belief that indeed peer 1 & peer 2 are neighbours connected via undirected edge ( read bidirectional TCP connection ).
+                </p>
+                <p class="blogText">
+                    Now I spend some time in imposing synthetic network topology, for running simulation & collecting data. First I start with
+                    a cycle, where I bring in 5 peers, each maintaining connection with 2 other peers.
+                </p>
+                <img class="imgCenter" src="../images/network-topology-perception-cycle.jpg">
+                <p class="blogText">
+                    Each peer runs protocol, while collecting two kind of logs. Visualising accumulated <i>( from all network participants )</i>
+                    traffic log helps in understanding what cost whole network incurs for following this protocol.
+                </p>
+                <ol>
+                    <li>How much bytes of data does it send & receive from its neighbours ? --- <b>Traffic Log</b></li>
+                    <li>What messages does it receives from its neighbours ? --- <b>Message Log</b></li>
+                </ol>
+                <img class="imgCenter" src="../images/network-topology-perception-cycle-traffic.png">
+                <p class="blogText">
+                    Data says, each of 5 edges, carried total 208 bytes of data. Representation is direction
+                    agnostic, but I can clearly understand edge (1, 2), helped in carrying 104 bytes in 1 -> 2
+                    direction & remaining in reverse. Same is true for other edges.
+                    <br>
+                    <br>
+                    I choose to see how peer 0 is viewing world around it, by reconstructing network graph
+                    from collected message log of peer 0.
+                </p>
+                <iframe src="../images/network-topology-perception-cycle-graph-0.html"></iframe>
+                <p class="blogText">
+                    As peer 0 is able to correctly construct network topology from messages it received, now I like to inspect
+                    how peer 0 helped its neighbour peer 1, in constructing its view of world.
+                </p>
+                <iframe src="../images/network-topology-perception-cycle-graph-1.html"></iframe>
+                <p class="blogText">
+                    It's evident as long as participants follow protocol by their heart, they'll themselves learn network
+                    topology correctly, while helping others gaining same world view.
+                    <br>
+                    <br>
+                    I impose mesh topology on peers & let them follow protocol for understanding cost requirement and
+                    viewing world from their point of view. In mesh topology each peer maintains connection with other N-1
+                    peers where network has N participants. So in total number of edges in network should be N * (N-1) / 2.
+                    I take 5 nodes i.e. 10 edges across which data flows in either direction.
+                </p>
+                <img class="imgCenter" src="../images/network-topology-perception-mesh-traffic.png">
+                <p class="blogText">
+                    I notice each edge ( read TCP connection ) carries on average ~700 bytes of data, which is significantly
+                    higher than circular network topology. This is solely because of presence of more edges in network than cycle
+                    topology, so discovering them all costs more data transfer. With presence of 10 edges, total cost incurred by network
+                    for following protocol is quite high.
+                    <br>
+                    <br>
+                    But I wonder, <i>does paying this much help in gaining correct view of network ?</i> For finding so, I choose
+                    to view world around from peer 4's eyes.
+                </p>
+                <iframe src="../images/network-topology-perception-mesh-graph-4.html"></iframe>
+                <p class="blogText">
+                    As peer 4 respected protocol, it gained full picture of network topology. Clicking on peer 4's edges shows
+                    amount of data transferred using that link.
+                </p>
+                <table class="centeredTable">
+                    <tr>
+                        <th>Peer</th>
+                        <th>In ( bytes )</th>
+                        <th>Out ( bytes )</th>
+                    </tr>
+                    <tr>
+                        <td>Peer 0</td>
+                        <td>326</td>
+                        <td>326</td>
+                    </tr>
+                    <tr>
+                        <td>Peer 1</td>
+                        <td>407</td>
+                        <td>407</td>
+                    </tr>
+                    <tr>
+                        <td>Peer 2</td>
+                        <td>434</td>
+                        <td>434</td>
+                    </tr>
+                    <tr>
+                        <td>Peer 3</td>
+                        <td>407</td>
+                        <td>407</td>
+                    </tr>
+                </table>
+                <p class="blogText">
+                    Total 3148 bytes of data peer 4 transferred to its neighbours while following protocol. 
+                    But when I look at how much peer 4 had to spend, in case of circular network topology,
+                    it's only 208 bytes.
+                    <br>
+                    <br>
+                    Finally I decide to impose another topology, shaped like starfish. After orchestrating connection
+                    between peers, I let them run protocol. Starfish topology is cycle network in disguise, just that
+                    it's drawn in different way. I want to understand does changing peer connections little bit, 
+                    make any difference in node's perception of outer world.
+                </p>
+                <img class="imgCenter" src="../images/network-topology-perception-starfish.jpg">
+                <p class="blogText">
+                    Cost incurred by network, while following protocol, in starfish topology is similar to what I found
+                    in circular network topology. Each edge helps in transferring 208 bytes of data.
+                </p>
+                <img class="imgCenter" src="../images/network-topology-perception-starfish-traffic.png">
+                <p class="blogText">
+                    I reconstruct network from message log, for understanding how peer 3 views world around itself. And it's evident
+                    it's view is correct, while cost incurred is same as cycle network topology.
+                </p>
+                <iframe src="../images/network-topology-perception-starfish-graph-3.html"></iframe>
             </article>
         </div>
     </div>
