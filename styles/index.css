@@ -204,3 +204,14 @@ table, th, td {
   padding-left: 0.2vw;
   padding-right: 0.2vw;
 }
+
+iframe {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: 2vw;
+  margin-bottom: 2vw;
+  width: 97%;
+  height: 545px;
+  border-radius: 1.2vw;
+}
