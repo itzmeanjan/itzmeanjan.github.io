@@ -55,8 +55,8 @@
         <div class="childDiv">
             <article>
                 <p class="blogText">
-                    Recently I've been attempting to get a p2p node's global world view,
-                    where my interest is in finding how can a p2p node learn about
+                    Recently I've been attempting to view world around from p2p node's perspective
+                    i.e. how can a p2p node learn about
                     global topology of network it's part of. Nodes follow one cooperative
                     protocol by forwarding messages to peers who hasn't yet seen certain message.
                     Each peer authors its own message & helps in forwarding peer-authored messages
@@ -106,8 +106,8 @@
  // local neughbourhood, so that nodes
  // on which edge is incident upon
  // learns of each others identifiers
- def add_edge_gossip():
-    // send to peer connection established to
+ def add_edge_gossip_init():
+    // kind = "add"
     msg_s = author_message(:self)
     send(msg_s, :peer)
     
@@ -121,7 +121,16 @@
                 </div>
                 <div class="microlight">
  // announce it to all neighbours
- def del_edge_gossip():
+ def del_edge_gossip_init():
+    // kind = "del"
+    msg = author_message(self_id)
+    propagate(msg, :all)
+ enddef
+                </div>
+                <div class="microlight">
+ // announce it to all neighbours
+ def probe_gossip_init():
+    // kind = "probe"
     msg = author_message(self_id)
     propagate(msg, :all)
  enddef
@@ -149,6 +158,50 @@
     endwhile
  enddef
                 </div>
+                <p class="blogText">
+                    For running simulation, I set up <b>N</b>-many libp2p nodes, each listening for
+                    incoming connections while each also attempting to establish
+                    connection with <b>M</b>-many randomly chosen peers, essentially
+                    forming a dynamically synthesized nework topology.
+                    <br>
+                    <br>
+                    During network forming step, each peer follows protocol i.e. announces
+                    <i>edge added</i> message to its local neighbours, which is eventually propagated
+                    throughout network, helping current network participants to learn of existence of
+                    edge between a pair of nodes.
+                    After network forming, one peer attempts to gauge network i.e. broadcasts
+                    probe message to its neighbours, resulting into whole network learning
+                    of message along with path trace, helping them to picture network structure.
+                    In this step all current participants get a full picture of network.
+                    To simulate link failure scenario, one randomly chosen connection
+                    is dropped, which triggers <i>edge removed</i> message being broadcasted
+                    to other neighbours still connected, from both of peers which just got disconnected.
+                    By inspecting this message participants remove edge from graph which they
+                    locally maintain as world view.
+                    At the very end, randomly one connection is established, trigerring propagation of
+                    <i>edge added</i> message, letting peers update their world view, by adding new edge
+                    in graph.
+                    <br>
+                    <br>
+                    Randomly generated simulation setup has 7 nodes & 14 edges, where peer_1
+                    probes, as a result of it everyone pictures whole world. This is how peer_1 sees
+                    world around itself.
+                </p>
+                <img class="imgCenter" src="../images/adaptive-network-topology-peer-1-probe.png">
+                <p class="blogText">
+                    Now I take a look at how peer_2 sees world around itself, after end of probing round.
+                    And both of peer_1 & peer_2 find similar world view.
+                    <br>
+                    <br>
+                    When I check remaining nodes world views, I find exact similarity.
+                </p>
+                <img class="imgCenter" src="../images/adaptive-network-topology-peer-2-probe.png">
+                <p class="blogText">
+                    I plot collected metrics i.e. data transferred over each edge ( read TCP connection )
+                    for collaborative probing. I see some edges carrying more data compared to others due to
+                    presence of important vertices i.e. some vertex has degree 6 <i>( max possible )</i>.
+                </p>
+                <img class="imgCenter" src="../images/adaptive-network-topology-probe-cost.png">
             </article>
         </div>
     </div>
