@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<!--
+  Author: Anjan Roy<hello@itzmeanjan.in>
+-->
+<html>
+
+<head>
+    <title>
+        Anjan Roy, Software Engineer, India
+    </title>
+    <meta prefix="og: http://ogp.me/ns#" property="og:type" content="website">
+    <meta prefix="og: http://ogp.me/ns#" property="og:title" content="Anjan Roy, Software Engineer, India">
+    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="My Thoughts, Experiments & Experiences">
+    <meta prefix="og: http://ogp.me/ns#" property="og:url" content="https://itzmeanjan.in">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url"
+        content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:width" content="950">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:height" content="735">
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://itzmeanjan.in/">
+    <meta property="twitter:title" content="Anjan Roy, Software Engineer, India">
+    <meta property="twitter:description" content="My Thoughts, Experiments & Experiences">
+    <meta property="twitter:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta property="twitter:site" content="@meanjanry">
+    <meta name="description" content="My Thoughts, Experiments & Experiences">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="author" content="Anjan Roy">
+    <meta name="keywords"
+        content="anjan, roy, itzmeanjan, software, engineer, india, portfolio, skills, projects, thoughts, experiments, experiences">
+    <meta name="theme-color" content="darkslategrey">
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" type="text/css" href="../styles/index.css">
+    <script src="../styles/code.js"></script>
+</head>
+
+<body>
+    <div id="parentDiv">
+        <div id="navBar">
+            <nav>
+                <a class="navLink" href="/"><big>H</big>ome</a> |
+                <a class="navLink" href="https://github.com/itzmeanjan" target="_blank"><big>P</big>rojects</a> |
+                <a class="navLink" href="/pages/blog.html"><big>B</big>log</a> |
+                <a class="navLink" href="/pages/contact.html"><big>C</big>ontact</a>
+            </nav>
+        </div>
+        <div class="childDiv">
+            <article>
+                <h1 class="blogHeader">
+                    Adaptive Perception of Network Topology
+                </h1>
+                <h3>Created : June 28, 2021</h3>
+            </article>
+        </div>
+        <div class="childDiv">
+            <article>
+                <p class="blogText">
+                    Recently I've been attempting to get a p2p node's global world view,
+                    where my interest is in finding how can a p2p node learn about
+                    global topology of network it's part of. Nodes follow one cooperative
+                    protocol by forwarding messages to peers who hasn't yet seen certain message.
+                    Each peer authors its own message & helps in forwarding peer-authored messages
+                    while playing role of <b>hop</b>. By inspecting message body, node learns
+                    of which hops has helped in forwarding certain message & pictures network structure.
+                    <br>
+                    <br>
+                    Last week I wrote about it <a class="blogLink" href="../pages/perceiving-p2p-topology.html">here</a>.
+                    <br>
+                    <br>
+                    In previous setting of simulation, network topologies were statically synthetic & small number
+                    of participants collaborated. This week I explore more dynamically generated network
+                    topologies. I also bring in libp2p based nodes into picture. Main goal is to understand
+                    how to tweak the algorithm so that it can adaptively catch changes happening throughout
+                    network, while keeping network wide peer specific topology probings at minimum.
+                    I classify messages passed around by respective purpose. Broadly speaking, there're
+                    three kinds of messages which can be sent across network.
+                </p>
+                <ol>
+                    <li>Probe Message</li>
+                    <li>Edge Add Message</li>
+                    <li>Edge Remove Message</li>
+                </ol>
+                <p class="blogText">
+                    I consider each participant of p2p network as <b>vertex</b>
+                    & each TCP connection between a pair of them as an <b>edge</b>, while picturing
+                    p2p network as graph. P2P networks keep changing
+                    their shape frequently, due to some node going down or network partition
+                    occuring, which is why node's world view should be adapting to those changes.
+                    I name, TCP connection being established between two peers as <b>edge added event</b>,
+                    where as disconnection of two peers triggers <b>edge removed event</b>. When either
+                    of these two events happen, news is gossiped throughout network. And this allows
+                    existing participants to either add or remove an edge from graph, it's maintaining locally
+                    as world view.
+                    <br>
+                    But some peer who has just joined network may be interested in exploring world
+                    around, so it authors one message, which is passed throughout network keeping
+                    trace of hops who cooperated in gossiping, helping every participant to refresh
+                    their world view too. And this is what I call, <b>probing</b>.
+                    Probing helps any network participant to learn network topology
+                    while it's not really necessary that everyone probes, rather single peer
+                    probes & everyone learns.
+                </p>
+                <div class="microlight">
+ // send self authored message to peer
+ // and forward peer authored one to
+ // local neughbourhood, so that nodes
+ // on which edge is incident upon
+ // learns of each others identifiers
+ def add_edge_gossip():
+    // send to peer connection established to
+    msg_s = author_message(:self)
+    send(msg_s, :peer)
+    
+    // wait for peer to send
+    recv(&msg_r, :peer)
+    append_hop(msg_r, :self)
+
+    // except from whom received
+    propagate(msg_r, :peers)
+ enddef
+                </div>
+                <div class="microlight">
+ // announce it to all neighbours
+ def del_edge_gossip():
+    msg = author_message(self_id)
+    propagate(msg, :all)
+ enddef
+                </div>
+                <div class="microlight">
+ // run for each TCP connection peer
+ // manages with its direct neighbours
+ def handle_message():
+    while(true):
+        recv(&msg, :peer)
+        if author(msg) == :self:
+            continue
+        endif
+        
+        // updates network view
+        // by inspecting message
+        refresh_network_view(msg)
+
+        forward? = inspect(msg)
+        if forward?:
+            // so that network structure can be pictured
+            msg = append_hop(msg)
+            propagate(msg, forward_to(msg))
+        endif
+    endwhile
+ enddef
+                </div>
+            </article>
+        </div>
+    </div>
+    <div id="footerDiv">
+        <footer>
+            <p id="footerText">
+                &copy <a href="https://github.com/itzmeanjan/itzmeanjan.github.io" id="footerLink"
+                    target="_blank"><big>A</big>njan Roy</a> ( <big>M</big>IT Licensed )
+            </p>
+        </footer>
+    </div>
+</body>
+
+</html>
