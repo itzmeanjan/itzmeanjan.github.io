@@ -57,7 +57,9 @@
                 <p class="blogText">
                     Recently I've been attempting to view world around from p2p node's perspective
                     i.e. how can a p2p node learn about
-                    global topology of network it's part of. Nodes follow one cooperative
+                    global topology of network it's part of. Nodes are aware of neighbourhood
+                    but not how neighbours are themselves stuctured. Node has no idea of
+                    edges existing between a pair of vertices, when it's not one of those. Nodes follow one cooperative
                     protocol by forwarding messages to peers who hasn't yet seen certain message.
                     Each peer authors its own message & helps in forwarding peer-authored messages
                     while playing role of <b>hop</b>. By inspecting message body, node learns
@@ -67,7 +69,7 @@
                     Last week I wrote about it <a class="blogLink" href="../pages/perceiving-p2p-topology.html">here</a>.
                     <br>
                     <br>
-                    In previous setting of simulation, network topologies were statically synthetic & small number
+                    In previous setting of simulation, network topologies were statically synthesized & small number
                     of participants collaborated. This week I explore more dynamically generated network
                     topologies. I also bring in libp2p based nodes into picture. Main goal is to understand
                     how to tweak the algorithm so that it can adaptively catch changes happening throughout
@@ -83,22 +85,33 @@
                 <p class="blogText">
                     I consider each participant of p2p network as <b>vertex</b>
                     & each TCP connection between a pair of them as an <b>edge</b>, while picturing
-                    p2p network as graph. P2P networks keep changing
+                    p2p overlay network as graph. P2P networks keep changing
                     their shape frequently, due to some node going down or network partition
                     occuring, which is why node's world view should be adapting to those changes.
                     I name, TCP connection being established between two peers as <b>edge added event</b>,
-                    where as disconnection of two peers triggers <b>edge removed event</b>. When either
+                    whereas disconnection of two peers triggers <b>edge removed event</b>. When either
                     of these two events happen, news is gossiped throughout network. And this allows
-                    existing participants to either add or remove an edge from graph, it's maintaining locally
+                    existing participants to either add or remove an edge from graph, which it's maintaining locally
                     as world view.
                     <br>
                     But some peer who has just joined network may be interested in exploring world
-                    around, so it authors one message, which is passed throughout network keeping
+                    around, so it authors one probe message, which is passed throughout network collecting
                     trace of hops who cooperated in gossiping, helping every participant to refresh
-                    their world view too. And this is what I call, <b>probing</b>.
+                    their world view. And this is what I call, <b>probing</b>.
                     Probing helps any network participant to learn network topology
                     while it's not really necessary that everyone probes, rather single peer
                     probes & everyone learns.
+                    <br>
+                    <br>
+                    When announcing <b>edge added</b> event, both of peers upon which edge
+                    is incident, authors their own message with <i>kind</i> set to <b>add</b>.
+                    Each incident node sends message to other one, at very first step of
+                    connection establishment, making other side of edge aware of self-identity.
+                    After that each of them shares message with their neighbours,
+                    so that it can be propagated throughout network. Before announcing, peer sets self-id
+                    as other side of edge, denoting edge has been established between two peers; also
+                    appends self as hop of message so that network doesn't send this message back to
+                    this peer again --- reducing cost to some extent.
                 </p>
                 <div class="microlight">
  // send self authored message to peer
@@ -113,25 +126,46 @@
     
     // wait for peer to send
     recv(&msg_r, :peer)
+    // designates edge by adding self_id
+    // where peer_id is already present
+    update_edge_description(msg_r, :self)
     append_hop(msg_r, :self)
 
     // except from whom received
     propagate(msg_r, :peers)
  enddef
                 </div>
+                <img class="imgCenter" src="../images/adaptive-network-topology-edge-added-flow.jpg">
+                <p class="blogText">
+                    Similarly when disconnection between two peers occur, edge removed event is propagated.
+                    But this time each of those affected nodes, author their own message with kind set to <b>del</b>
+                    and puts edge description in terms of ( previously ) incident node identifiers, so that when other participants receive
+                    message they can delete this edge from their locally maintained view network.
+                </p>
                 <div class="microlight">
  // announce it to all neighbours
  def del_edge_gossip_init():
     // kind = "del"
-    msg = author_message(self_id)
+    msg = author_message(:self)
+    add_edge_description(msg, :self, :peer)
     propagate(msg, :all)
  enddef
                 </div>
+                <img class="imgCenter" src="../images/adaptive-network-topology-edge-removed-flow.jpg">
+                <p class="blogText">
+                    Probing specific crafted message carries authorship details, kind set to <b>probe</b>
+                    & identifier of hops i.e. trace of path through which message has traversed. That's
+                    why inspection of probe message body, helps peer in deciding whom to forward message
+                    & picturing a path in network. Over time a peer receives multiple copies of same message
+                    traversed via different paths, from its neighbours --- learning of existence of multiple paths in network.
+                    Peers follow collaborative gossip protocol & message path is determined by trace in message body, which
+                    is updated before forwarding it to next hop.
+                </p>
                 <div class="microlight">
  // announce it to all neighbours
  def probe_gossip_init():
     // kind = "probe"
-    msg = author_message(self_id)
+    msg = author_message(:self)
     propagate(msg, :all)
  enddef
                 </div>
@@ -178,14 +212,14 @@
                     to other neighbours still connected, from both of peers which just got disconnected.
                     By inspecting this message participants remove edge from graph which they
                     locally maintain as world view.
-                    At the very end, randomly one connection is established, trigerring propagation of
+                    At the very end, randomly one connection is established, triggering propagation of
                     <i>edge added</i> message, letting peers update their world view, by adding new edge
                     in graph.
                     <br>
                     <br>
                     Randomly generated simulation setup has 7 nodes & 14 edges, where peer_1
                     probes, as a result of it everyone pictures whole world. This is how peer_1 sees
-                    world around itself.
+                    world around itself after running probing step.
                 </p>
                 <img class="imgCenter" src="../images/adaptive-network-topology-peer-1-probe.png">
                 <p class="blogText">
@@ -199,9 +233,44 @@
                 <p class="blogText">
                     I plot collected metrics i.e. data transferred over each edge ( read TCP connection )
                     for collaborative probing. I see some edges carrying more data compared to others due to
-                    presence of important vertices i.e. some vertex has degree 6 <i>( max possible )</i>.
+                    presence of important vertices i.e. some vertex has even degree 6 <i>( max possible )</i>.
                 </p>
                 <img class="imgCenter" src="../images/adaptive-network-topology-probe-cost.png">
+                <p class="blogText">
+                    I trigger edge disconnection & let disconnection message get propagated throughout network.
+                    I find Peer 1 looses connection with Peer 3, so both of them must remove
+                    that edge from their local view of network --- which they do.
+                </p>
+                <img class="imgCenter" src="../images/adaptive-network-topology-peer-1-edge-del.png">
+                <p class="blogText">
+                    But interesting part is, does others also capture this change ? For checking that,
+                    I snapshot Peer 2's network view at this moment & it also captures change as expected.
+                </p>
+                <img class="imgCenter" src="../images/adaptive-network-topology-peer-2-edge-del.png">
+                <p class="blogText">
+                    During edge disconnection, some messages are passed around network, each edge's contribution
+                    towards its network wide propagation is captured in following cost graph.
+                    <br>
+                    <br>
+                    After a careful inspection, I see connection <i>Peer 1 <-> Peer 3</i> & <i>Peer 1 <-> Peer 2</i>
+                    doesn't anyhow contribute to forwarding of <b>edge removed</b> message, which is desired
+                    behaviour because none of these edges exist in graph as of now.
+                    Link between <i>Peer 1</i> & <i>Peer 3</i> just got failed, while <i>Peer 1</i> & <i>Peer 2</i> is going to
+                    get connected in next step of simulation.
+                </p>
+                <img class="imgCenter" src="../images/adaptive-network-topology-del-cost.png">
+                <p class="blogText">
+                    Finally it's time to simulate random connection establishment between a pair of peers. 
+                    After <b>edge added</b> message passing has stabilised, I take a look at world view of Peer 1, finding
+                    existence of new edge between Peer 1 & Peer 2.
+                </p>
+                <img class="imgCenter" src="../images/adaptive-network-topology-peer-1-edge-add.png">
+                <p class="blogText">
+                    For understanding whether Peer 3 has learned of this change in topology, I snapshot
+                    its world view at this point of time. As expected all other peers who were not involved
+                    in connection establishment ( i.e. none of incident vertices ) has correctly learned change.
+                </p>
+                <img class="imgCenter" src="../images/adaptive-network-topology-peer-3-edge-add.png">
             </article>
         </div>
     </div>
