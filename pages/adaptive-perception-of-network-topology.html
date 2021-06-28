@@ -63,7 +63,8 @@
                     protocol by forwarding messages to peers who hasn't yet seen certain message.
                     Each peer authors its own message & helps in forwarding peer-authored messages
                     while playing role of <b>hop</b>. By inspecting message body, node learns
-                    of which hops has helped in forwarding certain message & pictures network structure.
+                    of which hops has helped in forwarding certain message & pictures path in network. A few
+                    of these messages, traversed through different paths, helps in forming substantial portion of network graph.
                     <br>
                     <br>
                     Last week I wrote about it <a class="blogLink" href="../pages/perceiving-p2p-topology.html">here</a>.
@@ -86,7 +87,7 @@
                     I consider each participant of p2p network as <b>vertex</b>
                     & each TCP connection between a pair of them as an <b>edge</b>, while picturing
                     p2p overlay network as graph. P2P networks keep changing
-                    their shape frequently, due to some node going down or network partition
+                    their structure frequently, due to some node going down or network partition
                     occuring, which is why node's world view should be adapting to those changes.
                     I name, TCP connection being established between two peers as <b>edge added event</b>,
                     whereas disconnection of two peers triggers <b>edge removed event</b>. When either
@@ -140,7 +141,7 @@
                     Similarly when disconnection between two peers occur, edge removed event is propagated.
                     But this time each of those affected nodes, author their own message with kind set to <b>del</b>
                     and puts edge description in terms of ( previously ) incident node identifiers, so that when other participants receive
-                    message they can delete this edge from their locally maintained view network.
+                    message they can delete this edge from their locally maintained view of network.
                 </p>
                 <div class="microlight">
  // announce it to all neighbours
@@ -186,7 +187,7 @@
         forward? = inspect(msg)
         if forward?:
             // so that network structure can be pictured
-            msg = append_hop(msg)
+            msg = append_hop(msg, :self)
             propagate(msg, forward_to(msg))
         endif
     endwhile
@@ -217,7 +218,7 @@
                     in graph.
                     <br>
                     <br>
-                    Randomly generated simulation setup has 7 nodes & 14 edges, where peer_1
+                    Randomly generated simulation setup has 7 nodes & 15 edges, where peer_1
                     probes, as a result of it everyone pictures whole world. This is how peer_1 sees
                     world around itself after running probing step.
                 </p>
@@ -233,12 +234,12 @@
                 <p class="blogText">
                     I plot collected metrics i.e. data transferred over each edge ( read TCP connection )
                     for collaborative probing. I see some edges carrying more data compared to others due to
-                    presence of important vertices i.e. some vertex has even degree 6 <i>( max possible )</i>.
+                    presence of important vertices i.e. vertices having >= 3 edges, where they can have at max 6.
                 </p>
                 <img class="imgCenter" src="../images/adaptive-network-topology-probe-cost.png">
                 <p class="blogText">
                     I trigger edge disconnection & let disconnection message get propagated throughout network.
-                    I find Peer 1 looses connection with Peer 3, so both of them must remove
+                    I find Peer 1 looses connection with Peer 4, so both of them must remove
                     that edge from their local view of network --- which they do.
                 </p>
                 <img class="imgCenter" src="../images/adaptive-network-topology-peer-1-edge-del.png">
@@ -252,25 +253,65 @@
                     towards its network wide propagation is captured in following cost graph.
                     <br>
                     <br>
-                    After a careful inspection, I see connection <i>Peer 1 <-> Peer 3</i> & <i>Peer 1 <-> Peer 2</i>
+                    After a careful inspection, I see connection <i>Peer 1 <-> Peer 4</i> & <i>Peer 1 <-> Peer 3</i>
                     doesn't anyhow contribute to forwarding of <b>edge removed</b> message, which is desired
                     behaviour because none of these edges exist in graph as of now.
-                    Link between <i>Peer 1</i> & <i>Peer 3</i> just got failed, while <i>Peer 1</i> & <i>Peer 2</i> is going to
+                    Link between <i>Peer 1</i> & <i>Peer 4</i> just got failed, while <i>Peer 1</i> & <i>Peer 3</i> is going to
                     get connected in next step of simulation.
                 </p>
                 <img class="imgCenter" src="../images/adaptive-network-topology-del-cost.png">
                 <p class="blogText">
                     Finally it's time to simulate random connection establishment between a pair of peers. 
                     After <b>edge added</b> message passing has stabilised, I take a look at world view of Peer 1, finding
-                    existence of new edge between Peer 1 & Peer 2.
+                    existence of new edge between Peer 1 & Peer 3.
                 </p>
                 <img class="imgCenter" src="../images/adaptive-network-topology-peer-1-edge-add.png">
                 <p class="blogText">
-                    For understanding whether Peer 3 has learned of this change in topology, I snapshot
+                    For understanding whether Peer 7 has learned of this change in topology, I snapshot
                     its world view at this point of time. As expected all other peers who were not involved
                     in connection establishment ( i.e. none of incident vertices ) has correctly learned change.
                 </p>
-                <img class="imgCenter" src="../images/adaptive-network-topology-peer-3-edge-add.png">
+                <img class="imgCenter" src="../images/adaptive-network-topology-peer-7-edge-add.png">
+                <p class="blogText">
+                    Cost analysis shows newly created edge i.e. <i>Peer 1 <-> Peer 3</i> carrying
+                    edge addition message, while <i>Peer 1 <-> Peer 4</i> doing nothing, because it doesn't
+                    exist anymore.
+                </p>
+                <img class="imgCenter" src="../images/adaptive-network-topology-add-cost.png">
+                <p class="blogText">
+                    Results of simulation seem promising for dynamically adapting world view to network
+                    state changes. Peers can even colloborate on when to probe, avoiding chances of
+                    simultaneous probing, because if one peer starts probing, all will be benefitting from it.
+                    <br>
+                    <br>
+                    I keep code used for simulating & generating these findings <a class="blogLink" href="https://github.com/itzmeanjan/p2p/tree/main/v2">here</a>.
+                    <br>
+                    <br>
+                    I note few points for further exploration,
+                </p>
+                <ul>
+                    <li>
+                        Each process remembers whether certain <b>{addition, deletion}</b> message has been forwarded
+                        instead of using message itself for keeping track of it --- saves some bandwidth.
+                    </li>
+                    <li>
+                        Peers signing messages to cryptographically assert probe message indeed
+                        hopped through them.
+                    </li>
+                    <li>
+                        Using edge addition message to propagate peer address throughout network, allowing
+                        anyone interested to attempt connection with it.
+                    </li>
+                    <li>
+                        Using world view to take better routing decision.
+                    </li>
+                    <li>
+                        Dynamically graft edges forming faster path to distant vertex.
+                    </li>
+                    <li>
+                        Pruning edges to reduce duplicate paths --- reducing data transfer cost.
+                    </li>
+                </ul>
             </article>
         </div>
     </div>
