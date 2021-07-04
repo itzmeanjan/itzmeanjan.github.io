@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<!--
+  Author: Anjan Roy<hello@itzmeanjan.in>
+-->
+<html>
+
+<head>
+    <title>
+        Anjan Roy, Software Engineer, India
+    </title>
+    <meta prefix="og: http://ogp.me/ns#" property="og:type" content="website">
+    <meta prefix="og: http://ogp.me/ns#" property="og:title" content="Anjan Roy, Software Engineer, India">
+    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="My Thoughts, Experiments & Experiences">
+    <meta prefix="og: http://ogp.me/ns#" property="og:url" content="https://itzmeanjan.in">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url"
+        content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:width" content="950">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:height" content="735">
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://itzmeanjan.in/">
+    <meta property="twitter:title" content="Anjan Roy, Software Engineer, India">
+    <meta property="twitter:description" content="My Thoughts, Experiments & Experiences">
+    <meta property="twitter:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta property="twitter:site" content="@meanjanry">
+    <meta name="description" content="My Thoughts, Experiments & Experiences">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="author" content="Anjan Roy">
+    <meta name="keywords"
+        content="anjan, roy, itzmeanjan, software, engineer, india, portfolio, skills, projects, thoughts, experiments, experiences">
+    <meta name="theme-color" content="darkslategrey">
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" type="text/css" href="../styles/index.css">
+    <script src="../styles/code.js"></script>
+</head>
+
+<body>
+    <div id="parentDiv">
+        <div id="navBar">
+            <nav>
+                <a class="navLink" href="/"><big>H</big>ome</a> |
+                <a class="navLink" href="https://github.com/itzmeanjan" target="_blank"><big>P</big>rojects</a> |
+                <a class="navLink" href="/pages/blog.html"><big>B</big>log</a> |
+                <a class="navLink" href="/pages/contact.html"><big>C</big>ontact</a>
+            </nav>
+        </div>
+        <div class="childDiv">
+            <article>
+                <h1 class="blogHeader">
+                    Understanding Random Linear Network Coding
+                </h1>
+                <h3>Created : July 05, 2021</h3>
+            </article>
+        </div>
+        <div class="childDiv">
+            <article>
+                <p class="blogText">
+                    After exploring applications, benefits & disadvantages of <b>R</b>andom <b>L</b>inear <b>N</b>etwork <b>C</b>oding,
+                    I've decided to dig deeper into theory. Today I'll attempt to manually code a chunk of data & finally recover
+                    back original data from coded one, using RLNC.
+                    <br>
+                    <br>
+                    I've taken <span class="highlight">0xa5c3 = 0b1010_0101_1100_0011</span> as 16-bit original
+                    data chunk, which I'm splitting into N<i>( = 2 )</i> equal sized pieces i.e. <span class="highlight">{0xa5, 0xc3}</span>.
+                    I define each symbol to be 4-bits i.e. 1 nibble. M-many symbols together make up ( read when concatenated ) one piece. Each piece
+                    has exactly M-many symbols. In total, M * N -many symbols in data chunk.
+                </p>
+                <img class="imgCenter" src="../images/understand-rlnc-chunk-preparation.jpg">
+                <p class="blogText">
+                    For performing coding, I interpret each nibble as element of some <b>G</b>alois <b>F</b>ield.
+                    I choose to use GF(2 ^ 4) as the extension field of prime field GF(2). In extension field GF(2 ^ 4),
+                    there're 16 possible elements, each generated following
+                </p>
+                <div class="microlight">
+ A(x) = a_3 * x^3 + a_2 * x^2 + a_1 * x^1 + a_0 * x^0, where a_i ∈ {0, 1} // because GF(2) is my prime field
+                </div>
+                <table class="centeredTable">
+                    <tr>
+                        <th>Binary</th>
+                        <th>Polynomial</th>
+                    </tr>
+                    <tr>
+                        <td>0000</td>
+                        <td>0</td>
+                    </tr>
+                    <tr>
+                        <td>0001</td>
+                        <td>1</td>
+                    </tr>
+                    <tr>
+                        <td>0010</td>
+                        <td>x</td>
+                    </tr>
+                    <tr>
+                        <td>0011</td>
+                        <td>x+1</td>
+                    </tr>
+                    <tr>
+                        <td>0100</td>
+                        <td>x<sup>2</sup></td>
+                    </tr>
+                    <tr>
+                        <td>...</td>
+                        <td>...</td>
+                    </tr>
+                </table>
+                <p class="blogText">
+                    I use <span class="highlight">x^4 + x + 1</span> as irreducible polynomial for field
+                    operations. When I add/ substract two elements ( read polynomials ) of GF(2 ^ 4), resulting
+                    polynomial's degree can't be > 3. But result of multiplication can increase polynomial degree
+                    > (m - 1), hence element doesn't belong to GF(2 ^ m) anymore. For bringing it back to GF(2 ^ m),
+                    I choose to modulo reduce it with irreducible polynomial for GF(2 ^ 4).
+                </p>
+                <div class="microlight">
+ $ python3
+ >>> import galois
+ >>> GF16 = galois.GF(2**4)
+
+ >>> p1 = galois.Poly([1,0,1,0])
+    Poly(x^3 + x, GF(2))
+ >>> p2 = galois.Poly([1,0])
+    Poly(x, GF(2))
+ >>> p1 * p2 # x^4+x^2 ∉ GF(2 ^ 4)
+    Poly(x^4 + x^2, GF(2))
+ >>> (p1 * p2) % GF16.irreducible_poly # now okay
+    Poly(x^2 + x + 1, GF(2))
+                </div>
+                <p class="blogText">
+                    Irreducible polynomials behave like prime numbers, having only 1 & self as factors.
+                </p>
+                <div class="microlight">
+ >>> GF16.irreducible_poly
+    Poly(x^4 + x + 1, GF(2))
+ >>> galois.poly_factors(GF16.irreducible_poly)
+    ([Poly(x^4 + x + 1, GF(2))], [1])
+                </div>
+                <p class="blogText">
+                    Inverse of polynomial in GF(2 ^ m) is defined as
+                </p>
+                <div class="microlight">
+ A^-1(x) . A(x) = 1 mod P(x), where P(x) = irreducible polynomial = x^4 + x + 1 for GF(2 ^ 4)
+                </div>
+                <p class="blogText">
+                    That's why inverse of <span class="highlight">x^3 + 1</span> is <span class="highlight">x</span>
+                    because of <span class="highlight">(x * (x^3 + 1)) mod (x^4 + x + 1) = 1</span>
+                </p>
+                <div class="microlight">
+ >>> ( galois.Poly([1,0]) * galois.Poly([1,0,0,1]) ) % GF16.irreducible_poly
+    Poly(1, GF(2))
+                </div>
+            </article>
+        </div>
+    </div>
+    <div id="footerDiv">
+        <footer>
+            <p id="footerText">
+                &copy <a href="https://github.com/itzmeanjan/itzmeanjan.github.io" id="footerLink"
+                    target="_blank"><big>A</big>njan Roy</a> ( <big>M</big>IT Licensed )
+            </p>
+        </footer>
+    </div>
+</body>
+
+</html>
