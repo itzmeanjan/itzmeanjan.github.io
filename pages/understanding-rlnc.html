@@ -142,12 +142,46 @@
                 </div>
                 <p class="blogText">
                     That's why inverse of <span class="highlight">x^3 + 1</span> is <span class="highlight">x</span>
-                    because of <span class="highlight">(x * (x^3 + 1)) mod (x^4 + x + 1) = 1</span>
+                    --- <span class="highlight">(x * (x^3 + 1)) mod (x^4 + x + 1) = 1</span>
                 </p>
                 <div class="microlight">
  >>> ( galois.Poly([1,0]) * galois.Poly([1,0,0,1]) ) % GF16.irreducible_poly
     Poly(1, GF(2))
                 </div>
+                <br>
+                <p class="blogText">
+                    Now I prepare symbols ( read nibbles ) as elements of GF(2 ^ 4).
+                </p>
+                <img class="imgCenter" src="../images/understand-rlnc-symbol-to-poly.png">
+                <p class="blogText">
+                    I'll now create two coding vectors, each having two randomly dragged GF(2 ^ 4) elements,
+                    because I've N<i>( = 2 )</i> pieces, each piece having M<i>( = 2 )</i> symbols.
+                    I arrange those two coding vectors as M x N matrix & perform coding by multiplying
+                    random coefficients with original pieces.
+                </p>
+                <img class="imgCenter" src="../images/understand-rlnc-coding-vector.png">
+                <p class="blogText">
+                    Essence of coding is just performing following matrix multiplication. Obtained P<sup>'</sup><sub>1</sub> &
+                    P<sup>'</sup><sub>2</sub> is what's sent over wire, along with coding matrix.
+                </p>
+                <img class="imgCenter" src="../images/understand-rlnc-coding.png">
+                <p class="blogText">
+                    For finding out P<sup>'</sup><sub>1</sub>, I perform polynomial multiplication in
+                    GF(2 ^ 4) & obtain one coded piece <span class="highlight">0b1011_1001</span>.
+                    One point to note in coded piece construction is how symbols from different
+                    pieces are added together.
+                </p>
+                <img class="imgCenter" src="../images/understand-rlnc-piece-1-construction.png">
+                <p class="blogText">
+                    Similarly I construct other coded piece P<sup>'</sup><sub>2</sub>, as result I get
+                    <span class="highlight">0b1110_1001</span>.
+                </p>
+                <img class="imgCenter" src="../images/understand-rlnc-piece-2-construction.png">
+                <p class="blogText">
+                    I've constructed both coded pieces as <span class="highlight">0b1011_1001_1110_1001</span>, which I'm
+                    going to send over wire along with coding matrix.
+                </p>
+               <img class="imgCenter" src="../images/understand-rlnc-coded-pieces.png"> 
             </article>
         </div>
     </div>
