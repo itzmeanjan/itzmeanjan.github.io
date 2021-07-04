@@ -56,8 +56,19 @@
             <article>
                 <p class="blogText">
                     After exploring applications, benefits & disadvantages of <b>R</b>andom <b>L</b>inear <b>N</b>etwork <b>C</b>oding,
-                    I've decided to dig deeper into theory. Today I'll attempt to manually code a chunk of data & finally recover
-                    back original data from coded one, using RLNC.
+                    I've decided to dig deeper into theory.
+                    <br>
+                    <br>
+                    RLNC is a powerful construction for addressing several p2p networking problems. It can be
+                    used for attaining Min Cut Max Flow capacity of underlying network graph. It can work
+                    well in distributed fashion for network topologies which keep changing dynamically i.e. churn is high. Effectively
+                    solving coupon collector's problem in p2p CDNs. It seems to be a good candidate for delay & disruption
+                    tolerant network protocols too. There're several variations of how to code pieces. But I'm starting with
+                    full network coding, where I take a whole data chunk & apply coding on all pieces.
+                    <br>
+                    <br>
+                    Today I'll attempt to manually code a chunk of data & finally recover back original 
+                    data from coded pieces, using RLNC.
                     <br>
                     <br>
                     I've taken <span class="highlight">0xa5c3 = 0b1010_0101_1100_0011</span> as 16-bit original
@@ -69,7 +80,10 @@
                 <p class="blogText">
                     For performing coding, I interpret each nibble as element of some <b>G</b>alois <b>F</b>ield.
                     I choose to use GF(2 ^ 4) as the extension field of prime field GF(2). In extension field GF(2 ^ 4),
-                    there're 16 possible elements, each generated following
+                    there're 16 possible elements, each generated using following rule.
+                    <br>
+                    <br>
+                    GF(2 ^ m), where m = 4, I choose because I'm considering each nibble as a symbol.
                 </p>
                 <div class="microlight">
  A(x) = a_3 * x^3 + a_2 * x^2 + a_1 * x^1 + a_0 * x^0, where a_i ∈ {0, 1} // because GF(2) is my prime field
@@ -107,8 +121,14 @@
                 <p class="blogText">
                     I use <span class="highlight">x^4 + x + 1</span> as irreducible polynomial for field
                     operations. When I add/ substract two elements ( read polynomials ) of GF(2 ^ 4), resulting
-                    polynomial's degree can't be > 3. But result of multiplication can increase polynomial degree
-                    > (m - 1), hence element doesn't belong to GF(2 ^ m) anymore. For bringing it back to GF(2 ^ m),
+                    polynomial's degree can't be > 3. Addition/ substraction is simply XOR --- it's defined as.
+                    Modular division 2 is performed because allowed polynomial coefficient can't be > 1, for prime field GF(2).
+                </p>
+                <img class="imgCenter" src="../images/understand-rlnc-poly-add.png">
+                <p class="blogText">
+                    But result of multiplication can increase polynomial degree
+                    > (m - 1), hence element may not belong to GF(2 ^ m) anymore.
+                    For bringing it back to GF(2 ^ m),
                     I choose to modulo reduce it with irreducible polynomial for GF(2 ^ 4).
                 </p>
                 <div class="microlight">
@@ -154,7 +174,7 @@
                 </p>
                 <img class="imgCenter" src="../images/understand-rlnc-symbol-to-poly.png">
                 <p class="blogText">
-                    I'll now create two coding vectors, each having two randomly dragged GF(2 ^ 4) elements,
+                    I'll now create two coding vectors, each having two randomly drawn GF(2 ^ 4) elements,
                     because I've N<i>( = 2 )</i> pieces, each piece having M<i>( = 2 )</i> symbols.
                     I arrange those two coding vectors as M x N matrix & perform coding by multiplying
                     random coefficients with original pieces.
@@ -162,7 +182,7 @@
                 <img class="imgCenter" src="../images/understand-rlnc-coding-vector.png">
                 <p class="blogText">
                     Essence of coding is just performing following matrix multiplication. Obtained P<sup>'</sup><sub>1</sub> &
-                    P<sup>'</sup><sub>2</sub> is what's sent over wire, along with coding matrix.
+                    P<sup>'</sup><sub>2</sub> is what's sent over wire, along with coding vectors.
                 </p>
                 <img class="imgCenter" src="../images/understand-rlnc-coding.png">
                 <p class="blogText">
@@ -179,7 +199,7 @@
                 <img class="imgCenter" src="../images/understand-rlnc-piece-2-construction.png">
                 <p class="blogText">
                     I've constructed both coded pieces as <span class="highlight">0b1011_1001_1110_1001</span>, which I'm
-                    going to send over wire along with coding matrix.
+                    going to send over wire along with respective coding vectors.
                 </p>
                <img class="imgCenter" src="../images/understand-rlnc-coded-pieces.png">
                <p class="blogText">
@@ -197,23 +217,71 @@
                <img class="imgCenter" src="../images/understand-rlnc-decoding-gaussian-elimination.png">
                <p class="blogText">
                    Now I'm going to plug inverted coding matrix into decoding flow, as a result of it, I get
-                   two equations. I find out values of P<sub>1</sub> & P<sub>2</sub>.
+                   two equations for finding out values of P<sub>1</sub> & P<sub>2</sub> --- original pieces.
                    <br>
                    <br>
                    Solving equation for P<sub>1</sub>, decodes one coded piece. I get 
                    <span class="highlight">0b1010_0101</span>, which is exactly same as first original piece.
                </p>
                <img class="imgCenter" src="../images/understand-rlnc-decoding-piece-1.png">
+               
                <p class="blogText">
                    Solving for P<sub>2</sub>, gives me other decoded piece which also turns out to be
                    same as original second piece.
                </p>
                <img class="imgCenter" src="../images/understand-rlnc-decoding-piece-2.png">
                <p class="blogText">
-                   Using RLNC, I've coded a 16-bit message into two pieces; transmitted it over wire along with
-                   respective coding vectors; finally decoded pieces to original data in recipient process.
+                   Using RLNC, I've coded a 16-bit message into two pieces & correctly decoded coded ones to
+                   original pieces, in recipient process.
                </p>
                <img class="imgCenter" src="../images/understand-rlnc-original-and-decoded.png">
+               <p class="blogText">
+                   Source peer codes 16-bit whole data chunk into two pieces, using RLNC; wires
+                   codes pieces along with respective randomly drawn coding vectors, which says
+                   how pieces are coded together i.e. how much coding weight assigned to which
+                   piece; finally destination peer decodes & recovers original data chunk.
+               </p>
+               <img class="imgCenter" src="../images/understand-rlnc-overall.jpg">
+               <p class="blogText">
+                   If I bring in one intermediate node, it doesn't need to get all coded pieces
+                   and then <b>decode-encode</b>, rather it can just <b>re-encode</b> available pieces 
+                   by randomly drawing coefficients, while ensuring
+                   recoded pieces are actually associated with original pieces by multiplying
+                   newly generated coding vector at intermediate node with received piece's coding
+                   vectors i.e. coding matrix. It's a <i>distributed coding protocol</i>.
+               </p>
+               <p class="blogText">
+                   I wonder,
+               </p>
+               <ul>
+                   <li>
+                       Can I use RLNC for distributing pieces uniformly throughout p2p CDN ?
+                   </li>
+                   <li>
+                       How well does it solve piece selection problem ?
+                   </li>
+                   <li>
+                       How well does it perform in face of high churn ?
+                   </li>
+                   <li>
+                       How other variants of network coding i.e. sparse/ generation/ multi-generation-mixing 
+                       based codings perform ?
+                   </li>
+                   <li>
+                       Coded pieces alone act like ciphered data, can RLNC be used as free ciphering tool ?
+                   </li>
+                   <li>
+                       With intelligent routing of pieces, is it able to provide some acceptable level of
+                       security ?
+                   </li>
+               </ul>
+               <p class="blogText">
+                   As next step, I plan to dig deeper into other network coding methods, while also
+                   prototyping for collecting statistics & getting whole picture clearer.
+                   <br>
+                   <br>
+                   Have a great time !
+               </p>
             </article>
         </div>
     </div>
