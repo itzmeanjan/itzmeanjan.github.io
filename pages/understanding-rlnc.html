@@ -181,7 +181,39 @@
                     I've constructed both coded pieces as <span class="highlight">0b1011_1001_1110_1001</span>, which I'm
                     going to send over wire along with coding matrix.
                 </p>
-               <img class="imgCenter" src="../images/understand-rlnc-coded-pieces.png"> 
+               <img class="imgCenter" src="../images/understand-rlnc-coded-pieces.png">
+               <p class="blogText">
+                   After recipient peer receives both coded pieces & respective coding vectors, I see
+                   figuring out what original pieces are, is a linear algebra problem. One thing to note here,
+                   while inverting coding matrix, GF(2 ^ m) rules need to be respected.
+                   <br>
+                   <br>
+                   This is what piece decoding looks like from high level.
+               </p>
+               <img class="imgCenter" src="../images/understand-rlnc-decoding.png">
+               <p class="blogText">
+                   For finding inverse of coding matrix, I'm going to use Gaussian Elimination method.
+               </p>
+               <img class="imgCenter" src="../images/understand-rlnc-decoding-gaussian-elimination.png">
+               <p class="blogText">
+                   Now I'm going to plug inverted coding matrix into decoding flow, as a result of it, I get
+                   two equations. I find out values of P<sub>1</sub> & P<sub>2</sub>.
+                   <br>
+                   <br>
+                   Solving equation for P<sub>1</sub>, decodes one coded piece. I get 
+                   <span class="highlight">0b1010_0101</span>, which is exactly same as first original piece.
+               </p>
+               <img class="imgCenter" src="../images/understand-rlnc-decoding-piece-1.png">
+               <p class="blogText">
+                   Solving for P<sub>2</sub>, gives me other decoded piece which also turns out to be
+                   same as original second piece.
+               </p>
+               <img class="imgCenter" src="../images/understand-rlnc-decoding-piece-2.png">
+               <p class="blogText">
+                   Using RLNC, I've coded a 16-bit message into two pieces; transmitted it over wire along with
+                   respective coding vectors; finally decoded pieces to original data in recipient process.
+               </p>
+               <img class="imgCenter" src="../images/understand-rlnc-original-and-decoded.png">
             </article>
         </div>
     </div>
