@@ -232,6 +232,151 @@
                     to construct new coded piece & respective coding vector.
                 </p>
                 <img class="imgCenter" src="../images/rlnc-in-depth-recoding-4.png">
+                <br>
+                <p class="blogText">
+                    It's good time to take a look at what I've done so far. 
+                    I check how many coded pieces I have now, along with their respective coding vectors.
+                </p>
+                <img class="imgCenter" src="../images/rlnc-in-depth-coded-all.jpg">
+                <p class="blogText">
+                    I move to decoding step, where I randomly choose 3 useful pieces & attempt to
+                    reconstruct original byte slice. I need to choose <b>3</b> useful pieces, because
+                    I coded 3 original pieces & after several rounds of coding/ recoding I've now
+                    6 coded pieces. If seen from mathematical point of view, this is nothing but
+                    solving linear algebra problem, where I need to have at least 3 equations for finding
+                    values of 3 unknowns. These unknowns are original pieces, known equations are coding vectors
+                    & coded pieces.
+                </p>
+                <img class="imgCenter" src="../images/rlnc-in-depth-decoding-1.png">
+                <p class="blogText">
+                    Speaking of collecting <b>useful</b> pieces, it denotes I need to select linearly independent
+                    pieces. Everytime I choose one piece from available ones, I need to make a check on whether
+                    rank of coding matrix increases by 1 or not. If it doesn't increase, this packet is linearly
+                    dependent with what I already have --- meaning it's not heplful. I attempt to choose next useful one.
+                    I stop as soon as I find rank of my coding matrix has reached 3 because I need to have 3 equations
+                    for finding out original 3 pieces.
+                    <br>
+                    <br>
+                    First I choose piece with coding vector <span class="highlight">[160, 28, 233]</span>, which increases rank to 1
+                    compared from rank 0 of empty matrix.
+                </p>
+                <div class="microlight">
+ >>> mat = gf256([[]]) # empty matrix
+
+ >>> import numpy as np
+ >>> np.linalg.matrix_rank(mat)
+ 0
+
+ >>> mat = gf256([[160, 28, 233]])
+ >>> np.linalg.matrix_rank(mat)
+ 1
+                </div>
+                <p class="blogText">
+                    Now I randomly collect coding vector <span class="highlight">[189, 244, 80]</span>, which increases rank to 2.
+                </p>
+                <div class="microlight">
+ >>> mat = gf256([[160, 28, 233], [189, 244, 80]])
+ >>> np.linalg.matrix_rank(mat)
+ 2
+                </div>
+                <p class="blogText">
+                    Though I don't have any piece with coding vector <span class="highlight">[135, 57, 63]</span>,
+                    but for a moment I assume I do. Now I check whether this piece is useful or not. And turns out
+                    coding matrix's rank doesn't increase, so this <i>imaginary</i> piece can be ignored.
+                </p>
+                <div class="microlight">
+ >>> mat = gf256([[160, 28, 233], [189, 244, 80], [135, 57, 63]])
+ >>> np.linalg.matrix_rank(mat)
+ 2
+                </div>
+                <p class="blogText">
+                    Finally I choose another useful piece i.e. with coding vector 
+                    <span class="highlight">[157, 233, 247]</span>, which makes rank of coding matrix 3.
+                    Now inverting this 3 x 3 matrix & multiplying with coded pieces, gives me back original pieces.
+                </p>
+                <div class="microlight">
+ >>> mat = gf256([[160, 28, 233], [189,244,80], [157, 233, 247]])
+ >>> np.linalg.inv(mat)
+ GF([[ 87, 131,  95],
+    [  0,  64, 187],
+    [250, 121, 131]], order=2^8)
+                </div>
+                <p class="blogText">
+                    For constructing back original pieces, I follow same rule as used when coding.
+                </p>
+                <img class="imgCenter" src="../images/rlnc-in-depth-decoding-2.png">
+                <p class="blogText">
+                    Reconstructed pieces are same as original one.
+                </p>
+                <div class="microlight">
+ >>> gf256(87) * gf256(185) + gf256(131) * gf256(245) + gf256(95) * gf256(64)
+ GF(97, order=2^8) # symbol 1 of piece 1
+
+ >>> gf256(87) * gf256(176) + gf256(131) * gf256(190) + gf256(95) * gf256(118)
+ GF(110, order=2^8) # symbol 2 of piece 1
+
+ >>> gf256(0) * gf256(185) + gf256(64) * gf256(245) + gf256(187) * gf256(64)
+ GF(106, order=2^8) # symbol 1 of piece 2
+
+ >>> gf256(0) * gf256(176) + gf256(64) * gf256(190) + gf256(187) * gf256(118)
+ GF(97, order=2^8) # symbol 2 of piece 2
+
+ >>> gf256(250) * gf256(185) + gf256(121) * gf256(245) + gf256(131) * gf256(64)
+ GF(110, order=2^8) # symbol 1 of piece 3
+
+ >>> gf256(250) * gf256(176) + gf256(121) * gf256(190) + gf256(131) * gf256(118)
+ GF(0, order=2^8) # symbol 2 of piece 3
+                </div>
+                <p class="blogText">
+                    I've successfully coded, recoded & decoded pieces using RLNC.
+                    <br>
+                    <br>
+                    One thing I noticed, rather than waiting for all pieces to be collected when decoding
+                    & then invert the coding matrix, it's better to prograssively decode.
+                    As soon as new useful piece is found, coding matrix is converted to <b>r</b>educed <b>r</b>ow <b>e</b>chelon
+                    <b>f</b>orm using sort of Gaussian Elimination. This keeps matrix prepared for revealing original
+                    pieces as soon as rank has reached 3.
+                    <br>
+                    <br>
+                    Before converting coding matrix to rref, I also append coded piece after respective coding vector.
+                    So I start with <span class="highlight">[160, 28, 233, 185, 176]</span>. This is actually augmented form
+                    of matrix.
+                </p>
+                <div class="microlight">
+ >>> mat = gf256([[160, 28, 233, 185, 176]])
+ >>> mat.row_reduce()
+ GF([[1, 77, 174, 32, 220]], order=2^8
+                </div>
+                <p class="blogText">
+                    Next coded piece which was discovered <span class="highlight">[189, 244, 80, 245, 190]</span>, is
+                    now added to rref matrix & again converted to rref.
+                </p>
+                <div class="microlight">
+ >>> mat = [[1, 77, 174, 32, 220], [189, 244, 80, 245, 190]]
+ >>> gf256(mat).row_reduce()
+ GF([[1, 0, 101, 105, 110],
+    [0, 1, 163, 128, 97]], order=2^8)
+                </div>
+                <p class="blogText">
+                    Last coded piece along with respective coding vector when added as new row of
+                    <b>rref</b>-ed augmented decoder's matrix & row reduced by performing elementary
+                    row operations, reveals original pieces i.e. <span class="highlight">[[97, 110], [106, 97], [110, 0]]</span>
+                    where last 0 was padded.
+                    <br>
+                    <br>
+                    Recovered byte slice <span class="highlight">[97, 110, 106, 97, 110]</span>.
+                </p>
+                <div class="microlight">
+ >>> mat = [[1, 0, 101, 105, 110], [0, 1, 163, 128, 97], [157, 233, 247, 64, 118]]
+ >>> gf256(mat).row_reduce()
+ GF([[  1,   0,   0,  97, 110],
+    [  0,   1,   0, 106,  97],
+    [  0,   0,   1, 110,   0]], order=2^8)
+                </div>
+                <p class="blogText">
+                    I find this idea of prograssively decoding as soon as new useful piece comes in
+                    from peers, to be more practical.
+                </p>
             </article>
         </div>
     </div>
