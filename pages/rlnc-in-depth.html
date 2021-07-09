@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<!--
+  Author: Anjan Roy<hello@itzmeanjan.in>
+-->
+<html>
+
+<head>
+    <title>
+        Anjan Roy, Software Engineer, India
+    </title>
+    <meta prefix="og: http://ogp.me/ns#" property="og:type" content="website">
+    <meta prefix="og: http://ogp.me/ns#" property="og:title" content="Anjan Roy, Software Engineer, India">
+    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="My Thoughts, Experiments & Experiences">
+    <meta prefix="og: http://ogp.me/ns#" property="og:url" content="https://itzmeanjan.in">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url"
+        content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:width" content="950">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:height" content="735">
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://itzmeanjan.in/">
+    <meta property="twitter:title" content="Anjan Roy, Software Engineer, India">
+    <meta property="twitter:description" content="My Thoughts, Experiments & Experiences">
+    <meta property="twitter:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta property="twitter:site" content="@meanjanry">
+    <meta name="description" content="My Thoughts, Experiments & Experiences">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="author" content="Anjan Roy">
+    <meta name="keywords"
+        content="anjan, roy, itzmeanjan, software, engineer, india, portfolio, skills, projects, thoughts, experiments, experiences">
+    <meta name="theme-color" content="darkslategrey">
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" type="text/css" href="../styles/index.css">
+    <script src="../styles/code.js"></script>
+</head>
+
+<body>
+    <div id="parentDiv">
+        <div id="navBar">
+            <nav>
+                <a class="navLink" href="/"><big>H</big>ome</a> |
+                <a class="navLink" href="https://github.com/itzmeanjan" target="_blank"><big>P</big>rojects</a> |
+                <a class="navLink" href="/pages/blog.html"><big>B</big>log</a> |
+                <a class="navLink" href="/pages/contact.html"><big>C</big>ontact</a>
+            </nav>
+        </div>
+        <div class="childDiv">
+            <article>
+                <h1 class="blogHeader">
+                    Random Linear Network Coding - Encoder, Decoder, Recoder
+                </h1>
+                <h3>Created : July 10, 2021</h3>
+            </article>
+        </div>
+        <div class="childDiv">
+            <article>
+                <p class="blogText">
+                    Last week I spent some time going through encoding, decoding process in <b>R</b>andom <b>L</b>inear <b>N</b>etwork <b>C</b>oding,
+                    this week I was exploring recoding part of RLNC, which is seemingly more interesting
+                    because other block coding/ rateless coding techniques don't possess it.
+                    One of the good parts of RLNC is it can provide <b>F</b>orward <b>E</b>rror <b>C</b>orrection
+                    not only in point-to-point manner, but also in a fully distributed setup. The <i><b>R</b>andom</i> part
+                    of RLNC denotes coding vector creation is more flexible, while still being equally ( if not more ) performant.
+                    Each peer can randomly draw coefficients without any need of coordination & code original pieces/
+                    recode already coded pieces ( received from some other peer ) into newly coded pieces, which can be distributed to next hops
+                    who may again recode if needed, while coded pieces still staying decodable as long as
+                    enough number of linearly independent pieces are found. RLNC allows flexible generation size
+                    choice i.e. how many pieces to code together is easily configurable. RLNC is able to
+                    effectively solve p2p file sharing system's <i>rarest piece selection problem</i> to a great
+                    extent, because each piece is quite equally important to peers interested in collecting all pieces
+                    for constructing whole file.
+                    Source peer can spread N-many original pieces along with few coded pieces throughout network
+                    & may leave. Other peers can create more coded pieces using any combination of
+                    coded/ uncoded pieces available to it. After sometime when some new peer is interested in
+                    constructing whole file, it'll simply collect minimum N-many useful pieces from any peers.
+                    As long as collected pieces together encompass all original pieces, data is fully constructable.
+                    RLNC provides with some level of inherent security because if atleast N-many pieces
+                    are not available, data can't be decoded. Though I don't think it's something to be relied on
+                    due to presence of flexible generation based RLNC techniques, where it's possible to decode from
+                    stream of data i.e. not waiting for all pieces to arrive & then decode.
+                    <br>
+                    <br>
+                    I'll dig deep into coding, decoding & recoding for full RLNC scheme, where I take a byte slice
+                    ; generate coded pieces, which are recoded & newly coded pieces are made available; some useful pieces are collected
+                    from set of all available pieces for attempting decoding into original byte slice. 
+                    I also explain, <i>how to choose <b>useful</b> pieces ?</i>
+                </p>
+                <p class="blogText">
+                    I start by taking a byte array i.e. <span class="highlight">[97, 110, 106, 97, 110]</span>, which I plan to code. For coding using RLNC, I need
+                    to fix one finite field from where I'll be drawing elements at random i.e. coding coefficients.
+                    As each element of byte array can be represented using 8-bits <i>( max possible byte 255 )</i>,
+                    I choose <b>G</b>alois <b>F</b>ield 2**8, which also has 256 elements. GF(2**8) is an extension of prime field GF(2). All arithmetic operations
+                    in this finite field i.e. addition & multiplication result into element of same field. 
+                    I intensionally skipped subtraction & division, because they're addition & multiplication in disguise, respectively. 
+                    <br>
+                    <br>
+                    I choose <span class="highlight">x^8 + x^4 + x^3 + x^2 + 1</span>
+                    as irreducible polynomial, which behaves like a prime number i.e. has only 1 & self as factors.
+                </p>
+                <div class="microlight">
+ $ python3
+ >>> import galois
+ >>> gf256 = galois.GF(2 ** 8) # extension field
+ >>> irr = gf256.irreducible_poly
+ >>> irr
+ Poly(x^8 + x^4 + x^3 + x^2 + 1, GF(2)) # default irreducible polynomial for field
+ >>> galois.poly_factors(irr)
+ ([Poly(x^8 + x^4 + x^3 + x^2 + 1, GF(2))], [1]) # only two factors i.e. 1 & self
+                </div>
+                <p class="blogText">
+                    One more operation which I need to perform on finite field elements is <i>inverse</i>. Multiplicative
+                    inverse can be easily calculated using lookup table ( available for small field sizes ).
+                </p>
+                <div class="microlight">
+ >>> gf256(1) / gf256(129)
+ GF(84, order=2^8)
+                </div>
+                <p class="blogText">
+                    Now if I check result of multiplication of 129 & 84 in GF(2**8), it must be 1.
+                </p>
+                <div class="microlight">
+ >>> gf256(84) * gf256(129)
+ GF(1, order=2^8)
+                </div>
+                <p class="blogText">
+                    Now I've to divide byte slice into set of pieces. Each piece will have few symbols, where
+                    each symbol is a <b>G</b>alois <b>F</b>ield element & I've already decided to work with GF(2**8).
+                    I pack 2 field elements together and create a piece. So, I've 3 pieces, with each of first two pieces having 2 symbols
+                    and last one having 1 symbol.
+                </p>
+                <img class="imgCenter" src="../images/rlnc-in-depth-byte-slice-1.png">
+                <p class="blogText">
+                    But for performing RLNC, I need to have all pieces consisting of same number of symbols, 
+                    which is why I pad 0 at end of last piece.
+                    <br>
+                    <br>
+                    Pieces are ready to be coded now.
+                </p>
+                <img class="imgCenter" src="../images/rlnc-in-depth-byte-slice-2.png">
+                <p class="blogText">
+                    As I've 3 pieces to be coded together, I randomly draw 3 elements from GF(2**8)
+                    & use as first coding vector.
+                </p>
+                <div class="microlight">
+ >>> coding_vector = [68, 236, 219]
+                </div>
+                <p class="blogText">
+                    Coding is simply performing this matrix multiplication.
+                </p>
+                <img class="imgCenter" src="../images/rlnc-in-depth-coding-1.png">
+                <p class="blogText">
+                    One thing to note, pieces are added together by performing symbol by symbol addition.
+                    Resulting coded piece has two symbols then.
+                </p>
+                <img class="imgCenter" src="../images/rlnc-in-depth-coding-2.png">
+                <p class="blogText">
+                    Following this thoery, I try to construct first coded piece. I've to represent coding vector
+                    & original pieces as polyomials. First symbol of first piece i.e. <span class="highlight">97</span>
+                    can be written as <span class="highlight">x^6 + x^5 + 1</span>. Similarly I write all of the field
+                    elements as polynomials.
+                </p>
+                <img class="imgCenter" src="../images/rlnc-in-depth-coding-3.png">
+                <p class="blogText">
+                    All arithmetic operations need to be performed on chosen finite field & resulting
+                    elements also ends up in same field. I'll construct both symbols of first coded piece.
+                </p>
+                <div class="microlight">
+ >>> (gf256(68) * gf256(97)) + (gf256(236) * gf256(106)) + (gf256(219) * gf256(110))
+ GF(147, order=2^8) # symbol_1
+
+ >>> gf256(68) * gf256(110) + gf256(236) * gf256(97) + gf256(219) * gf256(0)
+ GF(130, order=2^8) # symbol_2
+                </div>
+                <p class="blogText">
+                    First coded piece along with randomly chosen coding vector used for construction.
+                </p>
+                <img class="imgCenter" src="../images/rlnc-in-depth-coding-4.png">
+            </article>
+        </div>
+    </div>
+    <div id="footerDiv">
+        <footer>
+            <p id="footerText">
+                &copy <a href="https://github.com/itzmeanjan/itzmeanjan.github.io" id="footerLink"
+                    target="_blank"><big>A</big>njan Roy</a> ( <big>M</big>IT Licensed )
+            </p>
+        </footer>
+    </div>
+</body>
+
+</html>
