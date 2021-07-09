@@ -166,9 +166,9 @@
                 </p>
                 <div class="microlight">
  >>> gf256(157) * gf256(97) + gf256(233) * gf256(106) + gf256(247) * gf256(110)
- GF(64, order=2^8)
+ GF(64, order=2^8) # symbol 1
  >>> gf256(157) * gf256(110) + gf256(233) * gf256(97) + gf256(247) * gf256(0)
- GF(118, order=2^8)
+ GF(118, order=2^8) # symbol 2
                 </div>
                 <p class="blogText">
                     First coded piece along with randomly chosen coding vector, used for construction.
@@ -182,9 +182,9 @@
                 </p>
                 <div class="microlight">
  >>> gf256(160) * gf256(97) + gf256(28) * gf256(106) + gf256(233) * gf256(110)
- GF(185, order=2^8)
+ GF(185, order=2^8) # symbol 1
  >>> gf256(160) * gf256(110) + gf256(28) * gf256(97) + gf256(233) * gf256(0)
- GF(176, order=2^8)
+ GF(176, order=2^8) # symbol 2
                 </div>
                 <p class="blogText">
                     Second coding vector & respective coded piece is here. One thing to note, these two need
@@ -196,6 +196,42 @@
                     Similarly I construct two more coded pieces.
                 </p>
                 <img class="imgCenter" src="../images/rlnc-in-depth-coding-6.png">
+                <br>
+                <p class="blogText">
+                    Time for recoding, where I take 4 coded pieces & randomly take
+                    a combination of those for constructing recoded pieces. As I've 4 pieces
+                    to combine, I've to randomly draw 4 coefficients from GF(2**8). I generate
+                    new coded piece as I did before.
+                </p>
+                <div class="microlight">
+ >>> (re)coding_vector = [102, 82, 165, 0]
+
+ >>> gf256(102) * gf256(64) + gf256(82) * gf256(185) + gf256(165) * gf256(20) + gf256(0) * gf256(171)
+ GF(197, order=2^8) # symbol 1
+ >>> gf256(102) * gf256(118) + gf256(82) * gf256(176) + gf256(165) * gf256(130) + gf256(0) * gf256(28)
+ GF(25, order=2^8) # symbol 2
+                </div>
+                <p class="blogText">
+                    If I check my <i>(re)</i>coding vector, it has dimension of 1 x 4, while all coding vectors
+                    having dimension of 1 x 3. Surely I need to process this recoding vector to make it 1 x 3.
+                    If I take a look at matrix constructed by all coding vectors, it's 4 x 3.
+                </p>
+                <img class="imgCenter" src="../images/rlnc-in-depth-recoding-1.png">
+                <p class="blogText">
+                    And intuition is correct, I have to perform following matrix multiplication to get final
+                    coding vector for this recoding step, which is to be associated with respective recoded piece
+                    & can be distributed to peers.
+                </p>
+                <img class="imgCenter" src="../images/rlnc-in-depth-recoding-2.png">
+                <p class="blogText">
+                    So, <i>(re)</i>coded piece & respective coding vector is here.
+                </p>
+                <img class="imgCenter" src="../images/rlnc-in-depth-recoding-3.png">
+                <p class="blogText">
+                    In similar way, I randomly choose 4 coefficients & recode coded pieces
+                    to construct new coded piece & respective coding vector.
+                </p>
+                <img class="imgCenter" src="../images/rlnc-in-depth-recoding-4.png">
             </article>
         </div>
     </div>
