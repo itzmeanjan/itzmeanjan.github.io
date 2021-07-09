@@ -142,7 +142,7 @@
                     & use as first coding vector.
                 </p>
                 <div class="microlight">
- >>> coding_vector = [68, 236, 219]
+ >>> coding_vector = [157, 233, 247]
                 </div>
                 <p class="blogText">
                     Coding is simply performing this matrix multiplication.
@@ -165,16 +165,37 @@
                     elements also ends up in same field. I'll construct both symbols of first coded piece.
                 </p>
                 <div class="microlight">
- >>> (gf256(68) * gf256(97)) + (gf256(236) * gf256(106)) + (gf256(219) * gf256(110))
- GF(147, order=2^8) # symbol_1
-
- >>> gf256(68) * gf256(110) + gf256(236) * gf256(97) + gf256(219) * gf256(0)
- GF(130, order=2^8) # symbol_2
+ >>> gf256(157) * gf256(97) + gf256(233) * gf256(106) + gf256(247) * gf256(110)
+ GF(64, order=2^8)
+ >>> gf256(157) * gf256(110) + gf256(233) * gf256(97) + gf256(247) * gf256(0)
+ GF(118, order=2^8)
                 </div>
                 <p class="blogText">
-                    First coded piece along with randomly chosen coding vector used for construction.
+                    First coded piece along with randomly chosen coding vector, used for construction.
                 </p>
                 <img class="imgCenter" src="../images/rlnc-in-depth-coding-4.png">
+                <p class="blogText">
+                    This way, I again randomly draw 3 elements from GF(2**8), which I use for constructing
+                    second coded piece. This time I get <span class="highlight">[160, 28, 233]</span> & while
+                    trying to construct both symbols of second coded piece, I follow aforementioned formula of
+                    symbol by symbol addition.
+                </p>
+                <div class="microlight">
+ >>> gf256(160) * gf256(97) + gf256(28) * gf256(106) + gf256(233) * gf256(110)
+ GF(185, order=2^8)
+ >>> gf256(160) * gf256(110) + gf256(28) * gf256(97) + gf256(233) * gf256(0)
+ GF(176, order=2^8)
+                </div>
+                <p class="blogText">
+                    Second coding vector & respective coded piece is here. One thing to note, these two need
+                    to be kept together & when transfered over wire to some other peer this association
+                    must not be lost otherwise piece won't be helpful while attempting to recode/ decode.
+                </p>
+                <img class="imgCenter" src="../images/rlnc-in-depth-coding-5.png">
+                <p class="blogText">
+                    Similarly I construct two more coded pieces.
+                </p>
+                <img class="imgCenter" src="../images/rlnc-in-depth-coding-6.png">
             </article>
         </div>
     </div>
