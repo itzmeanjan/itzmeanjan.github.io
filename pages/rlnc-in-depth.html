@@ -65,7 +65,8 @@
                     recode already coded pieces ( received from some other peer ) into newly coded pieces, which can be distributed to next hops
                     who may again recode if needed, while coded pieces still staying decodable as long as
                     enough number of linearly independent pieces are found. RLNC allows flexible generation size
-                    choice i.e. how many pieces to code together is easily configurable. RLNC is able to
+                    choice i.e. how many pieces to code together is easily configurable. And it enables usage
+                    of sliding window technique while coding pieces. RLNC is able to
                     effectively solve p2p file sharing system's <i>rarest piece selection problem</i> to a great
                     extent, because each piece is quite equally important to peers interested in collecting all pieces
                     for constructing whole file.
@@ -76,12 +77,18 @@
                     As long as collected pieces together encompass all original pieces, data is fully constructable.
                     RLNC provides with some level of inherent security because if atleast N-many pieces
                     are not available, data can't be decoded. Though I don't think it's something to be relied on
-                    due to presence of flexible generation based RLNC techniques, where it's possible to decode from
+                    always, due to presence of flexible generation based RLNC techniques, where it's possible to decode from
                     stream of data i.e. not waiting for all pieces to arrive & then decode.
+                    One problem with RLNC is, while some peer only attempting to collect useful pieces neighbours might endup
+                    sending linearly dependent pieces ( read <i>useless pieces</i> ), because they don't know what's available with peer.
+                    In these scenarios, some sort of protocol level coordination is required for letting neighbours know what's
+                    available & what peer is looking for. If this kind of coordination is not used from protocol level
+                    peers might be doing unnecesary coding/ recoding which can be avoided. These coordinations also
+                    help peers in constructing whole piece faster.
                     <br>
                     <br>
-                    I'll dig deep into coding, decoding & recoding for full RLNC scheme, where I take a byte slice
-                    ; generate coded pieces, which are recoded & newly coded pieces are made available; some useful pieces are collected
+                    I'll dig deep into coding, decoding & recoding for full RLNC scheme, where I take a byte slice;
+                    generate coded pieces, which are recoded & newly coded pieces are made available; some useful pieces are collected
                     from set of all available pieces for attempting decoding into original byte slice. 
                     I also explain, <i>how to choose <b>useful</b> pieces ?</i>
                 </p>
@@ -89,7 +96,8 @@
                     I start by taking a byte array i.e. <span class="highlight">[97, 110, 106, 97, 110]</span>, which I plan to code. For coding using RLNC, I need
                     to fix one finite field from where I'll be drawing elements at random i.e. coding coefficients.
                     As each element of byte array can be represented using 8-bits <i>( max possible byte 255 )</i>,
-                    I choose <b>G</b>alois <b>F</b>ield 2**8, which also has 256 elements. GF(2**8) is an extension of prime field GF(2). All arithmetic operations
+                    I choose <b>G</b>alois <b>F</b>ield 2**8, which also has 256 elements <i>( from 0 to 255 )</i>.
+                    GF(2**8) is an extension of prime field GF(2). All arithmetic operations
                     in this finite field i.e. addition & multiplication result into element of same field. 
                     I intensionally skipped subtraction & division, because they're addition & multiplication in disguise, respectively. 
                     <br>
@@ -109,14 +117,15 @@
                 </div>
                 <p class="blogText">
                     One more operation which I need to perform on finite field elements is <i>inverse</i>. Multiplicative
-                    inverse can be easily calculated using lookup table ( available for small field sizes ).
+                    inverse can be easily calculated using lookup table ( good for small field sizes ).
                 </p>
                 <div class="microlight">
  >>> gf256(1) / gf256(129)
  GF(84, order=2^8)
                 </div>
                 <p class="blogText">
-                    Now if I check result of multiplication of 129 & 84 in GF(2**8), it must be 1.
+                    Now if I check result of multiplication of <span class="highlight">129</span> & <span class="highlight">84</span> in GF(2**8),
+                    it must be 1.
                 </p>
                 <div class="microlight">
  >>> gf256(84) * gf256(129)
@@ -125,7 +134,7 @@
                 <p class="blogText">
                     Now I've to divide byte slice into set of pieces. Each piece will have few symbols, where
                     each symbol is a <b>G</b>alois <b>F</b>ield element & I've already decided to work with GF(2**8).
-                    I pack 2 field elements together and create a piece. So, I've 3 pieces, with each of first two pieces having 2 symbols
+                    I pack 2 field elements together and create a piece. So, I've 3 pieces, with each of first two having 2 symbols
                     and last one having 1 symbol.
                 </p>
                 <img class="imgCenter" src="../images/rlnc-in-depth-byte-slice-1.png">
@@ -156,13 +165,16 @@
                 <p class="blogText">
                     Following this thoery, I try to construct first coded piece. I've to represent coding vector
                     & original pieces as polyomials. First symbol of first piece i.e. <span class="highlight">97</span>
-                    can be written as <span class="highlight">x^6 + x^5 + 1</span>. Similarly I write all of the field
-                    elements as polynomials.
+                    can be written as <span class="highlight">x^6 + x^5 + 1</span>.
+                </p>
+                <img class="imgCenter" src="../images/rlnc-in-depth-byte-slice-3.png">
+                <p class="blogText">
+                    Similarly I write all of the field elements as polynomials.
                 </p>
                 <img class="imgCenter" src="../images/rlnc-in-depth-coding-3.png">
                 <p class="blogText">
                     All arithmetic operations need to be performed on chosen finite field & resulting
-                    elements also ends up in same field. I'll construct both symbols of first coded piece.
+                    elements also end up in same field. I'll construct both symbols of first coded piece.
                 </p>
                 <div class="microlight">
  >>> gf256(157) * gf256(97) + gf256(233) * gf256(106) + gf256(247) * gf256(110)
@@ -213,7 +225,7 @@
                 </div>
                 <p class="blogText">
                     If I check my <i>(re)</i>coding vector, it has dimension of 1 x 4, while all coding vectors
-                    having dimension of 1 x 3. Surely I need to process this recoding vector to make it 1 x 3.
+                    of coded pieces ( 4 of them ) having dimension of 1 x 3. Surely I need to process this recoding vector to make it 1 x 3.
                     If I take a look at matrix constructed by all coding vectors, it's 4 x 3.
                 </p>
                 <img class="imgCenter" src="../images/rlnc-in-depth-recoding-1.png">
@@ -252,7 +264,7 @@
                     Speaking of collecting <b>useful</b> pieces, it denotes I need to select linearly independent
                     pieces. Everytime I choose one piece from available ones, I need to make a check on whether
                     rank of coding matrix increases by 1 or not. If it doesn't increase, this packet is linearly
-                    dependent with what I already have --- meaning it's not heplful. I attempt to choose next useful one.
+                    dependent with what I already have --- meaning it's not <i>useful</i>. I attempt to choose next useful one.
                     I stop as soon as I find rank of my coding matrix has reached 3 because I need to have 3 equations
                     for finding out original 3 pieces.
                     <br>
@@ -272,7 +284,7 @@
  1
                 </div>
                 <p class="blogText">
-                    Now I randomly collect coding vector <span class="highlight">[189, 244, 80]</span>, which increases rank to 2.
+                    Now I randomly collect piece with coding vector <span class="highlight">[189, 244, 80]</span>, which increases rank to 2.
                 </p>
                 <div class="microlight">
  >>> mat = gf256([[160, 28, 233], [189, 244, 80]])
@@ -292,7 +304,7 @@
                 <p class="blogText">
                     Finally I choose another useful piece i.e. with coding vector 
                     <span class="highlight">[157, 233, 247]</span>, which makes rank of coding matrix 3.
-                    Now inverting this 3 x 3 matrix & multiplying with coded pieces, gives me back original pieces.
+                    Now inverting this 3 x 3 matrix & multiplying with coded pieces, gives me original pieces back.
                 </p>
                 <div class="microlight">
  >>> mat = gf256([[160, 28, 233], [189,244,80], [157, 233, 247]])
@@ -334,13 +346,12 @@
                     One thing I noticed, rather than waiting for all pieces to be collected when decoding
                     & then invert the coding matrix, it's better to prograssively decode.
                     As soon as new useful piece is found, coding matrix is converted to <b>r</b>educed <b>r</b>ow <b>e</b>chelon
-                    <b>f</b>orm using sort of Gaussian Elimination. This keeps matrix prepared for revealing original
-                    pieces as soon as rank has reached 3.
+                    <b>f</b>orm using sort of Gaussian Elimination technique. This keeps matrix prepared for revealing original
+                    pieces, and as soon as rank reaches 3 original pieces are readily available.
                     <br>
                     <br>
-                    Before converting coding matrix to rref, I also append coded piece after respective coding vector.
-                    So I start with <span class="highlight">[160, 28, 233, 185, 176]</span>. This is actually augmented form
-                    of matrix.
+                    I also append coded piece after respective coding vector i.e. I work with augmented matrix.
+                    So I start with <span class="highlight">[160, 28, 233, 185, 176]</span>.
                 </p>
                 <div class="microlight">
  >>> mat = gf256([[160, 28, 233, 185, 176]])
@@ -349,7 +360,7 @@
                 </div>
                 <p class="blogText">
                     Next coded piece which was discovered <span class="highlight">[189, 244, 80, 245, 190]</span>, is
-                    now added to rref matrix & again converted to rref.
+                    now added to augmented matrix & again converted to rref.
                 </p>
                 <div class="microlight">
  >>> mat = [[1, 77, 174, 32, 220], [189, 244, 80, 245, 190]]
@@ -359,9 +370,9 @@
                 </div>
                 <p class="blogText">
                     Last coded piece along with respective coding vector when added as new row of
-                    <b>rref</b>-ed augmented decoder's matrix & row reduced by performing elementary
+                    augmented decoder's matrix & row reduced by performing elementary
                     row operations, reveals original pieces i.e. <span class="highlight">[[97, 110], [106, 97], [110, 0]]</span>
-                    where last 0 was padded.
+                    where last 0 is what I padded during coding.
                     <br>
                     <br>
                     Recovered byte slice <span class="highlight">[97, 110, 106, 97, 110]</span>.
@@ -374,8 +385,22 @@
     [  0,   0,   1, 110,   0]], order=2^8)
                 </div>
                 <p class="blogText">
-                    I find this idea of prograssively decoding as soon as new useful piece comes in
+                    I find this idea of progressively decoding as soon as new useful piece comes in
                     from peers, to be more practical.
+                    <br>
+                    <br>
+                    The whole coding, recoding & decoding flow from high level. This simulation setup
+                    is kept <a class="blogLink" href="https://gist.github.com/itzmeanjan/b156584c4747c60ce0cdc54888608597" target="_blank">here</a> for future reference.
+                </p>
+                <img class="imgCenter" src="../images/rlnc-in-depth-high-level.jpg">
+                <p class="blogText">
+                    After full RLNC scheme, I plan to understand other variants of RLNC along with their
+                    respective benefits & drawbacks. Particularly I've interest in Fulcrum Codes.
+                    I plan to make use of RLNC along with custom protocol built on top of TCP/ UDP.
+                    RLNC seems to be a good candidate for p2p mesh networks, which need to be explored more.
+                    <br>
+                    <br>
+                    Have a great time !
                 </p>
             </article>
         </div>
