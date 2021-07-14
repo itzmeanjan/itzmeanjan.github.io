@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<!--
+  Author: Anjan Roy<hello@itzmeanjan.in>
+-->
+<html>
+
+<head>
+    <title>
+        P2P Sync - A Network Coding based Protocol Design
+    </title>
+    <meta prefix="og: http://ogp.me/ns#" property="og:type" content="website">
+    <meta prefix="og: http://ogp.me/ns#" property="og:title"
+        content="P2P Sync - A Network Coding based Protocol Design">
+    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="">
+    <meta prefix="og: http://ogp.me/ns#" property="og:url" content="https://itzmeanjan.in">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url"
+        content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:width" content="950">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:height" content="735">
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://itzmeanjan.in/">
+    <meta property="twitter:title" content="P2P Sync - A Network Coding based Protocol Design">
+    <meta property="twitter:description" content="">
+    <meta property="twitter:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta property="twitter:site" content="@meanjanry">
+    <meta name="description" content="">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="author" content="Anjan Roy">
+    <meta name="keywords"
+        content="anjan, roy, itzmeanjan, software, engineer, india, portfolio, skills, projects, thoughts, experiments, experiences">
+    <meta name="theme-color" content="darkslategrey">
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" type="text/css" href="../styles/index.css">
+    <script src="../styles/code.js"></script>
+</head>
+
+<body>
+    <div id="parentDiv">
+        <div id="navBar">
+            <nav>
+                <a class="navLink" href="/"><big>H</big>ome</a> |
+                <a class="navLink" href="https://github.com/itzmeanjan" target="_blank"><big>P</big>rojects</a> |
+                <a class="navLink" href="/pages/blog.html"><big>B</big>log</a> |
+                <a class="navLink" href="/pages/contact.html"><big>C</big>ontact</a>
+            </nav>
+        </div>
+        <div class="childDiv">
+            <article>
+                <h1 class="blogHeader">
+                    P2P Sync - A Network Coding based Protocol Design
+                </h1>
+                <h3>Created : July 15, 2021</h3>
+            </article>
+        </div>
+        <div class="childDiv">
+            <article>
+                <p class="blogText">
+                    After studying <b>R</b>andom <b>L</b>inear <b>N</b>etwork <b>C</b>oding for last few weeks,
+                    I've decided to make use of it for designing data syncing protocol in p2p network. Client-server
+                    model works pretty well, but I can make better use of bandwidth of all participants
+                    when each plays role of both client & server. Assuming a chunk of data, which is owned
+                    by only one peer, has suddenly become popular. Lots of peers who has interest in that chunk
+                    could directly ask the only owner for chunk --- resulting into heavy load on owner.
+                    But one thing to notice, as interested peers prograssively keep owning some portion of
+                    chunk, they could also help others with what they have now. This way only owner doesn't end up
+                    feeding all interested parties, rather interested parties also feed other interested parties.
+                    This calls for decentralised coordination --- which is <i>not so easy</i>. In p2p networks,
+                    piece collection is an important problem, where each interested peer tries to collect all pieces
+                    of whole data chunk. Because if owner sends whole chunk as a single entity, coordination
+                    is harder to define & manage, rather data chunk is splitted into multiple smaller pieces.
+                    Now interested peers will attempt to collect all pieces from owner & partial owners. Duplicate
+                    pieces are not helpful, every peer is looking for not-yet-seen pieces. As syncing
+                    tends to reach end, peers start seeing more duplicates, which results into longer
+                    sync time. Some pieces are rare, some are very rare and lots of peers attempting to collect
+                    those rare pieces, resulting into <i>chaos in network</i>.
+                    <br>
+                    <br>
+                    One thing can be done for solving scope of rarest piece collection problem --- rather than
+                    treating each piece as unique, I can combine fragments of pieces together and form whole new pieces,
+                    which are not distinctive easily. From high level, it looks all pieces are more or less equally important.
+                    Now peers don't collect original pieces from actual owner/ partial owners, rather they collect these
+                    new pieces <i>( consisting of fragments of other pieces too )</i> and decode back to original when they've
+                    collected enough useful pieces.
+                </p>
+            </article>
+        </div>
+    </div>
+    <div id="footerDiv">
+        <footer>
+            <p id="footerText">
+                &copy <a href="https://github.com/itzmeanjan/itzmeanjan.github.io" id="footerLink"
+                    target="_blank"><big>A</big>njan Roy</a> ( <big>M</big>IT Licensed )
+            </p>
+        </footer>
+    </div>
+</body>
+
+</html>
