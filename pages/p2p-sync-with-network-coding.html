@@ -236,6 +236,111 @@
                     set as > 1, where these elements are selected from prime ring buffer.
                 </p>
                 <img class="imgCenter" src="../images/p2p-sync-protocol-rich-coded-piece.png">
+                <p class="blogText">
+                    Question is, how to use these piece construction techniques, so that I can decrease chance
+                    of getting duplicate coded pieces. I propose one way how peers can share pieces with recipient party
+                    which reduces scope of encountering duplicate pieces, even when multiple peers are acting as sender
+                    while maintaining little to no coordination among them.
+                </p>
+                <div class="microlight">
+ begin:
+    skip = S // provided by recipient
+    begin_index = B // provided by recipient
+
+    base_coded_piece = code(:base, pieces);
+    send(base_coded_piece);
+    with_rich = False;
+    // N = original piece count in generation
+    for (i = begin_index; i < N; i += skip):
+        if with_rich:
+            rich_coded_piece = code(:rich, pieces, i);
+            send(rich_coded_piece, i);
+        endif
+        
+        decodable_coded_piece = code(:decodable, pieces, i);
+        send(decodable_coded_piece, i);
+        
+        // send rich piece every other round
+        with_rich = !with_rich;
+    endfor
+ end
+                </div>
+                <p class="blogText">
+                    As usual, I start with an example. Say, I want to have byte slice <span class="highlight">[97, 110, 106, 97, 110]</span>
+                    from 2 peers whom I know having whole slice. Whole slice transfer is performed in single
+                    generation.
+                    I ask Peer_1 to start sending pieces from coding index 0, while using skip factor 2. I'm setting
+                    skip factor 2, because I plan to connect to 2 peers & download pieces concurrently from both of them.
+                    <br>
+                    <br>
+                    Peer_1 starts with sharing base coded piece, where all elements of coding vector are set to 1.
+                    Resulting into construction of coded piece 106.
+                    <br>
+                    <br>
+                    After that peer enters loop, where it prepares decodable piece, with coding index set as 0. For coding index <b>i</b>,
+                    it takes prime at index <b>i</b>, from ring buffer, inserts at index <b>i</b> of coding
+                    vector, populates all other elements by putting 1. Using this coding vector, it generates
+                    one decodable coded piece 201.
+                    One thing to notice, during first decodable coded piece sharing, Peer_1 hasn't shared
+                    any rich piece. But in next round, it'll.
+                    <br>
+                    <br>
+                    In this round, coding index is 2, so coding vector is constructed by filling index 2
+                    of coding vector with prime number at index 2 i.e. 5 & other elements set to 1. This coding
+                    vector is used for decodable piece. Constructed coded piece is 223. But this is the round when
+                    rich piece also needs to be shared, which is prepared by constructing respective coding vector
+                    i.e. starting at index 2, filling up with prime at index 2 i.e. 5 & circularly filling other places
+                    by drawing next primes from ring buffer. This results into rich piece 23.
+                    <br>
+                    <br>
+                    This round, peer works with coding index 4, so it prepares decodable piece by putting 11 i.e. prime
+                    at index 4 from prime ring buffer, at index 4 of coding vector, while filling up other places with 1.
+                    Finally it results into decodable coded piece 225.
+                </p>
+                <table class="centeredTable">
+                    <tr>
+                        <th rowspan="2">Original Pieces</th>
+                        <th rowspan="2">Coding Vector</th>
+                        <th rowspan="2">Piece Type</th>
+                        <th colspan="2">Over-the-Wire</th>
+                    </tr>
+                    <tr>
+                        <th>Coding Index</th>
+                        <th>Coded Piece</th>
+                    </tr>
+                    <tr>
+                        <td rowspan="5">[97, 110, 106, 97, 110]</td>
+                        <td>[1, 1, 1, 1, 1]</td>
+                        <td>Base</td>
+                        <td>NaN</td>
+                        <td>106</td>
+                    </tr>
+                    <tr>
+                        <td>[2, 1, 1, 1, 1]</td>
+                        <td>Decodable</td>
+                        <td>0</td>
+                        <td>201</td>
+                    </tr>
+                    <tr>
+                        <td>[1, 1, 5, 1, 1]</td>
+                        <td>Decodable</td>
+                        <td>2</td>
+                        <td>223</td>
+                    </tr>
+                    <tr>
+                        <td>[13, 17, 5, 7, 11]</td>
+                        <td>Rich</td>
+                        <td>2</td>
+                        <td>23</td>
+                    </tr>
+                    <tr>
+                        <td>[1, 1, 1, 1, 11]</td>
+                        <td>Decodable</td>
+                        <td>4</td>
+                        <td>225</td>
+                    </tr>
+                </table>
+                <img class="imgCenter" src="../images/p2p-sync-protocol-peer-1-protocol-flow.jpg">
             </article>
         </div>
     </div>
