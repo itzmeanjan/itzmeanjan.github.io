@@ -74,15 +74,132 @@
                     tends to reach end, peers start seeing more duplicates, which results into longer
                     sync time. Some pieces are rare, some are very rare and lots of peers attempting to collect
                     those rare pieces, resulting into <i>chaos in network</i>.
-                    <br>
-                    <br>
-                    One thing can be done for solving scope of rarest piece collection problem --- rather than
+                </p>
+                <img class="imgCenter" src="../images/p2p-sync-protocol-client-server-vs-p2p.jpg">
+                <p class="blogText">
+                    For solving scope of rarest piece collection problem --- rather than
                     treating each piece as unique, I can combine fragments of pieces together and form whole new pieces,
-                    which are not distinctive easily. From high level, it looks all pieces are more or less equally important.
+                    which are not easily distinctive. From high level, it looks all pieces are more or less equally important.
                     Now peers don't collect original pieces from actual owner/ partial owners, rather they collect these
                     new pieces <i>( consisting of fragments of other pieces too )</i> and decode back to original when they've
-                    collected enough useful pieces.
+                    collected enough useful pieces. While sharing these coded pieces, peers also share how have they combined
+                    original pieces for constructing coded ones. Actually original pieces are randomly assigned some
+                    coefficients/ weights i.e. pieces are added together while multiplying by respective random weights & coded pieces are formed. 
+                    If there're N-many original pieces, atleast N-many useful coded pieces are required for reconstructing back
+                    whole chunk.
+                    <br>
+                    <br>
+                    This is what RLNC does, abstractly.
                 </p>
+                <img class="imgCenter" src="../images/p2p-sync-protocol-coded-pieces.jpg">
+                <p class="blogText">
+                    I start with a byte slice i.e. <span class="highlight">[97, 110, 106, 97, 110]</span> which is owned
+                    by N-many parties in p2p network. I could have asked one party to share that slice with me & I've the slice
+                    now --- N+1 parties. But I can also ask M <i>( < N )</i>-many parties to share certain portion of slice
+                    with me, concurrently, expecting I get whole slice faster. The effects are clearly visible when slice size is larger.
+                    <br>
+                    <br>
+                    So I ask each of M-many peers to share few pieces with me, but wireless networks are unreliable inherently.
+                    As my goal is reliably getting pieces as fast as possible, while transferring least possible bytes of data,
+                    I decide to use coded piece distribution scheme. Each of M-many owner peers code original pieces & share coded pieces
+                    with me, when I've enough of them, I decode them back to original byte slice. I can use RLNC for that.
+                    <br>
+                    <br>
+                    If byte slice size is large, then I've to buffer all those coded pieces & at end when enough of them are collected,
+                    I attempt to decode by performing computionally expensive large matrix inversion, which costs ~ O(n^3). First issue, I can't
+                    understand what I'm receiving as I receive it, rather after I receive all, I try to figure out what I've received. I want to
+                    have a scheme where I can work on decoded data, as I keep receiving remaining, while still enjoying benefits of network coding.
+                    Second, I don't want to perform inversion of a large matrix. For solving second issue, I decide to split whole
+                    byte slice into generations & pieces of each generation are coded together i.e. there're no cross-generation
+                    coding/ decoding dependency. As generations are lot smaller in size, performing small matrix's inverse is not tiresome.
+                    Introducing idea of generations also decreases waiting time before decoding to a great extent. But still for a single generation's
+                    decoding, I've to wait for receiving all coded pieces of generation.
+                </p>
+                <img class="imgCenter" src="../images/p2p-sync-protocol-idea-of-generation.jpg">
+                <p class="blogText">
+                    In following design, I'm going to consider byte slice <span class="highlight">[97, 110, 106, 97, 110]</span>
+                    as single generation, with 5 pieces i.e. each piece consists of only single symbol.
+                </p>
+                <img class="imgCenter" src="../images/p2p-sync-protocol-byte-slice.png">
+                <p class="blogText">
+                    My interest is in transferring this byte slice from M-many peers with as little coordination possible. The more
+                    coordination, the more network traffic, the more bandwidth wastage. In plain & simple generational RLNC, randomly
+                    coding coefficients are drawn from some agreed upon finite field. As coefficients are random, they need to be
+                    accompanied with coded pieces for successful decoding.
+                    <br>
+                    <br>
+                    As I've 5 pieces, I randomly choose 5 coefficients from <b>G</b>alois <b>F</b>ield (2**8), which has
+                    256 elements & perform coding. Coded piece & coding vector, both are carried over wire to peer.
+                </p>
+                <div class="microlight">
+ $ python3
+ >>> import galois
+ >>> gf = galois.GF(2**8)
+ >>> data = [97, 110, 106, 97, 110]
+ >>> gf(97)*gf(11) + gf(110)*gf(9) + gf(106)*gf(7) + gf(97)*gf(131) + gf(110)*gf(97)
+ GF(122, order=2^8)
+
+ >>> over_wire = {'coded_piece': 122, 'coding_vector': [11, 9, 7, 131, 97]}
+                </div>
+                <p class="blogText">
+                    One way to avoid sending coding vector, which is an overhead, is pair of peers
+                    agreeing upon seed, used for generating random coding coefficients. 
+                    At beginning of session seed is shared & for rest of session it's used on receiver's
+                    side for populating coding vectors --- now only <span class="highlight">{"coded_piece": 122}</span> sent over wire.
+                    <br>
+                    <br>
+                    One important goal is to avoid obtaining linearly dependent pieces ( read useless pieces ), which is sometimes result of
+                    randomly drawn coding coefficients. For sake for avoiding it, I choose to use prime numbers as coding coeffients.
+                    <br>
+                    <br>
+                    GF(2**8) has 256 elements i.e. from 0 to 255, it has 54 primes in range. I use these primes in ordered fashion for drawing
+                    coefficients.
+                    <br>
+                    <br>
+                    Assume I'm working on a range, where I've 6 primes which are <span class="highlight">[2, 3, 5, 7, 11, 13]</span> & my original pieces
+                    are <span class="highlight">[97, 110, 106, 97, 110]</span>. I want to code & generate 5 pieces, while using primes as coding
+                    coefficients in ordered fashion, but I want to keep coordination as little as possible. I choose to use one sliding window technique,
+                    where each piece's coeffients are chosen from one prime ring buffer based on selected <i>index</i>. For
+                    coding index <b>i</b>, start with filling coding vector's index <b>i</b> with prime number at index <b>i</b> 
+                    <i>( primes are ascending ordered in ring buffer )</i>, then following indices are filled with consequtive elements
+                    from ring buffer. If coding index > 0, first few remaining positions are filled in circular way
+                    with consequtive primes, continuing after point where left off while populating in forward direction.
+                </p>
+                <table class="centeredTable">
+                    <tr>
+                        <th>Original Piece</th>
+                        <th>Coding Index</th>
+                        <th>Coding Vector</th>
+                        <th>Coded Piece</th>
+                    </tr>
+                    <tr>
+                        <td rowspan="5">[97, 110, 106, 97, 110]</td>
+                        <td>0</td>
+                        <td>[2, 3, 5, 7, 11]</td>
+                        <td>112</td>
+                    </tr>
+                    <tr>
+                        <td>1</td>
+                        <td>[13, 3, 5, 7, 11]</td>
+                        <td>101</td>
+                    </tr>
+                    <tr>
+                        <td>2</td>
+                        <td>[13, 2, 5, 7, 11]</td>
+                        <td>11</td>
+                    </tr>
+                    <tr>
+                        <td>3</td>
+                        <td>[13, 2, 3, 7, 11]</td>
+                        <td>106</td>
+                    </tr>
+                    <tr>
+                        <td>4</td>
+                        <td>[13, 2, 3, 5, 11]</td>
+                        <td>168</td>
+                    </tr>
+                </table>
+                <img class="imgCenter" src="../images/p2p-sync-protocol-prime-ring-buffer-coding.jpg">
             </article>
         </div>
     </div>
