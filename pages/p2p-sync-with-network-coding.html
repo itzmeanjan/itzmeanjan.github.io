@@ -399,6 +399,64 @@
                     </tr>
                 </table>
                 <img class="imgCenter" src="../images/p2p-sync-protocol-peer-2-protocol-flow.jpg">
+                <p class="blogText">
+                    I propose one modification in protocol, where receiver can specify
+                    whether it wants peer to send base coded piece or not. Because if it receives
+                    same base coded piece from two peers, it doesn't help anyhow. Rank of decoding
+                    matrix doesn't increase i.e. useless piece, no doubt.
+                    Receiver sets intension of receiving base coded piece from Peer_1 only.
+                </p>
+                <br>
+                <p class="blogText">
+                    It's a good time to run protocol & see what happens from receiver's perspective.
+                    For receiver goal is to prograssively keep decoding pieces & supplying to application
+                    layer with least possible delay, while keeping computional cost as low as possible.
+                    <br>
+                    <br>
+                    Receiver sees coded pieces in form <span class="highlight">(<i>coding-index</i>, <i>{base,decodable}-coded-piece</i>, <i>rich-coded-piece</i>)</span>.
+                    When <i>coding-index</i> is empty, it's base coded piece at index 1 of received tuple. If <i>coding-index</i>
+                    is non-empty, tuple[1] is decodable coded piece. For non-empty coding-index cases, last element of tuple
+                    may be non-empty sometimes, which denotes rich coded piece. One thing to note, when rich coded
+                    piece is shared, decodable one is also shared, as both of them having same coding index, it's
+                    sent over-wire only once --- some saving !
+                    <br>
+                    <br>
+                    From Peer_1, first piece received is base coded piece. A base coded piece is base coded
+                    because it's coding vector is simply <span class="highlight">[1, 1, 1, 1, 1]</span>.
+                    So I've only <span class="highlight">[1, 1, 1, 1, 1, 106]</span> in my decoding matrix.
+                    Not enough for solving any equation. Then, Peer_2 shares one decodable piece with coding vector 1.
+                    It denotes, it's possible to figure what's at index 1 of original piece slice, by row-reducing
+                    decoding matrix. I update decoding matrix by appending <span class="highlight">[1, 3, 1, 1, 1, 182]</span>.
+                    Coding vector recreation just from coding index is very easy on receiver's end, as it was
+                    on sender's end.
+                    Row reduction correctly reveals one element of original slice i.e. at index 1.
+                    Again Peer_1 shares decodable piece with coding index 0. As coding index is 0, coding
+                    vector can be formed easily i.e. <span class="highlight">[2, 1, 1, 1, 1]</span>.
+                    Updating decoding matrix by appending <span class="highlight">[2, 1, 1, 1, 1, 201]</span>
+                    & attempting to row reduce reveals another piece i.e. at index 0 of original byte slice.
+                    <br>
+                    <br>
+                    Till now, receiver has received 3 linearly independent pieces from 2 peers. So it's
+                    decoding matrix has rank of 3.
+                    It needs atleast 2 more useful pieces for completely figuring out what's whole byte slice.
+                    <br>
+                    <br>
+                    Fortunately, Peer_2 shares both decodable & rich coded pieces with coding index 3. Reconstructing
+                    coding vector for decodable piece with coding index 3 is easy i.e. <span class="highlight">[1, 1, 1, 7, 1]</span>.
+                    And for rich coded piece respective coding vector is <span class="highlight">[13, 17, 19, 7, 11]</span>.
+                    Appending both of these pieces into coding matrix, reveals all pieces.
+                    <br>
+                    <br>
+                    Though receiver makes use of other pieces received later, it doesn't make any change
+                    in already decoded pieces. So receiver can ask Peer_1, which shares last two pieces, to
+                    not send any more pieces.
+                    <br>
+                    <br>
+                    Receiving party successfully decodes pieces in prograssive mode, while collaborating
+                    with two peers for syncing with least possible messaging overhead & also putting very
+                    less computational burden on self.
+                </p>
+                <img class="imgCenter" src="../images/p2p-sync-protocol-decoder-protocol-flow.png">
             </article>
         </div>
     </div>
