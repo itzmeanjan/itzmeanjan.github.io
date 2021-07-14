@@ -152,10 +152,6 @@
                     randomly drawn coding coefficients. For sake for avoiding it, I choose to use prime numbers as coding coeffients.
                     <br>
                     <br>
-                    GF(2**8) has 256 elements i.e. from 0 to 255, it has 54 primes in range. I use these primes in ordered fashion for drawing
-                    coefficients.
-                    <br>
-                    <br>
                     Assume I'm working on a range, where I've 6 primes which are <span class="highlight">[2, 3, 5, 7, 11, 13]</span> & my original pieces
                     are <span class="highlight">[97, 110, 106, 97, 110]</span>. I want to code & generate 5 pieces, while using primes as coding
                     coefficients in ordered fashion, but I want to keep coordination as little as possible. I choose to use one sliding window technique,
@@ -200,6 +196,46 @@
                     </tr>
                 </table>
                 <img class="imgCenter" src="../images/p2p-sync-protocol-prime-ring-buffer-coding.jpg">
+                <p class="blogText">
+                    Actually I work on GF(2**8), having 256 elements i.e. from 0 to 255, it has 54 primes in range. I use these primes in ordered fashion for drawing
+                    coefficients. But it's not only sufficient, I introduce concept of various kinds of coded pieces
+                    based on how coding is being performed/ how coding coefficients are chosen.
+                </p>
+                <ul>
+                    <li>Base Coded Piece</li>
+                    <li>Decodable Coded Piece</li>
+                    <li>Rich Coded Piece</li>
+                </ul>
+                <p class="blogText">
+                    A base coded piece is constructed by taking coding vector with all elements set to 1.
+                    As I work with original pieces <span class="highlight">[97, 110, 106, 97, 110]</span>,
+                    I choose my base coding vector <span class="highlight">[1, 1, 1, 1, 1]</span>, resulting into
+                    coded piece 106.
+                </p>
+                <img class="imgCenter" src="../images/p2p-sync-protocol-base-coded-piece.png">
+                <p class="blogText">
+                    A decodable piece is same as base coded piece, except only one element of coding vector
+                    is > 1. As I'm only interested in prime numbers as coding coefficients, I choose
+                    from prime ring buffer as non-one coefficient. This piece is called decodable for a reason,
+                    because it's very easily decodable when recipient party has one base coded piece too.
+                </p>
+                <img class="imgCenter" src="../images/p2p-sync-protocol-decodable-coded-piece.png">
+                <p class="blogText">
+                    Assuming I've two pieces, one base coded piece i.e. <span class="highlight">[1, 1, 1, 1, 1, 106]</span>
+                    & other one decodable coded piece i.e. <span class="highlight">[2, 1, 1, 1, 1, 201]</span>, I can instantly
+                    figure out respective original piece, for which coding coefficient was chosen > 1.
+                </p>
+                <div class="microlight">
+ >>> pieces = [[1, 1, 1, 1, 1, 106], [2, 1, 1, 1, 1, 201]]
+ >>> gf(pieces).row_reduce() # 97 first piece, revealed
+ GF([[ 1,  0,  0,  0,  0, 97],
+    [ 0,  1,  1,  1,  1, 11]], order=2^8)
+                </div>
+                <p class="blogText">
+                    A rich coded piece, is indeed rich with coding coefficients i.e. coding vector has all elements
+                    set as > 1, where these elements are selected from prime ring buffer.
+                </p>
+                <img class="imgCenter" src="../images/p2p-sync-protocol-rich-coded-piece.png">
             </article>
         </div>
     </div>
