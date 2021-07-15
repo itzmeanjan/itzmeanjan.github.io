@@ -11,7 +11,8 @@
     <meta prefix="og: http://ogp.me/ns#" property="og:type" content="website">
     <meta prefix="og: http://ogp.me/ns#" property="og:title"
         content="P2P Sync - A Network Coding based Protocol Design">
-    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="">
+    <meta prefix="og: http://ogp.me/ns#" property="og:description" 
+        content="Primary design of P2P data syncing protocol, with great inspirations collected from several Network Coding literatures">
     <meta prefix="og: http://ogp.me/ns#" property="og:url" content="https://itzmeanjan.in">
     <meta prefix="og: http://ogp.me/ns#" property="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
     <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url"
@@ -21,10 +22,10 @@
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="https://itzmeanjan.in/">
     <meta property="twitter:title" content="P2P Sync - A Network Coding based Protocol Design">
-    <meta property="twitter:description" content="">
+    <meta property="twitter:description" content="Primary design of P2P data syncing protocol, with great inspirations collected from several Network Coding literatures">
     <meta property="twitter:image" content="https://itzmeanjan.in/images/myImage.jpg">
     <meta property="twitter:site" content="@meanjanry">
-    <meta name="description" content="">
+    <meta name="description" content="Primary design of P2P data syncing protocol, with great inspirations collected from several Network Coding literatures">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="author" content="Anjan Roy">
     <meta name="keywords"
@@ -62,7 +63,7 @@
                     when each plays role of both client & server. Assuming a chunk of data, which is owned
                     by only one peer, has suddenly become popular. Lots of peers who has interest in that chunk
                     could directly ask the only owner for chunk --- resulting into heavy load on owner.
-                    But one thing to notice, as interested peers prograssively keep owning some portion of
+                    But one thing to notice, as interested peers progressively keep owning some portion of
                     chunk, they could also help others with what they have now. This way only owner doesn't end up
                     feeding all interested parties, rather interested parties also feed other interested parties.
                     This calls for decentralised coordination --- which is <i>not so easy</i>. In p2p networks,
@@ -85,7 +86,7 @@
                     collected enough useful pieces. While sharing these coded pieces, peers also share how have they combined
                     original pieces for constructing coded ones. Actually original pieces are randomly assigned some
                     coefficients/ weights i.e. pieces are added together while multiplying by respective random weights & coded pieces are formed. 
-                    If there're N-many original pieces, atleast N-many useful coded pieces are required for reconstructing back
+                    If there're N-many original pieces, at least N-many useful coded pieces are required for reconstructing back
                     whole chunk.
                     <br>
                     <br>
@@ -95,7 +96,7 @@
                 <p class="blogText">
                     I start with a byte slice i.e. <span class="highlight">[97, 110, 106, 97, 110]</span> which is owned
                     by N-many parties in p2p network. I could have asked one party to share that slice with me & I've the slice
-                    now --- N+1 parties. But I can also ask M <i>( < N )</i>-many parties to share certain portion of slice
+                    now --- total N+1 owners. But I can also ask M <i>( < N )</i>-many parties to share certain portion of slice
                     with me, concurrently, expecting I get whole slice faster. The effects are clearly visible when slice size is larger.
                     <br>
                     <br>
@@ -110,9 +111,9 @@
                     understand what I'm receiving as I receive it, rather after I receive all, I try to figure out what I've received. I want to
                     have a scheme where I can work on decoded data, as I keep receiving remaining, while still enjoying benefits of network coding.
                     Second, I don't want to perform inversion of a large matrix. For solving second issue, I decide to split whole
-                    byte slice into generations & pieces of each generation are coded together i.e. there're no cross-generation
+                    byte slice into generations & pieces of each generation are coded together i.e. there's no cross-generation
                     coding/ decoding dependency. As generations are lot smaller in size, performing small matrix's inverse is not tiresome.
-                    Introducing idea of generations also decreases waiting time before decoding to a great extent. But still for a single generation's
+                    Introducing idea of generations also decreases waiting time before decoding, to a great extent. But still for a single generation's
                     decoding, I've to wait for receiving all coded pieces of generation.
                 </p>
                 <img class="imgCenter" src="../images/p2p-sync-protocol-idea-of-generation.jpg">
@@ -145,17 +146,20 @@
                     One way to avoid sending coding vector, which is an overhead, is pair of peers
                     agreeing upon seed, used for generating random coding coefficients. 
                     At beginning of session seed is shared & for rest of session it's used on receiver's
-                    side for populating coding vectors --- now only <span class="highlight">{"coded_piece": 122}</span> sent over wire.
+                    side for populating coding vectors --- now only <span class="highlight">{"coded_piece": 122}</span> sent over wire,
+                    in every round of piece transfer.
                     <br>
                     <br>
                     One important goal is to avoid obtaining linearly dependent pieces ( read useless pieces ), which is sometimes result of
-                    randomly drawn coding coefficients. For sake for avoiding it, I choose to use prime numbers as coding coeffients.
-                    <br>
-                    <br>
+                    randomly drawn coding coefficients. For sake for avoiding it, I choose to use prime numbers as coding coeffients
+                    in a specific way.
+                </p>
+                <br>
+                <p class="blogText">
                     Assume I'm working on a range, where I've 6 primes which are <span class="highlight">[2, 3, 5, 7, 11, 13]</span> & my original pieces
                     are <span class="highlight">[97, 110, 106, 97, 110]</span>. I want to code & generate 5 pieces, while using primes as coding
                     coefficients in ordered fashion, but I want to keep coordination as little as possible. I choose to use one sliding window technique,
-                    where each piece's coeffients are chosen from one prime ring buffer based on selected <i>index</i>. For
+                    where each piece's coeffients are chosen from one prime ring buffer based on selected <i>index</i>, which I call coding index. For
                     coding index <b>i</b>, start with filling coding vector's index <b>i</b> with prime number at index <b>i</b> 
                     <i>( primes are ascending ordered in ring buffer )</i>, then following indices are filled with consequtive elements
                     from ring buffer. If coding index > 0, first few remaining positions are filled in circular way
@@ -163,43 +167,63 @@
                 </p>
                 <table class="centeredTable">
                     <tr>
-                        <th>Original Piece</th>
-                        <th>Coding Index</th>
-                        <th>Coding Vector</th>
-                        <th>Coded Piece</th>
+                        <th rowspan="2">Original Piece</th>
+                        <th rowspan="2">Coding Index</th>
+                        <th rowspan="2">Coding Vector</th>
+                        <th rowspan="2">Coded Piece</th>
+                        <th colspan="2">Over the Wire</th>
+                    </tr>
+                    <tr>
+                        <th>
+                            Coding Index
+                        </th>
+                        <th>
+                            Coded Piece
+                        </th>
                     </tr>
                     <tr>
                         <td rowspan="5">[97, 110, 106, 97, 110]</td>
                         <td>0</td>
                         <td>[2, 3, 5, 7, 11]</td>
                         <td>112</td>
+                        <td>0</td>
+                        <td>112</td>
                     </tr>
                     <tr>
                         <td>1</td>
                         <td>[13, 3, 5, 7, 11]</td>
+                        <td>101</td>
+                        <td>1</td>
                         <td>101</td>
                     </tr>
                     <tr>
                         <td>2</td>
                         <td>[13, 2, 5, 7, 11]</td>
                         <td>11</td>
+                        <td>2</td>
+                        <td>11</td>
                     </tr>
                     <tr>
                         <td>3</td>
                         <td>[13, 2, 3, 7, 11]</td>
+                        <td>106</td>
+                        <td>3</td>
                         <td>106</td>
                     </tr>
                     <tr>
                         <td>4</td>
                         <td>[13, 2, 3, 5, 11]</td>
                         <td>168</td>
+                        <td>4</td>
+                        <td>168</td>
                     </tr>
                 </table>
                 <img class="imgCenter" src="../images/p2p-sync-protocol-prime-ring-buffer-coding.jpg">
                 <p class="blogText">
-                    Actually I work on GF(2**8), having 256 elements i.e. from 0 to 255, it has 54 primes in range. I use these primes in ordered fashion for drawing
+                    Actually I work on GF(2**8), having 256 elements i.e. from 0 to 255, which has 54 primes in range.
+                    I keep these primes in ascending sorted form in a ring buffer. I use these primes in ordered fashion for drawing
                     coefficients. But it's not only sufficient, I introduce concept of various kinds of coded pieces
-                    based on how coding is being performed/ how coding coefficients are chosen.
+                    based on how coding is being performed/ how coding coefficients are chosen from the prime ring buffer I just defined.
                 </p>
                 <ul>
                     <li>Base Coded Piece</li>
@@ -207,33 +231,51 @@
                     <li>Rich Coded Piece</li>
                 </ul>
                 <p class="blogText">
-                    A base coded piece is constructed by taking coding vector with all elements set to 1.
+                    <span class="noteText">Base Coded Piece :</span> A base coded piece is constructed by taking coding vector with all elements set to 1.
                     As I work with original pieces <span class="highlight">[97, 110, 106, 97, 110]</span>,
                     I choose my base coding vector <span class="highlight">[1, 1, 1, 1, 1]</span>, resulting into
                     coded piece 106.
                 </p>
                 <img class="imgCenter" src="../images/p2p-sync-protocol-base-coded-piece.png">
                 <p class="blogText">
-                    A decodable piece is same as base coded piece, except only one element of coding vector
+                    <span class="noteText">Decodable Coded Piece :</span> A decodable piece is same as base coded piece, except only one element of coding vector
                     is > 1. As I'm only interested in prime numbers as coding coefficients, I choose
-                    from prime ring buffer as non-one coefficient. This piece is called decodable for a reason,
+                    != 1 coefficients from prime ring buffer. This piece is called decodable for a reason,
                     because it's very easily decodable when recipient party has one base coded piece too.
+                    <br>
+                    <br>
+                    Though it's possible to fill any one position of coding vector with prime number, but
+                    later I show how specifying/ communicating which certain index to fill with prime is helpful in designing
+                    my protocol, while keeping bandwidth cost low.
                 </p>
                 <img class="imgCenter" src="../images/p2p-sync-protocol-decodable-coded-piece.png">
                 <p class="blogText">
                     Assuming I've two pieces, one base coded piece i.e. <span class="highlight">[1, 1, 1, 1, 1, 106]</span>
-                    & other one decodable coded piece i.e. <span class="highlight">[2, 1, 1, 1, 1, 201]</span>, I can instantly
-                    figure out respective original piece, for which coding coefficient was chosen > 1.
+                    & other one decodable coded piece with coding index 0 i.e. <span class="highlight">[2, 1, 1, 1, 1, 201]</span>, I can instantly
+                    figure out respective original piece i.e. at index 0, <i>because coding index is 0</i>, for which coding coefficient was chosen > 1.
                 </p>
                 <div class="microlight">
  >>> pieces = [[1, 1, 1, 1, 1, 106], [2, 1, 1, 1, 1, 201]]
- >>> gf(pieces).row_reduce() # 97 first piece, revealed
+ >>> gf(pieces).row_reduce() # 97 first piece ( at index 0 ), revealed
  GF([[ 1,  0,  0,  0,  0, 97],
     [ 0,  1,  1,  1,  1, 11]], order=2^8)
                 </div>
                 <p class="blogText">
-                    A rich coded piece, is indeed rich with coding coefficients i.e. coding vector has all elements
-                    set as > 1, where these elements are selected from prime ring buffer.
+                    <span class="noteText">Rich Coded Piece :</span> A rich coded piece, is indeed rich with coding coefficients i.e. coding vector has all elements
+                    set as > 1, where these elements are selected from prime ring buffer. Randomly choosing primes
+                    from ring buffer & preparing coding vector works pretty well, but little structured
+                    operational mode brings in lots of benefits. Coding index can be specified here too, so that
+                    where to start filling coding vector with primes can be easily defined. Here I choose coding index 0
+                    for rich coding, which is why I start filling coding vector at index 0 with prime at index 0 of ring buffer i.e.
+                    2. For remaining places, I start rolling over while plucking consequtive primes from ring buffer. And consequtive
+                    elements are 3, 5, 7, 11.
+                    <br>
+                    <br>
+                    If I've to work with coding index 1 & generate coding vector for rich coding, I'll
+                    fill index 1 of coding vector with prime at index 1 i.e. 3. And next places rightwards
+                    are filled with 5, 7, 11. Only one place remaining i.e. index 0 of coding vector, which I fill
+                    with next element of prime ring buffer i.e. 13. So, I finally prepare coding vector <span class="highlight">[13, 3, 5, 7, 11]</span>
+                    while just knowing coding index <span class="highlight">1</span>.
                 </p>
                 <img class="imgCenter" src="../images/p2p-sync-protocol-rich-coded-piece.png">
                 <p class="blogText">
@@ -249,38 +291,41 @@
 
     base_coded_piece = code(:base, pieces);
     send(base_coded_piece);
-    with_rich = False;
+    with_rich = false;
+
     // N = original piece count in generation
+    // i = coding index
     for (i = begin_index; i < N; i += skip):
         if with_rich:
+            decodable_coded_piece = code(:decodable, pieces, i);
             rich_coded_piece = code(:rich, pieces, i);
-            send(rich_coded_piece, i);
+
+            send(rich_coded_piece, decodable_coded_piece, i);
+        else:
+            decodable_coded_piece = code(:decodable, pieces, i);
+            send(decodable_coded_piece, i);            
         endif
-        
-        decodable_coded_piece = code(:decodable, pieces, i);
-        send(decodable_coded_piece, i);
-        
-        // send rich piece every other round
+
+        // toggle rich piece sending decision
         with_rich = !with_rich;
     endfor
  end
                 </div>
                 <p class="blogText">
                     As usual, I start with an example. Say, I want to have byte slice <span class="highlight">[97, 110, 106, 97, 110]</span>
-                    from 2 peers whom I know having whole slice. Whole slice transfer is performed in single
+                    from 2 peers, who're having whole slice. Whole slice transfer is performed in single
                     generation.
                     I ask Peer_1 to start sending pieces from coding index 0, while using skip factor 2. I'm setting
                     skip factor 2, because I plan to connect to 2 peers & download pieces concurrently from both of them.
+                    So Peer_1, shares 3 pieces with coding index <span class="highlight">[0, 2, 4]</span>.
                     <br>
                     <br>
                     Peer_1 starts with sharing base coded piece, where all elements of coding vector are set to 1.
                     Resulting into construction of coded piece 106.
                     <br>
                     <br>
-                    After that peer enters loop, where it prepares decodable piece, with coding index set as 0. For coding index <b>i</b>,
-                    it takes prime at index <b>i</b>, from ring buffer, inserts at index <b>i</b> of coding
-                    vector, populates all other elements by putting 1. Using this coding vector, it generates
-                    one decodable coded piece 201.
+                    After that peer enters loop, where it prepares decodable piece, with coding index set as 0.
+                    Using this coding vector, it generate one decodable coded piece 201.
                     One thing to notice, during first decodable coded piece sharing, Peer_1 hasn't shared
                     any rich piece. But in next round, it'll.
                     <br>
@@ -343,7 +388,7 @@
                 <img class="imgCenter" src="../images/p2p-sync-protocol-peer-1-protocol-flow.jpg">
                 <p class="blogText">
                     On the other hand, I ask Peer_2 to start at coding index 1, while using skip factor 2, due to
-                    presence of two concurrent peers.
+                    presence of two concurrent peers. It shares 2 pieces with coding indices <span class="highlight">[1, 3]</span>.
                     <br>
                     <br>
                     Peer_2 starts by sharing base coded piece, which is exactly same as what Peer_1 has also
@@ -402,19 +447,20 @@
                 <p class="blogText">
                     I propose one modification in protocol, where receiver can specify
                     whether it wants peer to send base coded piece or not. Because if it receives
-                    same base coded piece from two peers, it doesn't help anyhow. Rank of decoding
+                    same base coded piece from two peers, which doesn't help anyhow. Rank of decoding
                     matrix doesn't increase i.e. useless piece, no doubt.
                     Receiver sets intension of receiving base coded piece from Peer_1 only.
                 </p>
                 <br>
                 <p class="blogText">
                     It's a good time to run protocol & see what happens from receiver's perspective.
-                    For receiver goal is to prograssively keep decoding pieces & supplying to application
+                    For receiver goal is to progressively keep decoding pieces & supplying to application
                     layer with least possible delay, while keeping computional cost as low as possible.
                     <br>
                     <br>
-                    Receiver sees coded pieces in form <span class="highlight">(<i>coding-index</i>, <i>{base,decodable}-coded-piece</i>, <i>rich-coded-piece</i>)</span>.
-                    When <i>coding-index</i> is empty, it's base coded piece at index 1 of received tuple. If <i>coding-index</i>
+                    Receiver sees coded pieces in form <span class="highlight">( <i>coding-index</i>, <i>{base,decodable}-coded-piece</i>, <i>rich-coded-piece</i> )</span>.
+                    When <i>coding-index</i> is empty, it's base coded piece at index 1 of received tuple. It should be received 
+                    only once from only one peer. If <i>coding-index</i>
                     is non-empty, tuple[1] is decodable coded piece. For non-empty coding-index cases, last element of tuple
                     may be non-empty sometimes, which denotes rich coded piece. One thing to note, when rich coded
                     piece is shared, decodable one is also shared, as both of them having same coding index, it's
@@ -438,7 +484,7 @@
                     <br>
                     Till now, receiver has received 3 linearly independent pieces from 2 peers. So it's
                     decoding matrix has rank of 3.
-                    It needs atleast 2 more useful pieces for completely figuring out what's whole byte slice.
+                    It needs at least 2 more useful pieces for completely figuring out what's whole byte slice.
                     <br>
                     <br>
                     Fortunately, Peer_2 shares both decodable & rich coded pieces with coding index 3. Reconstructing
@@ -452,11 +498,43 @@
                     not send any more pieces.
                     <br>
                     <br>
-                    Receiving party successfully decodes pieces in prograssive mode, while collaborating
+                    Receiving party successfully decodes pieces in progressive mode, while collaborating
                     with two peers for syncing with least possible messaging overhead & also putting very
                     less computational burden on self.
                 </p>
                 <img class="imgCenter" src="../images/p2p-sync-protocol-decoder-protocol-flow.png">
+                <p class="blogText">
+                    This demonstration only shows how protocol should be working with single generation,
+                    but in reality for syncing large chunks of data, it needs to work with multiple generations.
+                    As data chunk is first splitted into generations & it's not a cross-generation scheme,
+                    it syncs pieces of same generation from multiple peers, while also working on other generations
+                    concurrently in a different session with few peers. For avoiding reception of duplicate pieces,
+                    skip factor should be set optimistically. Say, when working with 3 peers for syncing data of
+                    certain generation, skip factor set to 3. Now Peer_1 shares pieces with coding indices <span class="highlight">[0, 3, 6, ...]</span>,
+                    when it was asked to start with coding index 0. Similarly other two peers share non-overlapping sets of pieces,
+                    while only arguments shared over wire are starting coding index & skip factor. If noticed carefully,
+                    I need to have (P+1)-many primes for working with P-many original pieces in a generation, while
+                    not producing duplicate coded pieces. As I've 54 primes in 0 - 255 range, I can work with
+                    53 pieces in a generation. So, splitting should be done while respecting this constraint.
+                    <br>
+                    <br>
+                    It's still possible to receive few duplicate coded pieces, if some peer connection fails in mid of transfer,
+                    so other peer comes into picture. Session initiation with new peer begins with same <i>( as used for failed peer )</i>
+                    starting coding index & skip factor, which might result into some duplicate pieces. But it can be avoided
+                    by setting starting coding index of session, to where failed peer left off.
+                    Though skip factor needs to be properly set to avoid scope of receiving duplicate pieces. It stays
+                    quite negligible, but still can be improved.
+                </p>
+                <p class="blogText">
+                    I've written one simulator demonstrating protocol flow, which I keep 
+                    <a class="blogLink" href="https://gist.github.com/itzmeanjan/99a24996f4fbff021ce73cd02fc6590b" target="_blank">here</a> for
+                    future reference. I plan to write real implementation to get clear picture of protocol's
+                    benefits & limitations, so that I can revise it further. I'd love to learn about
+                    your suggestion.
+                </p>
+                <p class="blogText">
+                    Have a great time !
+                </p>
             </article>
         </div>
     </div>
