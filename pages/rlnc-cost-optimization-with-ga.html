@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<!--
+  Author: Anjan Roy<hello@itzmeanjan.in>
+-->
+<html>
+
+<head>
+    <title>
+        P2P Sync - A Network Coding based Protocol Design
+    </title>
+    <meta prefix="og: http://ogp.me/ns#" property="og:type" content="website">
+    <meta prefix="og: http://ogp.me/ns#" property="og:title"
+        content="P2P Sync - A Network Coding based Protocol Design">
+    <meta prefix="og: http://ogp.me/ns#" property="og:description" 
+        content="Primary design of P2P data syncing protocol, with great inspirations collected from several Network Coding literatures">
+    <meta prefix="og: http://ogp.me/ns#" property="og:url" content="https://itzmeanjan.in">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url"
+        content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:width" content="950">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:height" content="735">
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://itzmeanjan.in/">
+    <meta property="twitter:title" content="P2P Sync - A Network Coding based Protocol Design">
+    <meta property="twitter:description" content="Primary design of P2P data syncing protocol, with great inspirations collected from several Network Coding literatures">
+    <meta property="twitter:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta property="twitter:site" content="@meanjanry">
+    <meta name="description" content="Primary design of P2P data syncing protocol, with great inspirations collected from several Network Coding literatures">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="author" content="Anjan Roy">
+    <meta name="keywords"
+        content="anjan, roy, itzmeanjan, software, engineer, india, portfolio, skills, projects, thoughts, experiments, experiences">
+    <meta name="theme-color" content="darkslategrey">
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" type="text/css" href="../styles/index.css">
+    <script src="../styles/code.js"></script>
+</head>
+
+<body>
+    <div id="parentDiv">
+        <div id="navBar">
+            <nav>
+                <a class="navLink" href="/"><big>H</big>ome</a> |
+                <a class="navLink" href="https://github.com/itzmeanjan" target="_blank"><big>P</big>rojects</a> |
+                <a class="navLink" href="/pages/blog.html"><big>B</big>log</a> |
+                <a class="navLink" href="/pages/contact.html"><big>C</big>ontact</a>
+            </nav>
+        </div>
+        <div class="childDiv">
+            <article>
+                <h1 class="blogHeader">
+                    RLNC Cost Optimization with Genetic Algorithm
+                </h1>
+                <h3>Created : July 22, 2021</h3>
+            </article>
+        </div>
+        <div class="childDiv">
+            <article>
+                <p class="blogText">
+                    I was wondering <i>how can I division a chunk of binary data so that after
+                    application of <b>R</b>andom <b>L</b>inear <b>N</b>etwork <b>C</b>oding
+                    overhead is as low as possible ?</i>
+                    <br>
+                    <br>
+                    For applying RLNC on a chunk of data, it needs to be splitted into smaller
+                    pieces. Applying RLNC together on all of those pieces is costly when whole
+                    chunk size is large, because I've to solve lots of linear system of equations
+                    while decoding back to original pieces. Cost of matrix inversion is ~ O(n^3)
+                    --- I don't want to spend too much time in decoding, which is why I choose to make
+                    use of <i>Generation-based RLNC</i> where RLNC is only applied on pieces of
+                    same generation. N-many generations form whole binary chunk. Each generation has
+                    M-many pieces. And each piece has K-many symbols i.e. bytes. But passing only these
+                    generation specific coded pieces doesn't help decoding process, it also needs to know
+                    how exactly these pieces are combined togther, which requires encoder to also
+                    share respective randomly generated coding vectors, having M-many coding coefficients.
+                    Each of these coding coefficients are randomly drawn elements of <b>G</b>alois <b>F</b>ield (2**8),
+                    which is a finite field with 256 elements i.e. from 0 to 255. As I can represent each byte
+                    in 8-bits, GF(2**8) is a good finite field choice for performing RLNC.
+                </p>
+                <img class="imgCenter" src="../images/rlnc-with-ga-generation-piece-symbol.jpg">
+                <p class="blogText">
+                    Let's say I've 8 bytes of data, which I want to code using RLNC while splitting it into
+                    pieces of length 2 bytes. So each piece has 2 symbols. I've 4 pieces, which I can code
+                    at a time i.e. single generation coding. Or I may wish to pack 2 pieces together & do it
+                    in two generations. Each choice comes brings a cost. When performing 2 generation coding,
+                    in first generation I've to code 2 pieces, which requires me to send at least 2 linearly
+                    indepedent coded pieces along with respective randomly generated coding vectors to decoder
+                    process for successfully getting back original two pieces of this generation. Each coding vector
+                    needs to have two GF(2**8) elements, because I'm coding two pieces together of generation 1.
+                    As each random coding coefficient is of 1 byte, for each coded piece I've to send 2 * 1 = 2 bytes
+                    extra. This results into 2 bytes header ( read coding vector ) + 2 bytes body ( read coded piece )
+                    = 4 bytes over wire for each coded piece. As I've to send two of these linearly independent
+                    coded pieces, it costs me 8 bytes of data over wire.
+                    <br>
+                    <br>
+                    One thing to notice here, coding coefficients are randomly drawn from GF(2**8), which might end up
+                    generating linearly dependent coded pieces. Study suggests, sender needs to send 1.6 extra coded pieces
+                    on average for making it fully decodable on decoder process's site. Meaning, I need to send 3.6 coded
+                    pieces to decoder process, on average i.e. costing me 3.6 * 4 bytes = 14.4 bytes per generation. I've to follow
+                    same process for second generation, requiring me to send total 2 * 14.4 bytes = 28.8 bytes of data to decoding
+                    process over wire, for enabling it to fully decode 4 pieces of two generations. I wanted to transfer
+                    8 bytes of original data, as I choose to use RLNC I'm paying with much higher data transfer cost.
+                    <br>
+                    <br>
+                    This time I plan to share 4 original pieces in a single generation. As I code 4 pieces together, I need
+                    to have a coding vector of length 4 bytes, each coefficient randomly drawn from GF(2**8). Each coded piece
+                    need to carry 4 bytes header ( reading coding vector ) + 2 bytes body ( read coded piece ) = 6 bytes
+                    total. Receiver needs to get atleast 4 linearly independent coded pieces to be able to fully decode
+                    into original pieces. But study says, I need 1.6 more coded pieces, resulting into 5.6 * 6 bytes = 33.6
+                    bytes to be sent over wire.
+                    <br>
+                    <br>
+                    I could have splitted 8 bytes of original chunk into 8 pieces & applied RLNC in single generation ( read with 8 pieces )
+                    or 2 generations ( read with 4 pieces in each generation ) --- which would have costed me differently. 
+                    All these possible choices come at a price.
+                </p>
+                <img class="imgCenter" src="../images/rlnc-with-ga-cost-with-configuration.png">
+                <p class="blogText">
+                    Aforementioned table shows lowest possible cost is 21.6 bytes, where 8 bytes of data chunk
+                    is splitted into two pieces, each of 4 bytes, which are coded together in a single generation.
+                    The goal should be to choose the configuration while incurring lowest possible cost.
+                    <br>
+                    <br>
+                    Following diagram is another way to visualise cost with different choices. With 7 possible
+                    coding choices, bytes over wire is highest ( red ) when piece count is 8 ( green ) & coded in a single
+                    generation ( blue ) with no need to pad any extra bytes ( black ). My interest is choosing last point
+                    in plotted diagram ( index 6 along X-axis ), where bytes over wire is lowest, piece count set to 2, generation count 1 & no extra
+                    padding byte cost.
+                    <br>
+                    <br>
+                    Everytime before performing coding, I can make use of algorithm for finding all possible
+                    configurations of coding N-bytes original chunk & choosing the one with lowest cost. But I want to
+                    find it out in a different way --- using Genetic Algorithm.
+                </p>
+                <img class="imgCenter" src="../images/rlnc-with-ga-cost-distribution.png">
+            </article>
+        </div>
+    </div>
+    <div id="footerDiv">
+        <footer>
+            <p id="footerText">
+                &copy <a href="https://github.com/itzmeanjan/itzmeanjan.github.io" id="footerLink"
+                    target="_blank"><big>A</big>njan Roy</a> ( <big>M</big>IT Licensed )
+            </p>
+        </footer>
+    </div>
+</body>
+
+</html>
