@@ -133,6 +133,37 @@
                     find it out in a different way --- using Genetic Algorithm.
                 </p>
                 <img class="imgCenter" src="../images/rlnc-with-ga-cost-distribution.png">
+                <p class="blogText">
+                    For applying <b>G</b>enetic <b>A</b>lgorithm in some constraint satisfaction problem or more generally optimization problem,
+                    possible solutions need to be represented as chromosomes, while multiple possible solutions are kept
+                    in each generation of GA i.e. part of a population; applying several genetic operators on those chromosomes generates new population
+                    to be used for next generation of GA. Genetic operators i.e. selection; crossover/ mating; mutation when applied on current population
+                    or a subset of that, results into new chromosomes. Each chromosome needs to have a fitness value, which is the function I'm trying
+                    to optimize. Only selected individuals with high fitness are allowed to go to next generation. One random factor is always present when applying
+                    any of possible 3 genetic operators. This randomness ensures algorithm is able to explore unchartered search domain, rather than only
+                    exploiting. In constrast with traditional search & optimization algorithms, GA keeps a set of possible solutions ( read population )
+                    while exploring search space, which gives it better chance of finding optimal or close to optimal solutions.
+                    <br>
+                    <br>
+                    Representing each problem's elements of solution space ( read individuals ) as chromosome calls for special care, which is why
+                    some level of augmentation is generally required before GA can be applied on the problem. One famous problem --- <i>One Max Problem</i>, 
+                    which is solved using GA, has an easy to understand chromosome representation. I've a binary string of length N, goal is to find maximum
+                    number can be represented using binary string of length N. A binary string of length N with all bits set to 1 --- is no doubt the answer.
+                    Applying GA for solving this problem may seem like an overkill, but this makes it easier to understand the flow. I randomly choose
+                    M-many binary strings of length N, which are definitely possible solutions, just may not be optimal ones. For finding optimal one
+                    GA is run for K-many generations on these binary strings, while applying selection, crossover & mutation on these binary chromosomes.
+                    Each of these genetic operators are having several variations of theirs, which are applicable in different scenarios. When chromosomes are
+                    represented as binary string/ list of integers they're easier to operate on, but for lots of problems it's not possible to represent
+                    elements from solution space in these favourable forms, which calls for operating on floating point/ complex numbers.
+                    And while working with real/ complex numbers, crossover & mutation operators doesn't behave the way they used to behave for binary strings.
+                    Selection is well applicable for all kinds of chromosome representations, because it doesn't attempt to modify chromosomes, rather it just
+                    randomly selects from possible population.
+                    <br>
+                    <br>
+                    This is the exact problem I've to solve before I can apply GA on RLNC Cost Optimization. I know problem search space i.e. all possible
+                    elements. My interest is in representing them as chromosomes so that I can apply GA on them while also defining genetic operators.
+
+                </p>
             </article>
         </div>
     </div>
