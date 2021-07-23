@@ -6,13 +6,13 @@
 
 <head>
     <title>
-        P2P Sync - A Network Coding based Protocol Design
+        RLNC Cost Optimization with Genetic Algorithm
     </title>
     <meta prefix="og: http://ogp.me/ns#" property="og:type" content="website">
     <meta prefix="og: http://ogp.me/ns#" property="og:title"
-        content="P2P Sync - A Network Coding based Protocol Design">
+        content="RLNC Cost Optimization with Genetic Algorithm">
     <meta prefix="og: http://ogp.me/ns#" property="og:description" 
-        content="Primary design of P2P data syncing protocol, with great inspirations collected from several Network Coding literatures">
+        content="">
     <meta prefix="og: http://ogp.me/ns#" property="og:url" content="https://itzmeanjan.in">
     <meta prefix="og: http://ogp.me/ns#" property="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
     <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url"
@@ -21,11 +21,11 @@
     <meta prefix="og: http://ogp.me/ns#" property="og:image:height" content="735">
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="https://itzmeanjan.in/">
-    <meta property="twitter:title" content="P2P Sync - A Network Coding based Protocol Design">
-    <meta property="twitter:description" content="Primary design of P2P data syncing protocol, with great inspirations collected from several Network Coding literatures">
+    <meta property="twitter:title" content="RLNC Cost Optimization with Genetic Algorithm">
+    <meta property="twitter:description" content="">
     <meta property="twitter:image" content="https://itzmeanjan.in/images/myImage.jpg">
     <meta property="twitter:site" content="@meanjanry">
-    <meta name="description" content="Primary design of P2P data syncing protocol, with great inspirations collected from several Network Coding literatures">
+    <meta name="description" content="">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="author" content="Anjan Roy">
     <meta name="keywords"
@@ -207,16 +207,19 @@
                     round of tournament selection to find another parent & finally crossover them while respecting crossover probability.
                     That answers fifth question.
                 </p>
+                <br>
                 <p class="blogText">
-                    As I mentioned before, crossover will be little problematic as I define chromosomes as 5-element tuple instead of binary strings.
-                    It calls for special treatment, where two tournament selected parents to be mated for generating two children. I devise a way where I
-                    place possible piece sizes in ascending sorted order in a set. As I'm working with 8-bytes whole data chunk, allowed piece sizes are
-                    1-byte, 2-bytes, 3-bytes & 4-bytes. Placing them in ascending sorted order in a set gives me <span class="highlight">{1, 2, 3, 4}</span>.
+                    As I mentioned before, crossover will be little problematic because I define chromosomes as 5-element tuple instead of binary strings.
+                    It calls for special treatment, before two tournament selected parents can be mated for generating two children. I devise a way where I
+                    place possible piece sizes in ascending sorted order in a set, when total data chunk size is given. 
+                    As I'm working with 8-bytes whole data chunk, allowed piece sizes are
+                    1-byte, 2-bytes, 3-bytes & 4-bytes. Placing them in ascending sorted order in a set gives me <span class="highlight">{1, 2, 3, 4}</span> --- calling it
+                    piece-size-set.
                     <br>
                     <br>
-                    For first parent, say <span class="highlight">(4, 2, 0, 2, 1)</span> is individual's chromosome, I find respective piece size ( read 4 )'s index
-                    in piece size set, which is 3. I randomly select one shift factor from range <span class="highlight">[0, len(piece-size-set))</span>, which I'll
-                    use for shifting piece size index leftwards/ rightwards. I get shift factor 2, while I'm working with piece-size-set of length 4.
+                    For first parent, say <span class="highlight">(4, 2, 0, 2, 1)</span> is individual's chromosome, I find respective piece size ( read 4, at index 0 of tuple )'s index
+                    in piece-size-set, which is 3. I randomly select one shift factor from range <span class="highlight">[0, len(piece-size-set))</span>, which I'll
+                    use for shifting piece size index ( read 3 ) leftwards/ rightwards. I get shift factor 2, while I'm working with piece-size-set of length 4.
                     Now for generating first child, I randomly decide to shift first parent's piece size index ( read 3 ) leftwards by shift factor 2.
                     This gives me new shifted index <span class="highlight">( 3 - 2 ) % 4 = 1</span>. I look up piece size at index 1 of piece-size-set,
                     which is 2. Using piece size 2, I can prepare 4 pieces, because I've to split 8-bytes of whole chunk & I don't need to pad any extra zero bytes.
@@ -227,13 +230,100 @@
                     <li>4 pieces together, resulting into 1 generation</li>
                 </ul>
                 <p class="blogText">
-                    I randomly choose to go with 2 pieces together, which gives me first child <span class="highlight">( 2, 4, 0, 2, 2 )</span> ---
-                    a valid newly generated individual. Similarly for preparing second child, I decide to randomly shift second parent's
-                    piece size index ( read 0, because second parent is <span class="highlight">(1, 8, 0, 8, 1)</span> ) leftwards/ rightwards by shift factor 2.
-                    That gives me new piece size to be used in second child. As I did for first piece, same way I fill up other fields of 5-element chromosome tuple,
-                    where generation size is just randomly selected from available possibilities.
+                    I randomly choose to code 2 pieces together, which gives me first child <span class="highlight">( 2, 4, 0, 2, 2 )</span> ---
+                    a valid newly generated individual. I say generated first child is valid because I can find its presence in above table.
+                    <br>
+                    <br>
+                    Similarly for preparing second child, I decide to randomly shift second parent's
+                    piece size index ( read 0, because second parent is <span class="highlight">(1, 8, 0, 8, 1)</span> ) rightwards by shift factor 2.
+                    Shifted index is <span class="highlight">( 0 + 2 ) % 4 = 2</span>, where piece size is 3. If piece size is 3, piece count is also 3,
+                    by appending 1 extra byte. With this piece size, I've 3 pieces, which is prime, resulting that I need to code those 3 pieces together
+                    in a single generation. So obtained second child's chromosome looks like <span class="highlight">(3, 3, 1, 3, 1)</span> --- definitely
+                    a valid RLNC configuration.
                 </p>
                 <img class="imgCenter" src="../images/rlnc-with-ga-crossover.jpg">
+                <p class="blogText">
+                    Mutation invites random genetic diversity in next population, which is helpful when search space is large & mostly unchartered, where exploration is of prime interest, 
+                    rather than exploitation of known tricks.
+                    Mutation is a unary operator i.e. it takes a single chromosome & applies operator which results into a new chromosome i.e. individual. Same as crossover, I make use of shift factor, 
+                    which I randomly choose from <span class="highlight">[0, len(piece-size-set))</span> --- using 3 this time.
+                    Second child chromosome <span class="highlight">(3, 3, 1, 3, 1)</span> i.e. result of application of crossover operator is decided to be mutated.
+                    Index of piece size ( read 3 ) of this RLNC configuration is 2, in piece-size-set. This piece-size-set is same as before used during crossover --- <span class="highlight">{1, 2, 3, 4}</span>.
+                    Random decision to shift piece size index rightwards by shift factor 3, gives shifted index <span class="highlight">(2 + 3) % 4 = 1</span>, looking up piece
+                    size at index 1 of piece-size-set gives 2. With piece size of 2 bytes, I can have 4 pieces, while spending 0 on extra pad bytes. Again 4 pieces can be coded
+                    in any of possible two ways.
+                </p>
+                <ul>
+                    <li>2 pieces together, resulting into 2 generations</li>
+                    <li>4 pieces together, resulting into 1 generation</li>
+                </ul>
+                <p class="blogText">
+                    I randomly choose second way, giving me RLNC configuration <span class="highlight">(2, 4, 0, 4, 1)</span>, which is an individual of next GA population.
+                </p>
+                <img class="imgCenter" src="../images/rlnc-with-ga-mutation.jpg">
+                <p class="blogText">
+                    The last question is already answered --- atleast after defining crossover & mutation operator, which generates valid child chromosome(s), 
+                    where each of them are valid RLNC configuration for specified total data chunk length ( read 8 here ).
+                    <br>
+                    <br>
+                    Now I've everything I need to run GA & figure out what's best possible RLNC configuration --- evidently it's (4, 2, 0, 2, 1) costing 21.6 bytes over wire.
+                    With this configuration 8 bytes total chunk to be splitted into 2 pieces, each of 4 bytes length & those two pieces are coded together in a single RLNC generation,
+                    while no extra padding bytes are used.
+                    <br>
+                    <br>
+                    I run GA on 1024 bytes chunk for determining cheapest possible RLNC configuration, with GA population size 50 i.e. 50 chromosomes ( read possible solutions )
+                    to be maintained in each generation. And I run GA for 50 generations, after that lowest cost solution is what GA was able to figure out --- though
+                    it doesn't anyhow guarantee it finds optimal one.
+                    I also enable elitism setting, which passes best individual of certain generation to next generation without any modification, respecting genetic
+                    elitist behaviour. This ensures once an elite i.e. low cost RLNC configuration is found, it won't be lost until some lower cost
+                    alternative individual is found --- providing me with guarantee if lowest cost RLNC configuration is ever found, genetic operators won't touch it.
+                    <br>
+                    <br>
+                    After 50 generations, GA has discovered <span class="highlight">(128, 8, 0, 8, 1)</span> as lowest cost RLNC configuration --- costing 1305.6 bytes over wire.
+                    This configuration asks to split 1024 bytes original data chunk into 8 pieces, each of size 128 bytes. And those 8 pieces are coded together in a single generation.
+                </p>
+                <img class="imgCenter" src="../images/rlnc-with-ga-run-output.png">
+                <p class="blogText">
+                    I collected metrics on how GA performed in each generation --- what're minimum, maximum, mean, median fitness values in each of these generations.
+                    I'm specifically interested in how minimum fitness of each generation converges to lowest possible cost. It says around generation 2, cheapest
+                    configuration discovered reached ~1325 bytes, which stayed there for next few generations ( read genetic elitism at work ). And before generation count
+                    reached even 10, GA has discovered cheapest possible RLNC configuration with cost over wire of 1305.6 bytes. Data says cheapest possible configuration discovered
+                    is never lost after it's found for first time.
+                </p>
+                <img class="imgCenter" src="../images/rlnc-with-ga-run-logging.png">
+                <p class="blogText">
+                    Using conventional way, I can discover top 10 cheapest RLNC configurations, which doesn't enlist <span class="highlight">(128, 8, 0, 8, 1)</span> as cheapest,
+                    rather <span class="highlight">(114, 9, 2, 9, 1)</span> is cheaper with cost over wire of 1303.8 bytes. But GA didn't choose it, as this configuration requires to
+                    pad extra 2 bytes of data at end, which is pure waste --- resulting second cheapest configuration being treated as cheapest in terms of GA, while still being little bit
+                    expensive. This behaviour is due to how I defined fitness function of chromosomes, which sums padding bytes & cost over wire. Taking first, second cheapest configurations &
+                    computing their fitness values, results into <span class="highlight">(1303.8 + 2) = 1305.8</span> & <span class="highlight">(1305.6 + 0) = 1305.6</span> --- evidently RLNC
+                    configuration <span class="highlight">(128, 8, 0, 8, 1)</span> is chosen as cheapest by GA.
+                </p>
+                <img class="imgCenter" src="../images/rlnc-with-ga-run-top-n-config.png">
+                <p class="blogText">
+                    RLNC cost distribution & its change with respect to changes in other params like generation size, total piece count, extra padding bytes
+                    depicts when total piece count is max, #-of generations is max, padding bytes cost is 0, but cost over wire is highest. This is no doubt the configuration
+                    where each byte is considered as a piece, making 1024 pieces, which are coded together in 512 generations total. No extra bytes were padded, but it costs very high
+                    due to presence of lots of coding coefficient vectors, which are sent from source to destination over wire.
+                    <br>
+                    <br>
+                    Required padding bytes plot shows nice pattern over possible choice set. It's because some piece size choices are able to fully
+                    divide 1024 ( read total chunk size ), while some are not. Between any two such piece size choice, which are able to fully divide
+                    total chunk size i.e. 1024, possible piece size choices require increasing #-of extra padding bytes until reaches some highest value
+                    which then abruptly falls to 0 at next piece size choice, able to fully divide 1024. This keeps happening again & again, this way highest possible
+                    required padding bytes size may reach 200 bytes for <b>R</b>andom <b>L</b>inear <b>N</b>etwork <b>C</b>oding 1024 bytes original chunk.
+                </p>
+                <img class="imgCenter" src="../images/rlnc-with-ga-run-cost-distribution.png">
+                <p class="blogText">
+                    By applying GA, I'm able to find out cheapest RLNC configuration, when coding 1024 bytes chunk. Increasing total chunk size also
+                    increases possible #-of valid RLNC configurations to a great extent, which calls for some GA hyperparameter optimization i.e. tuning
+                    required population size, generation count, crossover/ mutation probability, tournament size etc. for reaching optimal/ close to optimal
+                    configuration.
+                    <br>
+                    <br>
+                    Further I plan to explore <i>does it make sense to use GA for determining cheap RLNC configuration in practice, 
+                    where solution space is probably much larger due to presence of huge chunk size ?</i>
+                </p>
             </article>
         </div>
     </div>
