@@ -284,7 +284,7 @@
                 </p>
                 <img class="imgCenter" src="../images/rlnc-with-ga-run-output.png">
                 <p class="blogText">
-                    I collected metrics on how GA performed in each generation --- what're minimum, maximum, mean, median fitness values in each of these generations.
+                    I collected metrics on how GA performed in each generation --- what're minimum ( blue ), maximum ( red ), mean ( green ), median ( black ) fitness values in each of these generations.
                     I'm specifically interested in how minimum fitness of each generation converges to lowest possible cost. It says around generation 2, cheapest
                     configuration discovered reached ~1325 bytes, which stayed there for next few generations ( read genetic elitism at work ). And before generation count
                     reached even 10, GA has discovered cheapest possible RLNC configuration with cost over wire of 1305.6 bytes. Data says cheapest possible configuration discovered
@@ -301,13 +301,13 @@
                 </p>
                 <img class="imgCenter" src="../images/rlnc-with-ga-run-top-n-config.png">
                 <p class="blogText">
-                    RLNC cost distribution & its change with respect to changes in other params like generation size, total piece count, extra padding bytes
+                    RLNC cost distribution & its change with respect to changes in other params like generation size ( blue ), total piece count ( green ), extra padding bytes ( black )
                     depicts when total piece count is max, #-of generations is max, padding bytes cost is 0, but cost over wire is highest. This is no doubt the configuration
                     where each byte is considered as a piece, making 1024 pieces, which are coded together in 512 generations total. No extra bytes were padded, but it costs very high
                     due to presence of lots of coding coefficient vectors, which are sent from source to destination over wire.
                     <br>
                     <br>
-                    Required padding bytes plot shows nice pattern over possible choice set. It's because some piece size choices are able to fully
+                    Required padding bytes plot ( black ) shows nice pattern over possible choice set. It's because some piece size choices are able to fully
                     divide 1024 ( read total chunk size ), while some are not. Between any two such piece size choice, which are able to fully divide
                     total chunk size i.e. 1024, possible piece size choices require increasing #-of extra padding bytes until reaches some highest value
                     which then abruptly falls to 0 at next piece size choice, able to fully divide 1024. This keeps happening again & again, this way highest possible
