@@ -130,40 +130,110 @@
                     <br>
                     Everytime before performing coding, I can make use of algorithm for finding all possible
                     configurations of coding N-bytes original chunk & choosing the one with lowest cost. But I want to
-                    find it out in a different way --- using Genetic Algorithm.
+                    find it out in a different way --- using <b>G</b>enetic <b>A</b>lgorithm.
                 </p>
                 <img class="imgCenter" src="../images/rlnc-with-ga-cost-distribution.png">
                 <p class="blogText">
-                    For applying <b>G</b>enetic <b>A</b>lgorithm in some constraint satisfaction problem or more generally optimization problem,
-                    possible solutions need to be represented as chromosomes, while multiple possible solutions are kept
-                    in each generation of GA i.e. part of a population; applying several genetic operators on those chromosomes generates new population
-                    to be used for next generation of GA. Genetic operators i.e. selection; crossover/ mating; mutation when applied on current population
-                    or a subset of that, results into new chromosomes. Each chromosome needs to have a fitness value, which is the function I'm trying
-                    to optimize. Only selected individuals with high fitness are allowed to go to next generation. One random factor is always present when applying
-                    any of possible 3 genetic operators. This randomness ensures algorithm is able to explore unchartered search domain, rather than only
-                    exploiting. In constrast with traditional search & optimization algorithms, GA keeps a set of possible solutions ( read population )
-                    while exploring search space, which gives it better chance of finding optimal or close to optimal solutions.
-                    <br>
-                    <br>
-                    Representing each problem's elements of solution space ( read individuals ) as chromosome calls for special care, which is why
-                    some level of augmentation is generally required before GA can be applied on the problem. One famous problem --- <i>One Max Problem</i>, 
-                    which is solved using GA, has an easy to understand chromosome representation. I've a binary string of length N, goal is to find maximum
-                    number can be represented using binary string of length N. A binary string of length N with all bits set to 1 --- is no doubt the answer.
-                    Applying GA for solving this problem may seem like an overkill, but this makes it easier to understand the flow. I randomly choose
-                    M-many binary strings of length N, which are definitely possible solutions, just may not be optimal ones. For finding optimal one
-                    GA is run for K-many generations on these binary strings, while applying selection, crossover & mutation on these binary chromosomes.
-                    Each of these genetic operators are having several variations of theirs, which are applicable in different scenarios. When chromosomes are
-                    represented as binary string/ list of integers they're easier to operate on, but for lots of problems it's not possible to represent
-                    elements from solution space in these favourable forms, which calls for operating on floating point/ complex numbers.
-                    And while working with real/ complex numbers, crossover & mutation operators doesn't behave the way they used to behave for binary strings.
-                    Selection is well applicable for all kinds of chromosome representations, because it doesn't attempt to modify chromosomes, rather it just
-                    randomly selects from possible population.
-                    <br>
-                    <br>
-                    This is the exact problem I've to solve before I can apply GA on RLNC Cost Optimization. I know problem search space i.e. all possible
-                    elements. My interest is in representing them as chromosomes so that I can apply GA on them while also defining genetic operators.
-
+                    Before I get to apply GA on RLNC Cost Optimization Problem, I've to answer some basic questions.
                 </p>
+                <ol>
+                    <li>
+                        How does solution space look like ?
+                    </li>
+                    <li>
+                        How to represent each chromosome ?
+                    </li>
+                    <li>
+                        What's the fitness function, available on each chromosome, which I'm trying to optimize ?
+                    </li>
+                    <li>
+                        How to generate initial population ?
+                    </li>
+                    <li>
+                        How to perform selection operation on current population, where chromosomes with better fitness to have better chance of selection ?
+                    </li>
+                    <li>
+                        How to crossover/ mate two chromosomes ?
+                    </li>
+                    <li>
+                        How does mutation of single chromosome happen ?
+                    </li>
+                    <li>
+                        And how do I make sure, after applying crossover/ mutation operator, generated chromosome is still a valid individual from possible solution space ?
+                    </li>
+                </ol>
+                <p class="blogText">
+                    My quest for finding these answers will hopefully lead me to successfully applying GA on RLNC Cost Optimization Problem & find something useful.
+                    <br>
+                    <br>
+                    I already know answer to first question. My interest is in splitting whole data chunk into piece of N-bytes & grouping M-pieces
+                    into generations, so that I can apply RLNC on pieces of same generation. I've to split & generate atleast two pieces to be able to apply
+                    RLNC, which means if I've 8 bytes of original data, I can choose to generate 2 pieces, each of length 4-bytes. This actually allows me
+                    to group <=4 bytes together & generate pieces of same length. I can choose to work with 1-byte/ 2-bytes/ 3-bytes/ 4-bytes piece size.
+                    Piece size choice affects piece count & whether I need to pad any extra bytes. Extra bytes pad is needed when I choose to make each piece
+                    of 3-bytes, because each piece must be of same length for applying RLNC. So extra zero bytes padding is a cost, I'd generally like to
+                    avoid it as much as possible. As I know piece count, I can decide how to group pieces together to make a RLNC generation. Rule is, I must
+                    have atleast 2 pieces in each generation for working with RLNC. Possible generation sizes are dependent on piece counts, while generation size
+                    choice affects generation count. I've five element tuples to work with.
+                    <br>
+                    <br>
+                    Solution space is a set of five element tuples, each representing a possible & valid RLNC configuration.
+                </p>
+                <div class="microlight">
+ ( piece-size, piece-count, extra-pad-bytes, generation-size, generation-count )
+                </div>
+                <p class="blogText">
+                    Answer to first question, almost answered second one too. I decide to represent each chromosome as a 5-element tuple. Though
+                    my interest was to represent chromosomes as binary strings, but seemingly this is what I've to work with. When defining crossover
+                    & mutation operators, I'll face some problems due to this kind of chromosome representation.
+                </p>
+                <p class="blogText">
+                    Third question is already answered. I know how to calculate cost over wire ( read in terms of bytes sent ) for a given 5-element tuple i.e. RLNC
+                    configuration. I use cost over wire as fitness function for each chromosome, so this is a fitness minimization problem. One thing I'm also interested
+                    in --- not sending too many extra padding bytes, which is not yet considered in cost over wire calculation. In modified fitness function, 
+                    I take sum of cost-over-wire & extra padding bytes.
+                </p>
+                <p class="blogText">
+                    As I'm not working with chromosomes represented as binary strings, I can't just randomly generate a list of byte strings,
+                    to be used as initial population. Rather I randomly choose N-many 5-element tuples from possible RLNC configuration set, where
+                    <i>N = population size of GA</i>.
+                </p>
+                <p class="blogText">
+                    One good thing about GA selection operator is it doesn't attempt to modify any chromosome, it just randomly chooses from
+                    current population while putting more preference on chromosomes having better fitness values. And that's why I don't have to
+                    devise any specific kind of selection operator. I make use of tournament selection operator with tournament size of 3.
+                    Meaning if I decide to maintain population size of 20, I'll be randomly selecting 3
+                    elements from current population & run a tournament on them to decide who gets to be selected to become a parent. I do another
+                    round of tournament selection to find another parent & finally crossover them while respecting crossover probability.
+                    That answers fifth question.
+                </p>
+                <p class="blogText">
+                    As I mentioned before, crossover will be little problematic as I define chromosomes as 5-element tuple instead of binary strings.
+                    It calls for special treatment, where two tournament selected parents to be mated for generating two children. I devise a way where I
+                    place possible piece sizes in ascending sorted order in a set. As I'm working with 8-bytes whole data chunk, allowed piece sizes are
+                    1-byte, 2-bytes, 3-bytes & 4-bytes. Placing them in ascending sorted order in a set gives me <span class="highlight">{1, 2, 3, 4}</span>.
+                    <br>
+                    <br>
+                    For first parent, say <span class="highlight">(4, 2, 0, 2, 1)</span> is individual's chromosome, I find respective piece size ( read 4 )'s index
+                    in piece size set, which is 3. I randomly select one shift factor from range <span class="highlight">[0, len(piece-size-set))</span>, which I'll
+                    use for shifting piece size index leftwards/ rightwards. I get shift factor 2, while I'm working with piece-size-set of length 4.
+                    Now for generating first child, I randomly decide to shift first parent's piece size index ( read 3 ) leftwards by shift factor 2.
+                    This gives me new shifted index <span class="highlight">( 3 - 2 ) % 4 = 1</span>. I look up piece size at index 1 of piece-size-set,
+                    which is 2. Using piece size 2, I can prepare 4 pieces, because I've to split 8-bytes of whole chunk & I don't need to pad any extra zero bytes.
+                    So I've 4 pieces, I can group them together in any of two possible ways.
+                </p>
+                <ul>
+                    <li>2 pieces together, resulting into 2 generations</li>
+                    <li>4 pieces together, resulting into 1 generation</li>
+                </ul>
+                <p class="blogText">
+                    I randomly choose to go with 2 pieces together, which gives me first child <span class="highlight">( 2, 4, 0, 2, 2 )</span> ---
+                    a valid newly generated individual. Similarly for preparing second child, I decide to randomly shift second parent's
+                    piece size index ( read 0, because second parent is <span class="highlight">(1, 8, 0, 8, 1)</span> ) leftwards/ rightwards by shift factor 2.
+                    That gives me new piece size to be used in second child. As I did for first piece, same way I fill up other fields of 5-element chromosome tuple,
+                    where generation size is just randomly selected from available possibilities.
+                </p>
+                <img class="imgCenter" src="../images/rlnc-with-ga-crossover.jpg">
             </article>
         </div>
     </div>
