@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<!--
+  Author: Anjan Roy<hello@itzmeanjan.in>
+-->
+<html>
+
+<head>
+    <title>
+        Erasure Coded Storage with RLNC
+    </title>
+    <meta prefix="og: http://ogp.me/ns#" property="og:type" content="website">
+    <meta prefix="og: http://ogp.me/ns#" property="og:title" content="Erasure Coded Storage with RLNC">
+    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="">
+    <meta prefix="og: http://ogp.me/ns#" property="og:url" content="https://itzmeanjan.in">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url"
+        content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:width" content="950">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:height" content="735">
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://itzmeanjan.in/">
+    <meta property="twitter:title" content="Erasure Coded Storage with RLNC">
+    <meta property="twitter:description" content="">
+    <meta property="twitter:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta property="twitter:site" content="@meanjanry">
+    <meta name="description" content="">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="author" content="Anjan Roy">
+    <meta name="keywords"
+        content="anjan, roy, itzmeanjan, software, engineer, india, portfolio, skills, projects, thoughts, experiments, experiences">
+    <meta name="theme-color" content="darkslategrey">
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" type="text/css" href="../styles/index.css">
+    <script src="../styles/code.js"></script>
+</head>
+
+<body>
+    <div id="parentDiv">
+        <div id="navBar">
+            <nav>
+                <a class="navLink" href="/"><big>H</big>ome</a> |
+                <a class="navLink" href="https://github.com/itzmeanjan" target="_blank"><big>P</big>rojects</a> |
+                <a class="navLink" href="/pages/blog.html"><big>B</big>log</a> |
+                <a class="navLink" href="/pages/contact.html"><big>C</big>ontact</a>
+            </nav>
+        </div>
+        <div class="childDiv">
+            <article>
+                <h1 class="blogHeader">
+                    Erasure Coded Storage with RLNC
+                </h1>
+                <h3>Created : August 08, 2021</h3>
+            </article>
+        </div>
+        <div class="childDiv">
+            <article>
+                <p class="blogText">
+                    After exploring <b>R</b>andom <b>L</b>inear <b>N</b>etwork <b>C</b>oding for some time, I've started writing one library in Golang, named <span class="highlight">kodr</span>,
+                    where I'm on my way to implementing various RLNC schemes i.e. Full RLNC, Systematic RLNC, Sparse RLNC, Generational RLNC, Sliding Window RLNC, Perpetual RLNC etc. . This week
+                    I was thinking RLNC can be good fit for storage systems where data chunks are already stored in erasure coded form in multiple geographically distant locations --- increasing redundancy,
+                    so that even if some of these locations become unreachable temporarily or permanently, original data can be recovered from available subset of data. A lot of these storage systems are using
+                    Reed Solomon Coding or some ( proprietary ) variant of it, but as I understand most of those coding schemes don't allow recoding as RLNC does. Good thing about RLNC is it can recode
+                    and construct newly coded pieces just from available coded pieces. It means for recoding RLNC decoder doesn't need to collect N-many linearly independent pieces & then decode them back to original N-many
+                    pieces, which are coded together again to generate <i>"recoded"</i> pieces, rather it takes M-many coded pieces ( read linear equations ) which are converted to new coded pieces ( read new linear equations )
+                    by randomly drawing coding coefficients from finite field GF(2**8). And these RLNC (re)coded pieces can be equally useful to decoder when constructing back original pieces, 
+                    as long as they're linearly independent. Recoding is beneficial when some storage locations of a cluster become temporarily or permanently unreachable, new redundancy in cluster
+                    can be created pretty fast by collecting some available coded pieces & generating new coded pieces from those.
+                    Today I'm interested in demonstrating same using a simulation I design using <span class="highlight">kodr</span>.
+                </p>
+                <p class="blogText">
+                    Assuming I've a multimedia file of N-bytes ( where N = 16265760 ), which I'd like to store in a reliable storage cluster & get whole file back when need it. To be more specific it's a MP4 coded video file
+                    with unique content identifier <span class="highlight">dfc734fc40a98e8a6e041af13893f6170f073b160dfdc16621e76ad4e6b847b4</span>. The storage cluster is reliable because it can handle failures
+                    of few of its components, upto to certain threshold & still return me back my file. No doubt cluster creates redundancy in data it stores, which effectively increases storage cost. Simply storage cluster can
+                    replicate original file into three locations, making it able to handle upto 2 locations failing & it's still able to give me back file when I need it. Or cluster can decide to store file in erasure coded form by constructing
+                    pieces ( read smaller byte chunks ) & distributing them over multiple locations. When I ask it for whole file it collects required pieces from available locations & reconstructs whole file for me by solving some linear
+                    equations.
+                </p>
+                <div class="microlight">
+ $ file file.mp4
+ file.mp4: ISO Media, MP4 Base Media v1 [ISO 14496-12:2003]
+
+ $ du -b file.mp4
+ 16265760        file.mp4
+
+ $ sha256sum file.mp4
+ dfc734fc40a98e8a6e041af13893f6170f073b160dfdc16621e76ad4e6b847b4  file.mp4
+                </div>
+                <p class="blogText">
+                    For coding N-bytes file, I need to specify how many pieces I want it to be chunked into. Say I want the file to be splitted into 32 pieces & code them together to construct 64 coded pieces, which cluster distributes
+                    through out network. Cluster employs 8 storage devices which are physically seperated from each other for storing 64 coded pieces I constructed --- each storage device storing 8 pieces. For constructing coded
+                    pieces I make use of <span class="highlight">kodr</span>, where I give it whole file i.e. a byte array of size 16_265_760 & express my intent of splitting it into 32 pieces.
+                    <br>
+                    <br>
+                    As total file can be divided into 32 pieces of equal size ( i.e. each of 508_305 bytes ), no padding bytes are required to be added at end of byte array. If it was not the case, B-many bytes are to be added at end
+                    of original byte slice of length N, so that (N+B)-bytes slice becomes properly divisible by piece count ( here it's 32 ). As 32 original pieces are being coded together, it results into carrying 32 more bytes in each coded
+                    piece, which is called random coding coefficient vector, where each element is drawn from GF(2**8). GF(2**8) has 256 elements, each of them can be easily represented in 1 byte = 8 bits. So each coded piece carries
+                    coded data of 508_305 bytes & 32 random coding coefficients. Another way to see coding vectors --- these are carrying information of how 32 original pieces are coded together so that I can exploit them during decoding
+                    back to original pieces. This results into coded piece of size 508_337 bytes  ( = 508_305 + 32 ).
+                    <br>
+                    <br>
+                    I'm going to generate 64 coded pieces, among those any linearly independent 32 of them are enough to construct back original file --- I need to collect & process 16_266_784 bytes coded data ( in total )
+                    to get back 16_265_760 bytes of original file, which is 1_024 bytes overhead.
+                </p>
+                <img class="imgCenter" src="../images/rlnc-coded-storage-distribution.jpg">
+                <p class="blogText">
+                    Each coded piece is of 508_337 bytes, so for storing 64 coded pieces cluster network needs to employ 325_335_68 bytes storage. Any 32 linearly independent pieces among 64 available ones are enough for
+                    reconstructing back original file. As I'm working with GF(2**8) which has 256 elements, the chance of generating linearly dependent pieces are pretty low, so most of these 64 coded pieces, spread across network
+                    are going to be linearly independent. For simulating that I'm randomly collecting total 32 coded pieces, I decide to random shuffle set of available 64 coded pieces & choose first 32 pieces.
+                </p>
+                <div class="microlight">
+ // random subset of coded piece availability, being simulated
+ rand.Shuffle(c_pieceCount, func(i, j int) {
+     c_pieces[i], c_pieces[j] = c_pieces[j], c_pieces[i]
+ })
+
+ have_c_pieces := c_pieces[:pieceCount] // 32 randomly collected coded pieces
+ dec := full.NewFullRLNCDecoder(uint(pieceCount))
+ for i := 0; i < pieceCount; i++ {
+    dec.AddPiece(have_c_pieces[i]) // decoding in-progress
+ }
+                </div>
+                <p class="blogText">
+                    After performing full RLNC decoding with 32 coded pieces, I expect to get back 32 original pieces. Turns out 32 collected coded pieces were linearly independent --- notice during encoding I just randomly chose
+                    32 finite field elements from GF(2**8), for constructing a coding coefficient vector, meaning random coefficient choice performs pretty good.
+                    <br>
+                    <br>
+                    Now computing SHA256 hash on reconstructed data must give me <span class="highlight">dfc734fc40a98e8a6e041af13893f6170f073b160dfdc16621e76ad4e6b847b4</span>. And indeed that happens ---
+                    confirming data reconstruction was successful.
+                </p>
+                <div class="microlight">
+ flattened := make([]byte, 0)
+ for i := range d_pieces {
+    flattened = append(flattened, d_pieces[i]...)
+ }
+                
+ hasher := sha256.New()
+ hasher.Write(flattened)
+ sum = hasher.Sum(nil)
+ log.Printf("SHA256(decoded): 0x%s\n", hex.EncodeToString(sum)) // shows `0xdfc734fc40a98e8a6e041af13893f6170f073b160dfdc16621e76ad4e6b847b4`
+ hasher.Reset()
+                </div>
+                <p class="blogText">
+                    Now I'd like to simulate recoding & piece repopulation behaviour. Assuming <i>Storage Location {1, 4, 6}</i> have become permanently unavailable & cluster would like
+                    to get same level of resiliency back --- so it decides to generate 24 coded pieces ( those many have become unavailable ) from available 40 pieces spread across 5 available storage locations.
+                    Cluster participants can start producing new coded pieces from 8 coded pieces they've locally & collaboratively make total 24 coded pieces, which are now sent to 3 new storage locations, replacing
+                    unavailable ones. Let me take an imaginary scenario for simulation purpose, where 40 available coded pieces are collected & splitted into 3 equal size ( = 20 ) overlapping subsets.
+                </p>
+                <div class="microlight">
+ available = { piece_0, piece_1 .. piece_38, piece_39 } // 40 available coded pieces
+ 
+ // slicing indices are exclusive on upper side
+ subset_0 => available[:20]
+ subset_1 => available[10:30]
+ subset_2 => available[20:]
+ 
+ // total 20 * 3 = 60 coded pieces, some being repeated
+ overlapping_piece_sets = { subset_0, subset_1, subset_2 }
+                </div>
+                <img class="imgCenter" src="../images/rlnc-coded-storage-split-into-overlapping-subsets.jpg">
+                <p class="blogText">
+                    Using subset_0's 20 pieces, I recode 8 new coded pieces. Similarly I generate 16 more coded pieces by recoding pieces from subset_{1, 2}. I've now 24 newly coded pieces, which are distributed
+                    to 3 newly available locations, replacing <i>Storage Location {1, 4, 6}</i> --- cluster has again same level of resiliency.
+                    <br>
+                    <br>
+                    Now I can decide to randomly collect any 32 linearly independent coded pieces & attempt to reconstruct back original video file. And generated flattened data has same 
+                    SHA256 hash <span class="highlight">0xdfc734fc40a98e8a6e041af13893f6170f073b160dfdc16621e76ad4e6b847b4</span>.
+                    <br>
+                    <br>
+                    One thing to notice, ignoring hypothetical recoding scenario where 40 available coded pieces are splitted into 3 overlapping subsets of pieces of equal size ( = 20 ),
+                    in real world cluster doesn't even need to ask all available 5 storage locations to collaboratively generate 24 pieces to fill up gap. Say cluster asks ( read master of cluster asking )
+                    only one participant to generate 8 new coded pieces from 8 locally available coded pieces. Similarly cluster asks 2 more available participants to generate 16 ( = 8 + 8 ) new coded
+                    pieces from respectively their locally available 8 pieces. Now network has 24 new coded pieces, which are just required to be sent over to new 3 storage locations, acting as replacement.
+                    So not much of corrdination is required among peers for handling repopulation scenario.
+                    <br>
+                    <br>
+                    Even it can be made simpler, say cluster wants to fill up gap of 24 missing coded pieces, it sends a message to network participants asking if someone having bandwidth ( read not very busy )
+                    would be interested in voluntarily constructing 24 coded pieces from 8 locally available pieces. If someone responds it will do so & help in sending those 24 new pieces to 3 newly available
+                    storage locations --- cluster back to previous resiliency level.
+                    <br>
+                    <br>
+                    This means, reconstruction-and-repopulation is not very hard & it can be performed without much coordination --- all participants don't need to be involved in this business, only those
+                    parties having lesser work at that moment, can join & perform. It's not the case for Reed Solomon coded storage clusters where each new scenario like piece repopulation
+                    needs to be handled by involving many more peers than required in RLNC based clusters.
+                    <br>
+                    <br>
+                    One thing I'd like to mention, each coded piece is of size 508337 bytes, which has two components. Rather than storing extra 32 bytes of coding vector, one 8/ 16 bytes
+                    seed can be stored for each coded piece, decreasing total storage requirement for 64 coded pieces in network. This 8/ 16 bytes seed can be used to generate 32 coding coefficients
+                    which will be treated like coding vector while recoding/ decoding. If 8 bytes seed is used for initialising pseudo random number generator, it saves 1536 bytes network wide for storing
+                    64 coded pieces. In quite same way, with 16 bytes seed, 1024 bytes network wide saving can be obtained.
+                </p>
+                <ol>
+                    <li>Random Coding Vector - 32 bytes</li>
+                    <li>Coded Data - 508305 bytes</li>
+                </ol>
+                <p class="blogText">
+                    It's very clearly understood, RLNC based storage clusters can shine. As I keep learning new RLNC based techniques, I plan to implement those in my library <span class="highlight">kodr</span>.
+                    Also I'd love to learn about your opinion around this.
+                    <br>
+                    <br>
+                    Have a great time !
+                </p>
+            </article>
+        </div>
+    </div>
+    <div id="footerDiv">
+        <footer>
+            <p id="footerText">
+                &copy <a href="https://github.com/itzmeanjan/itzmeanjan.github.io" id="footerLink"
+                    target="_blank"><big>A</big>njan Roy</a> ( <big>M</big>IT Licensed )
+            </p>
+        </footer>
+    </div>
+</body>
+
+</html>
