@@ -72,7 +72,14 @@
                     <a class="blogLink" target="_blank" href="https://journals.sagepub.com/doi/10.1155/2014/974836">here</a>, which I'm already implementing
                     in <span class="highlight">kodr</span>. You may want to check implementation <a href="https://github.com/itzmeanjan/kodr/pull/5" class="blogLink" target="_blank">progress</a>.
                 </p>
-                
+                <p class="blogText">
+                    In single threaded RLNC decoding implementation, there exists only one thread of execution which accepts newly received
+                    coded pieces; places coding vector into coding coefficient matrix & coded data vector into coded data matrix; reduces coefficient
+                    matrix into row echelon form, also replicates respective row operations in coded data matrix. This flow of execution is followed by
+                    executor thread on reception of every new coded piece. This way prograssively coded pieces get decoded. Finally reception of N-th linearly
+                    independent piece reveals all original pieces, N = generation size.
+                </p>
+                <img class="imgCenter" src="../images/parallel-rlnc-decoding-single-threaded.jpg">
             </article>
         </div>
     </div>
