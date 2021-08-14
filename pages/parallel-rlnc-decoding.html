@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<!--
+  Author: Anjan Roy<hello@itzmeanjan.in>
+-->
+<html>
+
+<head>
+    <title>
+        Parallel Decoding for Random Linear Network Codes
+    </title>
+    <meta prefix="og: http://ogp.me/ns#" property="og:type" content="website">
+    <meta prefix="og: http://ogp.me/ns#" property="og:title" content="Parallel Decoding for Random Linear Network Codes">
+    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="">
+    <meta prefix="og: http://ogp.me/ns#" property="og:url" content="https://itzmeanjan.in">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url"
+        content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:width" content="950">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:height" content="735">
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://itzmeanjan.in/">
+    <meta property="twitter:title" content="Parallel Decoding for Random Linear Network Codes">
+    <meta property="twitter:description" content="">
+    <meta property="twitter:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta property="twitter:site" content="@meanjanry">
+    <meta name="description" content="">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="author" content="Anjan Roy">
+    <meta name="keywords"
+        content="anjan, roy, itzmeanjan, software, engineer, india, portfolio, skills, projects, thoughts, experiments, experiences">
+    <meta name="theme-color" content="darkslategrey">
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" type="text/css" href="../styles/index.css">
+    <script src="../styles/code.js"></script>
+</head>
+
+<body>
+    <div id="parentDiv">
+        <div id="navBar">
+            <nav>
+                <a class="navLink" href="/"><big>H</big>ome</a> |
+                <a class="navLink" href="https://github.com/itzmeanjan" target="_blank"><big>P</big>rojects</a> |
+                <a class="navLink" href="/pages/blog.html"><big>B</big>log</a> |
+                <a class="navLink" href="/pages/contact.html"><big>C</big>ontact</a>
+            </nav>
+        </div>
+        <div class="childDiv">
+            <article>
+                <h1 class="blogHeader">
+                    Parallel Decoding for Random Linear Network Codes
+                </h1>
+                <h3>Created : August 16, 2021</h3>
+            </article>
+        </div>
+        <div class="childDiv">
+            <article>
+                <p class="blogText">
+                    This week I was exploring how parallelism can be incorporated into decoding of <b>R</b>andom <b>L</b>inear <b>N</b>etwork <b>C</b>odes ?
+                    During decoding of RLNC coded pieces it's required to invert one N x N coding coefficient matrix, where N = #-of pieces coded together i.e.
+                    generation size. And matrix inversion is quite expensive O(N ** 3), which is why I'm interested in implementing faster decoding algorithm
+                    in <span class="highlight">kodr</span>, a RLNC library I've started writing sometime ago. Currently implemented decoding technique
+                    works in progressive mode i.e. as soon as a new coded piece is received, decoder attempts to compute <b>R</b>educed <b>R</b>ow <b>E</b>chelon <b>F</b>orm of
+                    updated matrix ( read considering new coded piece ), which keeps pieces partially decoded. When N-th linearly independent piece is received
+                    last iteration of RREF calculation decodes whole data matrix & original pieces are revealed. This scheme works fine, but works in single threaded
+                    mode. So I'm looking for scheme which allows leveraging multiple CPU cores while decoding pieces, which are coded with large generation size
+                    ( read N is high ). As soon as generation size goes beyond 64, decoding speed starts to fall down very fast. I've found literatures around
+                    parallelization of RLNC decoding which also works in progressive mode i.e. decoder doesn't need to wait for receiving all of N-many coded pieces
+                    before it can start decoding those pieces.
+                    <br>
+                    <br>
+                    Today I'll dig deep into <b>P</b>arallel <b>R</b>ole <b>D</b>ivision <b>P</b>rogressive <b>D</b>ecoding technique, proposed
+                    <a class="blogLink" target="_blank" href="https://journals.sagepub.com/doi/10.1155/2014/974836">here</a>, which I'm already implementing
+                    in <span class="highlight">kodr</span>. You may want to check implementation <a href="https://github.com/itzmeanjan/kodr/pull/5" class="blogLink" target="_blank">progress</a>.
+                </p>
+                
+            </article>
+        </div>
+    </div>
+    <div id="footerDiv">
+        <footer>
+            <p id="footerText">
+                &copy <a href="https://github.com/itzmeanjan/itzmeanjan.github.io" id="footerLink"
+                    target="_blank"><big>A</big>njan Roy</a> ( <big>M</big>IT Licensed )
+            </p>
+        </footer>
+    </div>
+</body>
+
+</html>
