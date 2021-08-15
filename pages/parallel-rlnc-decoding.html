@@ -86,17 +86,35 @@
                     Say I create two threads of execution & place responsibility of mutating coding coefficient matrix on thread A, while other one replicates
                     those mutations on coded data matrix portion. As soon as a new coded piece is received, that's inspected by thread A, which primarily figures out
                     whether this piece is linearly dependent with already received pieces or not. If yes, discard piece because it doesn't bring any useful
-                    information which can help in decoding. If this piece turns out to be useful one, then Thread A proceeds with forward cleaning & backward substitution steps.
+                    information which can help in decoding. If this piece turns out to be useful one, then thread A proceeds with forward cleaning & backward substitution steps.
                     These steps are communicated to thread B, which replicates respective row operations on whole coded data matrix. So given one communication
                     channel exists between thread A & B, each of them works on two seperate portions of coded piece matrix. Actions of thread B are dependent
                     on what thread A decides to do on coding coefficient matrix. But thread A doesn't necessarily need to wait for thread B to replicate respective changes,
                     rather it can proceed with newly received coded pieces & in the mean time thread B performs it pending tasks. Those elementary row operations, which thread B needs
                     to perform on coded data matrix are put in a work queue, which is periodically monitored by thread B ( read looking for new task ). Thread B runs
-                    at its own pace, which <= pace of thread A. And on reception of N-th useful piece, thread A turns whole coding coefficient matrix into N x N identity matrix &
+                    at its own pace, which is <= pace of thread A. And on reception of N-th useful piece, thread A turns whole coding coefficient matrix into N x N identity matrix &
                     enqueues respective row operations in work queue, which will be eventually executed by worker thread B --- revealing N-many original pieces.
                     This progressive way to decoding allows me to make use of multiple cores available on almost all modern machines.
                 </p>
                 <img class="imgCenter" src="../images/parallel-rlnc-decoding-multi-threaded.jpg">
+                <p class="blogText">
+                    Let me extend this idea of operating on coding coefficient matrix & coded data matrix with two different threads of execution and employ
+                    > 1 worker threads, replicating elementary row operations on M-many non-overlapping set of columns of coded data matrix, 
+                    given M-many worker threads are involved. Essentially coded data matrix is vertically splitted into M-many sub matrices of dimension K x ( piece-length / M ),
+                    where K = #-of coded pieces received till now & K <= N ( = generation size ). Then M-many threads asynchronously replicate row operations
+                    on non-overlapping submatrices, without using any concurrency control mechanism --- no slow down due to lock contension. Thread which works on
+                    coding coefficient matrix is called supervisor thread, inspecting coding vector of newly arrived coded pieces, determining whether
+                    linearly independent or not etc. . Supervisor thread performs some elementary row operations on coding coefficient matrix, which are
+                    placed in worker queue in order, as those are to be replicated in coded data matrix. M-many worker threads keep listening for messages from
+                    supervisor thread for new enqueued work to be replicated in respective submatrix, it's responsible for managing. Worker threads doesn't need to
+                    synchronize their actions, they all work in their own pace --- further making model affordable. After N-many linearly independent coded pieces
+                    are received, before decoded data be consumed, it must be checked with M-many workers, whether they all have finished their pending works
+                    from worker queue or not. It may happen that not all of those M-many workers are completely done with executing row operations from worker queue
+                    & consumer end up reading still un-decoded data, which will be decoded in sometime future as soon as that/ those worker thread(s) complete their
+                    pending worklist. It may lead to data race, which is why before decoded data can be safely consumed, supervisor must receive M-many successful completion
+                    messages from M-many worker threads.
+                </p>
+                <p class="blogText"></p>
             </article>
         </div>
     </div>
