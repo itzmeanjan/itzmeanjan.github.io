@@ -10,7 +10,7 @@
     </title>
     <meta prefix="og: http://ogp.me/ns#" property="og:type" content="website">
     <meta prefix="og: http://ogp.me/ns#" property="og:title" content="Parallel Decoding for Random Linear Network Codes">
-    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="">
+    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="Detailed step-by-step explanation of Parallel Role Division Progressive Decoding Technique">
     <meta prefix="og: http://ogp.me/ns#" property="og:url" content="https://itzmeanjan.in">
     <meta prefix="og: http://ogp.me/ns#" property="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
     <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url"
@@ -20,10 +20,10 @@
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="https://itzmeanjan.in/">
     <meta property="twitter:title" content="Parallel Decoding for Random Linear Network Codes">
-    <meta property="twitter:description" content="">
+    <meta property="twitter:description" content="Detailed step-by-step explanation of Parallel Role Division Progressive Decoding Technique">
     <meta property="twitter:image" content="https://itzmeanjan.in/images/myImage.jpg">
     <meta property="twitter:site" content="@meanjanry">
-    <meta name="description" content="">
+    <meta name="description" content="Detailed step-by-step explanation of Parallel Role Division Progressive Decoding Technique">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="author" content="Anjan Roy">
     <meta name="keywords"
@@ -203,7 +203,7 @@
                 <img class="imgCenter" src="../images/parallel-rlnc-decoding-example-4.png">
                 <p class="blogText">
                     After reception of third coded piece, coding coefficient matrix & coded data matrix looks like below. Again, aforementioned
-                    3 steps to be performed on decoding data.
+                    3 steps to be performed for decoding data.
                 </p>
                 <img class="imgCenter" src="../images/parallel-rlnc-decoding-example-5.png">
                 <p class="blogText">
@@ -230,6 +230,25 @@
                     <li><span class="highlight">C[1] = C[1] + C[2] * C[1][2]</span></li>
                 </ol>
                 <img class="imgCenter" src="../images/parallel-rlnc-decoding-example-8.png">
+                <p class="blogText">
+                    For actually consuming decoded data, I need to wait for both worker threads to execute all pending row operations. After completion of all pending
+                    row operations in coded data matrix, original pieces are revealed --- ready for consumption by client application. Before worker threads
+                    stop, they must send one message to supervisor thread notifying completion of all tasks, in submatrix allocated to it.
+                </p>
+                <img class="imgCenter" src="../images/parallel-rlnc-decoding-example-9.png">
+                <p class="blogText">
+                    This way Parallel RDPD is able to harness power of multiple CPU cores available in most of modern machines, 
+                    for decoding Random Linear Network Coded data with minimal corridination among all employed threads. As worker threads are
+                    not synchronized, they're free to proceed at their own pace, except at very end of decoding supervisor expects to hear
+                    from all workers, notifying it of completion of execution of all pending elementary row operations.
+                    <br>
+                    <br>
+                    How good is Parallel RDPD compared to single threaded decoding algorithm ? After I complete implementation of Parallel RDPD
+                    in <span class="highlight">kodr</span> & benchmark it I'll find that out.
+                    <br>
+                    <br>
+                    Have a great time !
+                </p>
             </article>
         </div>
     </div>
