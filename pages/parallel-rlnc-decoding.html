@@ -114,7 +114,122 @@
                     pending worklist. It may lead to data race, which is why before decoded data can be safely consumed, supervisor must receive M-many successful completion
                     messages from M-many worker threads.
                 </p>
-                <p class="blogText"></p>
+                <p class="blogText">
+                    Now I'm going to demonstrate whole parallel decoding process with the help of an example. Say, generation size is 3 i.e. 3 pieces to be
+                    coded together & each piece is of size 4 bytes. So decoder needs to receive 3 linearly independent coded pieces to be able successfully
+                    decode original pieces. Supervisor thread works on coding coefficient matrix of dimension K x 3, where K = [1..3] & 2 worker threads
+                    are responsible for managing two non-overlapping coded data submatrices, each of dimension K x 2, where K = [1..3].
+                </p>
+                <img class="imgCenter" src="../images/parallel-rlnc-decoding-example-1.png">
+                <p class="blogText">
+                    After reception of every coded piece, three steps are performed in order on updated coding coefficient matrix by supervisor thread.
+                    And respective steps are also replicated on coded data matrix by two worker threads.
+                </p>
+                <ol>
+                    <li>Forward elimination</li>
+                    <li>Linear dependence test</li>
+                    <li>Backward substitution</li>
+                </ol>
+                <p class="blogText">
+                    When first coded piece is received, supervisor thread finds it's the only row in coding coefficient matrix, which is why step {1, 3} can't
+                    be performed for this piece. Linear dependence check requires dividing row C[0] by pivot element at C[0][0] & it can be clearly understood
+                    that as this is the only piece received so it's indeed useful i.e. trivial case. Resulting coding coefficient matrix looks like.
+                </p>
+                <div class="microlight">
+ $ python3
+ >> import galois
+ >> gf256 = galois.GF(2**8)
+ >> gf256([211, 85, 82]) / gf256(211)
+ GF([  1, 153,  97], order=2^8) 
+                </div>
+                <p class="blogText">
+                    Now same step needs to be performed on coded data matrix, by two worker threads. Both worker threads divide row D'[0] of their respective submatrices
+                    by weight 211.
+                </p>
+                <div class="microlight">
+ >> coded_data_row = [141, 239, 192, 175]
+ >> worker_thread_1 = coded_data_row[:2]
+ >> worker_thread_2 = coded_data_row[2:]
+ 
+ >> worker_thread_1 / gf256(211)
+ GF([124, 109], order=2^8)
+ 
+ >> worker_thread_2 / gf256(211)
+ GF([221,  38], order=2^8)
+                </div>
+                <p class="blogText">
+                    After reception of second coded piece, this is how coding coefficient matrix & coded data matrix looks like.
+                </p>
+                <img class="imgCenter" src="../images/parallel-rlnc-decoding-example-2.png">
+                <p class="blogText">
+                    Forward elimination cleans elements below pivots, so I multiply row C[0] with weight at cell C[1][0]; add resulting vector ( element by element )
+                    with row C[1]; finally put resulting vector in row C[1].
+                </p>
+                <div class="microlight">
+ >> tmp = gf256([1, 153, 97]) * gf256(187) // multiply by C[1][0]
+ >> tmp
+ GF([187, 170, 164], order=2^8)
+ >> gf256([187, 130, 146]) + tmp // then add with C[1]
+ GF([ 0, 40, 54], order=2^8) // = C[1], after step 1
+                </div>
+                <p class="blogText">
+                    As element at pivot cell C[1][1] is non-zero, elements of row C[1] can be divided by C[1][1] --- piece is linearly independent.
+                    After step 2, C[1] of coding coefficient matrix looks like below.
+                </p>
+                <div class="microlight">
+ >> gf256([ 0, 40, 54]) / gf256(40) // divide C[1] by 40
+ GF([  0,   1, 200], order=2^8) // = C[1], after step 2
+                </div>
+                <p class="blogText">
+                    Backward substitution cleans up elements above pivot elements. For eliminating elements above pivot element C[1][1],
+                    elements of row C[1] are multipled by C[0][1]; resulting vector is element-wise added with row C[0]; finally resulting
+                    vector replaces C[0]. This way both pivots C[0][0], C[1][1] have zero-ed cells above & below them.
+                </p>
+                <div class="microlight">
+ >> tmp = gf256([  0,   1, 200]) * gf256(153) // multiply by C[0][1]
+ >> tmp
+ GF([  0, 153,  58], order=2^8)
+ >> tmp + gf256([1, 153, 97]) // then add with C[0]
+ GF([ 1,  0, 91], order=2^8) // = C[0], after step 3
+                </div>
+                <p class="blogText">
+                    Supervisor thread managed coding coefficient matrix looks like below, after second linearly independent piece is received.
+                </p>
+                <img class="imgCenter" src="../images/parallel-rlnc-decoding-example-3.png">
+                <p class="blogText">
+                    Exact same row operations need to be performed on coded data matrix by two workers, which results into following. Note, these two
+                    worker threads are not synchronized.
+                </p>
+                <img class="imgCenter" src="../images/parallel-rlnc-decoding-example-4.png">
+                <p class="blogText">
+                    After reception of third coded piece, coding coefficient matrix & coded data matrix looks like below. Again, aforementioned
+                    3 steps to be performed on decoding data.
+                </p>
+                <img class="imgCenter" src="../images/parallel-rlnc-decoding-example-5.png">
+                <p class="blogText">
+                    For eliminating cells below pivots i.e. C[0][0] & C[1][1], following row operations are performed. After following row operations
+                    i.e. completion of step 1, coding coefficient matrix looks as below.
+                </p>
+                <ol>
+                    <li><span class="highlight">C[2] = C[2] + C[0] * C[2][0]</span></li>
+                    <li><span class="highlight">C[2] = C[2] + C[1] * C[2][1]</span></li>
+                </ol>
+                <img class="imgCenter" src="../images/parallel-rlnc-decoding-example-6.png">
+                <p class="blogText">
+                    As it turns out, pivot element C[2][2] is non-zero i.e. third piece is linearly independent with other two pieces,
+                    I can proceed with step 2, where pivot elements are made 1.
+                </p>
+                <img class="imgCenter" src="../images/parallel-rlnc-decoding-example-7.png">
+                <p class="blogText">
+                    And finally step 3, attempts to clean cells above pivot elements i.e. here C[2][2]. For zeroing cells above C[2][2],
+                    following sets of row operations need to be performed, which results into below coding coefficient matrix --- N x N identity
+                    matrix, denoting all pieces required for decoding data are received, as rank of this matrix = 3 = generation size.
+                </p>
+                <ol>
+                    <li><span class="highlight">C[0] = C[0] + C[2] * C[0][2]</span></li>
+                    <li><span class="highlight">C[1] = C[1] + C[2] * C[1][2]</span></li>
+                </ol>
+                <img class="imgCenter" src="../images/parallel-rlnc-decoding-example-8.png">
             </article>
         </div>
     </div>
