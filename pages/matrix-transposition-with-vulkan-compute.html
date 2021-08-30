@@ -156,6 +156,52 @@
                     <span class="highlight">gl_GlobalInvocationID.x</span> in OpenGL Shading Language ( read GLSL ), which I make use of
                     for writing compute shader. I keep full matrix transposition compute shader
                     <a class="blogLink" target="_blank" href="https://gist.github.com/itzmeanjan/3f6c17217a0dec4a6a981ea7ecf6ab28#file-matrix_transpose-glsl">here</a>.
+                    <br>
+                    <br>
+                    With this compute shader, I can ask Vulkan API to dispatch N-many work groups, each of size 32. It denotes graphics card will invoke compute shader 32
+                    times, in parallel, for 32 row indices of matrix under operation. After one work group completes, another starts, again spawning 32 execution threads.
+                    This way N-many work groups are dispatched in total, resulting into invocation of compute shader N x 32 times. I solve for N & dispatch 32 work groups
+                    when matrix has dimension of 1024 x 1024. Notice, none of these invocations are repeating any row of matrix. Also matrix transposition's smaller
+                    computation steps ( read row/ column switching ) are independent of each other, resulting into no use of synchronization techniques to prevent data race.
+                    <br>
+                    <br>
+                    There may be situations when matrix dimension is not properly divisible by 32, in that case some invocation of shader by Vulkan API
+                    may have <span class="highlight">gl_GlobalInvocationID.x</span> value >= matrix dimension, which are to be ignored, because no row with certain
+                    index exists in matrix under question & accessing that memory from shader should be illegal.
+                </p>
+                <div class="microlight">
+ N x 32 = number-of-rows
+                </div>
+                <p class="blogText">
+                    Remaining part is making matrix data available to GPU accessible memory, so that it can be accessed by compute shader, which requires
+                    me to bind GPU allocated buffers with descriptors defined in shader. And after computation is done, transposed matrix needs to be read
+                    back by CPU executable code, which requires mapping GPU accessible storage buffer to CPU accessible memory space.
+                    I think setting up Vulkan before computation can be enqueued, is quite verbose, requiring
+                    me to specify every single detail of memory allocation, association of descriptor set & pipeline layout with compiled shader module etc..
+                    Though for sake of simplicity I used <span class="highlight">vulkano</span>, which is higher level abstraction
+                    over Vulkan API, hiding some complexities, letting me write portions of GPGPU code in Rust. I keep whole implementation 
+                    <a class="blogLink" target="_blank" href="https://gist.github.com/itzmeanjan/3f6c17217a0dec4a6a981ea7ecf6ab28">here</a> for future reference.
+                    <br>
+                    <br>
+                    Finally it's time to transpose randomly generated 1024 x 1024 matrix, where I compute transposition on both GPU, CPU ( sequential ) & assert
+                    result for correctness.
+                </p>
+                <div class="microlight">
+ $ cargo build --release
+ $ ./target/release/matrix_transpose
+
+ Device: Intel(R) HD Graphics 5500 (BDW GT2)
+ Vulkan API: 1.2.0
+ Queue Count: 1  Compute: true   Graphics: true
+ GPU matrix transpose: 3.994984ms
+ CPU matrix transpose: 22.005047ms
+ Transpose asserted: 1.413437ms
+                </div>
+                <p class="blogText">
+                    In coming days, I plan to explore Vulkan more deeply, while sharing my understanding of how GPGPU can be used for parallelizing computations.
+                    <br>
+                    <br>
+                    Have a great time !
                 </p>
             </article>
         </div>
