@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<!--
+  Author: Anjan Roy<hello@itzmeanjan.in>
+-->
+<html>
+
+<head>
+    <title>
+        Matrix Transposition on GPGPU, with Vulkan Compute API
+    </title>
+    <meta prefix="og: http://ogp.me/ns#" property="og:type" content="website">
+    <meta prefix="og: http://ogp.me/ns#" property="og:title" content="Matrix Transposition on GPGPU, with Vulkan Compute API">
+    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="">
+    <meta prefix="og: http://ogp.me/ns#" property="og:url" content="https://itzmeanjan.in">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url"
+        content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:width" content="950">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:height" content="735">
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://itzmeanjan.in/">
+    <meta property="twitter:title" content="Matrix Transposition on GPGPU, with Vulkan Compute API">
+    <meta property="twitter:description" content="">
+    <meta property="twitter:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta property="twitter:site" content="@meanjanry">
+    <meta name="description" content="">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="author" content="Anjan Roy">
+    <meta name="keywords"
+        content="anjan, roy, itzmeanjan, software, engineer, india, portfolio, skills, projects, thoughts, experiments, experiences">
+    <meta name="theme-color" content="darkslategrey">
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" type="text/css" href="../styles/index.css">
+    <script src="../styles/code.js"></script>
+</head>
+
+<body>
+    <div id="parentDiv">
+        <div id="navBar">
+            <nav>
+                <a class="navLink" href="/"><big>H</big>ome</a> |
+                <a class="navLink" href="https://github.com/itzmeanjan" target="_blank"><big>P</big>rojects</a> |
+                <a class="navLink" href="/pages/blog.html"><big>B</big>log</a> |
+                <a class="navLink" href="/pages/contact.html"><big>C</big>ontact</a>
+            </nav>
+        </div>
+        <div class="childDiv">
+            <article>
+                <h1 class="blogHeader">
+                    Matrix Transposition on GPGPU, with Vulkan Compute API
+                </h1>
+                <h3>Created : August 31, 2021</h3>
+            </article>
+        </div>
+        <div class="childDiv">
+            <article>
+                <p class="blogText">
+                    Last week I was exploring Vulkan API for harnessing power of my laptop's integrated graphics card, though mainly interested in
+                    Vulkan Compute API so that I can put parallelizable computations on GPU. For easily parallelizable tasks such as matrix multiplication,
+                    matrix transposition, matrix & vector multiplication, matrix LU factorization, fast fourier transform etc. where matrix algebra is heavily involved,
+                    GPGPU shines. This is due to the fact how GPU computation is architected. For understanding it better, I planned to deep dive by implementing matrix
+                    transposition algorithm in both CPU & GPU executable forms. I chose matrix transposition because it's easy to understand & can easily be parallelized,
+                    due to absence of dependencies among smaller computations. Also computing on GPU requires copying data between CPU & GPU accessible memories, same applies
+                    for matrix transposition where I copy large 2-dimensional arrays between device local <i>( read GPU memory )</i> & host <i>( read CPU memory )</i> memories.
+                </p>
+                <p class="blogText">
+                    First I'll take a look at how matrix transposition is computed. Also for sake of simplicity, I use one N x N matrix during demonstration. I don't choose
+                    M x N matrix where M != N, because it won't let me perform transposition in-place, calling for further allocating one N x M matrix, which stores
+                    transposed form. Notice, elements positioned on matrix diagonal are always unchanged after transposition. Only lower & uppper triangular elements
+                    i.e. below & above of matrix diagonal respectively switch their places.
+                </p>
+                <div class="microlight">
+ begin:
+    if i == j:
+        return
+
+    tmp := A[i][j]
+    A[i][j] = A[j][i]
+    A[j][i] = tmp
+ end
+                </div>
+                <p class="blogText">
+                    If I expand aforementioned algorithm & step through it for a 2 x 3 matrix, I see diagonal elements are always untouched --- they can be
+                    simply copied from original to transposed matrix, only remainings are switching their places. In a square matrix, it becomes easier
+                    because transposition doesn't change matrix dimension, so it's in-place.
+                </p>
+                <div class="microlight">
+ // Generic M x N Matrix Transposition Algorithm
+
+ A = [[a, b, c], [d, e, f]] // 2 x 3 matrix original matrix
+
+ row := len(A) // read 2
+ col := len(A[0]) // read 3
+
+ B = [[0; row]; col] // 3 x 2 transposed matrix, now only holding zeros
+
+ // non-diagonal elements switching places
+ for i in 0..max(row, col) {
+     for j in 0..i {
+         if i < row && j < col:
+            B[j][i] = A[i][j]
+
+         if i < col && j < row:
+            B[i][j] = A[j][i]
+     }
+ }
+
+ // diagonal elements simply being copied
+ for i in 0..col {
+     for j in 0..row {
+         if i == j:
+            B[i][j] = A[i][j]
+            break
+     }
+ }
+                </div>
+                <img class="imgCenter" src="../images/matrix-transposition-step-by-step.jpg">
+            </article>
+        </div>
+    </div>
+    <div id="footerDiv">
+        <footer>
+            <p id="footerText">
+                &copy <a href="https://github.com/itzmeanjan/itzmeanjan.github.io" id="footerLink"
+                    target="_blank"><big>A</big>njan Roy</a> ( <big>M</big>IT Licensed )
+            </p>
+        </footer>
+    </div>
+</body>
+
+</html>
