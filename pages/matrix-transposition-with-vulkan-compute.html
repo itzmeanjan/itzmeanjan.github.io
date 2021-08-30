@@ -81,8 +81,7 @@
                 </div>
                 <p class="blogText">
                     If I expand aforementioned algorithm & step through it for a 2 x 3 matrix, I see diagonal elements are always untouched --- they can be
-                    simply copied from original to transposed matrix, only remainings are switching their places. In a square matrix, it becomes easier
-                    because transposition doesn't change matrix dimension, so it's in-place.
+                    simply copied from original to transposed matrix, only remainings are switching their places.
                 </p>
                 <div class="microlight">
  // Generic M x N Matrix Transposition Algorithm
@@ -115,6 +114,49 @@
  }
                 </div>
                 <img class="imgCenter" src="../images/matrix-transposition-step-by-step.jpg">
+                <p class="blogText">
+                    In a square matrix, it becomes easier because transposition doesn't change matrix dimension, so it's in-place. So I can demonstrate
+                    that only switching lower diagonal places of each row with respective upper diagonal portions of column, transposes a N x N matrix.
+                </p>
+                <img class="imgCenter" src="../images/square-matrix-transposition-step-by-step.jpg">
+                <p class="blogText">
+                    I can easily parallelize square matrix transposition on CPU, where each worker thread independently performs
+                    row/ column switching at cost of employing N-worker threads ( in total ). In that case transposition runs with
+                    execution cost of O(N), because each thread needs to switch ~N many elements. Notice, originally matrix transposition
+                    is O(N**2) algorithm.
+                    It's possible for large matrices that N-many threads can't be employed at same time, so work may be
+                    equally distributed among available P-many worker threads in round-robin fashion. In such case execution cost
+                    is ~ O(c*N).
+                </p>
+                <p class="blogText">
+                    My interest is in performing similar parallel transposition on GPGPU using Vulkan API, which requires me to write
+                    compute shader ( read code to be run on GPU ). This compute shader is parallelly invoked by Vulkan for each row
+                    & within each invocation elements across a row-column pair are switched. If GPU is able to invoke & execute N-many shaders
+                    at same time, transposition costs ~O(N). As GPUs are able to do so for quite large N, compared to CPUs, the speedup obtained
+                    is noticeably large.
+                </p>
+                <img class="imgCenter" src="../images/square-matrix-transposition-flow-on-gpu.jpg">
+                <p class="blogText">
+                    I notice for each parallel invocation of shader code, if row under operation has index <b>I</b>, work group needs to
+                    perform <b>I</b>-many switching. Those <b>I</b>-many switching are performed element-wise between first <b>I</b>-many 
+                    elements of row A[I] & column A[I]. I can express this logic in compute shader code.
+                </p>
+                <div class="microlight">
+ const uint idx = row_index; // index of row being operated on
+
+ // perform I-many switching between row A[I] & column A[I]
+ for(uint j = 0; j < idx; j++) {
+     const int tmp = matrix[idx][j];
+     matrix[idx][j] = matrix[j][idx];
+     matrix[j][idx] = tmp;
+ }
+                </div>
+                <p class="blogText">
+                    All I need to figure out now is, how to obtain index of row being operated on, which can be easily fetched by reading 
+                    <span class="highlight">gl_GlobalInvocationID.x</span> in OpenGL Shading Language ( read GLSL ), which I make use of
+                    for writing compute shader. I keep full matrix transposition compute shader
+                    <a class="blogLink" target="_blank" href="https://gist.github.com/itzmeanjan/3f6c17217a0dec4a6a981ea7ecf6ab28#file-matrix_transpose-glsl">here</a>.
+                </p>
             </article>
         </div>
     </div>
