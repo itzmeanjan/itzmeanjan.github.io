@@ -10,7 +10,7 @@
     </title>
     <meta prefix="og: http://ogp.me/ns#" property="og:type" content="website">
     <meta prefix="og: http://ogp.me/ns#" property="og:title" content="Matrix Transposition on GPGPU, with Vulkan Compute API">
-    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="">
+    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="Deep dive into Parallel Matrix Transposition on GPGPU, with Vulkan Compute API">
     <meta prefix="og: http://ogp.me/ns#" property="og:url" content="https://itzmeanjan.in">
     <meta prefix="og: http://ogp.me/ns#" property="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
     <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url"
@@ -20,14 +20,14 @@
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="https://itzmeanjan.in/">
     <meta property="twitter:title" content="Matrix Transposition on GPGPU, with Vulkan Compute API">
-    <meta property="twitter:description" content="">
+    <meta property="twitter:description" content="Deep dive into Parallel Matrix Transposition on GPGPU, with Vulkan Compute API">
     <meta property="twitter:image" content="https://itzmeanjan.in/images/myImage.jpg">
     <meta property="twitter:site" content="@meanjanry">
-    <meta name="description" content="">
+    <meta name="description" content="Deep dive into Parallel Matrix Transposition on GPGPU, with Vulkan Compute API">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="author" content="Anjan Roy">
     <meta name="keywords"
-        content="anjan, roy, itzmeanjan, software, engineer, india, portfolio, skills, projects, thoughts, experiments, experiences">
+        content="anjan, roy, itzmeanjan, vulkan, gpgpu, matrix, algebra, matrix, transposition, vulkano, compute, shader, rust">
     <meta name="theme-color" content="darkslategrey">
     <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
     <link rel="stylesheet" type="text/css" href="../styles/index.css">
@@ -49,7 +49,7 @@
                 <h1 class="blogHeader">
                     Matrix Transposition on GPGPU, with Vulkan Compute API
                 </h1>
-                <h3>Created : August 31, 2021</h3>
+                <h3>Created : August 30, 2021</h3>
             </article>
         </div>
         <div class="childDiv">
@@ -57,16 +57,16 @@
                 <p class="blogText">
                     Last week I was exploring Vulkan API for harnessing power of my laptop's integrated graphics card, though mainly interested in
                     Vulkan Compute API so that I can put parallelizable computations on GPU. For easily parallelizable tasks such as matrix multiplication,
-                    matrix transposition, matrix & vector multiplication, matrix LU factorization, fast fourier transform etc. where matrix algebra is heavily involved,
-                    GPGPU shines. This is due to the fact how GPU computation is architected. For understanding it better, I planned to deep dive by implementing matrix
+                    matrix transposition, matrix-vector multiplication, matrix LU factorization, fast fourier transform, random linear network coding etc. where matrix algebra is heavily involved,
+                    GPGPU shines. This is due to the fact how GPU computation is divided & conquered. For understanding it better, I planned to deep dive by implementing matrix
                     transposition algorithm in both CPU & GPU executable forms. I chose matrix transposition because it's easy to understand & can easily be parallelized,
-                    due to absence of dependencies among smaller computations. Also computing on GPU requires copying data between CPU & GPU accessible memories, same applies
+                    due to absence of dependencies among smaller computation steps. Also computing on GPU requires copying data between CPU & GPU accessible memories, same applies
                     for matrix transposition where I copy large 2-dimensional arrays between device local <i>( read GPU memory )</i> & host <i>( read CPU memory )</i> memories.
                 </p>
                 <p class="blogText">
-                    First I'll take a look at how matrix transposition is computed. Also for sake of simplicity, I use one N x N matrix during demonstration. I don't choose
+                    First I'll take a look at how matrix transposition is computed. Also for sake of simplicity, I use one N x N matrix during practical demonstration. I don't choose
                     M x N matrix where M != N, because it won't let me perform transposition in-place, calling for further allocating one N x M matrix, which stores
-                    transposed form. Notice, elements positioned on matrix diagonal are always unchanged after transposition. Only lower & uppper triangular elements
+                    transposed form. Notice, elements positioned on matrix diagonal are always unchanged after transposition. Only lower & upper triangular elements
                     i.e. below & above of matrix diagonal respectively switch their places.
                 </p>
                 <div class="microlight">
@@ -80,7 +80,7 @@
  end
                 </div>
                 <p class="blogText">
-                    If I expand aforementioned algorithm & step through it for a 2 x 3 matrix, I see diagonal elements are always untouched --- they can be
+                    If I expand aforementioned algorithm & step through its execution flow for a 2 x 3 matrix, I see diagonal elements are always untouched --- they can be
                     simply copied from original to transposed matrix, only remainings are switching their places.
                 </p>
                 <div class="microlight">
@@ -115,8 +115,8 @@
                 </div>
                 <img class="imgCenter" src="../images/matrix-transposition-step-by-step.jpg">
                 <p class="blogText">
-                    In a square matrix, it becomes easier because transposition doesn't change matrix dimension, so it's in-place. So I can demonstrate
-                    that only switching lower diagonal places of each row with respective upper diagonal portions of column, transposes a N x N matrix.
+                    In a square matrix, it becomes easier because transposition doesn't change matrix dimension, so it's in-place. I can demonstrate
+                    that, only switching lower diagonal places of each row with respective upper diagonal portions of column, transposes a N x N matrix.
                 </p>
                 <img class="imgCenter" src="../images/square-matrix-transposition-step-by-step.jpg">
                 <p class="blogText">
@@ -139,7 +139,8 @@
                 <p class="blogText">
                     I notice for each parallel invocation of shader code, if row under operation has index <b>I</b>, work group needs to
                     perform <b>I</b>-many switching. Those <b>I</b>-many switching are performed element-wise between first <b>I</b>-many 
-                    elements of row A[I] & column A[I]. I can express this logic in compute shader code.
+                    elements of <b>row A[I]</b> <i>( left to right )</i> & <b>column A[I]</b> <i>( top to bottom )</i>.
+                    I can express this logic in compute shader code.
                 </p>
                 <div class="microlight">
  const uint idx = row_index; // index of row being operated on
@@ -162,7 +163,13 @@
                     times, in parallel, for 32 row indices of matrix under operation. After one work group completes, another starts, again spawning 32 execution threads.
                     This way N-many work groups are dispatched in total, resulting into invocation of compute shader N x 32 times. I solve for N & dispatch 32 work groups
                     when matrix has dimension of 1024 x 1024. Notice, none of these invocations are repeating any row of matrix. Also matrix transposition's smaller
-                    computation steps ( read row/ column switching ) are independent of each other, resulting into no use of synchronization techniques to prevent data race.
+                    computation steps ( read row/ column switching ) are independent of each other, resulting into no need for use of synchronization techniques to prevent data race.
+                    <br>
+                    <br>
+                    Vulkan API allows me to dispatch shader execution not only in single dimension, but also along 2 or 3 dimensions. 2 dimensional dispatching can be used
+                    for image processing, where some filter ( read kernel of size K x K ) is applied on each pixel of original image. In that case current pixel
+                    under operation can be figured out inside compute shader by checking <span class="highlight">gl_GlobalInvocationID.xy</span>, which is a vector with 2 elements,
+                    storing row & column indices of image respectively. May be some other day, I'll talk more about usecases of multi-dimensional shader dispatching in compute pipeline.
                     <br>
                     <br>
                     There may be situations when matrix dimension is not properly divisible by 32, in that case some invocation of shader by Vulkan API
@@ -170,7 +177,7 @@
                     index exists in matrix under question & accessing that memory from shader should be illegal.
                 </p>
                 <div class="microlight">
- N x 32 = number-of-rows
+ N x 32 = number-of-rows // N = #-of work groups dispatched
                 </div>
                 <p class="blogText">
                     Remaining part is making matrix data available to GPU accessible memory, so that it can be accessed by compute shader, which requires
