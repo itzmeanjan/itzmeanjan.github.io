@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<!--
+  Author: Anjan Roy<hello@itzmeanjan.in>
+-->
+<html>
+
+<head>
+    <title>
+        Parallel Matrix Multiplication on GPGPU, using Vulkan Compute API
+    </title>
+    <meta prefix="og: http://ogp.me/ns#" property="og:type" content="website">
+    <meta prefix="og: http://ogp.me/ns#" property="og:title" content="Parallel Matrix Multiplication on GPGPU, using Vulkan Compute API">
+    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="Deep dive into Parallel Parallel Matrix Multiplication on GPGPU, using Vulkan Compute API">
+    <meta prefix="og: http://ogp.me/ns#" property="og:url" content="https://itzmeanjan.in">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url"
+        content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:width" content="950">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:height" content="735">
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://itzmeanjan.in/">
+    <meta property="twitter:title" content="Parallel Matrix Multiplication on GPGPU, using Vulkan Compute API">
+    <meta property="twitter:description" content="Deep dive into Parallel Parallel Matrix Multiplication on GPGPU, using Vulkan Compute API">
+    <meta property="twitter:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta property="twitter:site" content="@meanjanry">
+    <meta name="description" content="Deep dive into Parallel Parallel Matrix Multiplication on GPGPU, using Vulkan Compute API">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="author" content="Anjan Roy">
+    <meta name="keywords"
+        content="anjan, roy, itzmeanjan, vulkan, gpgpu, matrix, algebra, matrix, transposition, vulkano, compute, shader, rust">
+    <meta name="theme-color" content="darkslategrey">
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" type="text/css" href="../styles/index.css">
+    <script src="../styles/code.js"></script>
+</head>
+
+<body>
+    <div id="parentDiv">
+        <div id="navBar">
+            <nav>
+                <a class="navLink" href="/"><big>H</big>ome</a> |
+                <a class="navLink" href="https://github.com/itzmeanjan" target="_blank"><big>P</big>rojects</a> |
+                <a class="navLink" href="/pages/blog.html"><big>B</big>log</a> |
+                <a class="navLink" href="/pages/contact.html"><big>C</big>ontact</a>
+            </nav>
+        </div>
+        <div class="childDiv">
+            <article>
+                <h1 class="blogHeader">
+                    Parallel Matrix Multiplication on GPGPU, using Vulkan Compute API
+                </h1>
+                <h3>Created : September 06, 2021</h3>
+            </article>
+        </div>
+        <div class="childDiv">
+            <article>
+                <p class="blogText">
+                    This week I was trying to implement <i>Matrix Multiplication</i>, on GPGPU using Vulkan Compute API, which is pretty easy to
+                    parallelize, given that each cell of resulting matrix can be computed independent of any other cell. This is a simple good
+                    data parallel problem, where same kernel can be run for each cell of resulting matrix, while input is read from two immutible buffers
+                    ( read Matrix A, B ). For understanding performance gain when run on GPGPU, I planned to implement naive matrix multiplication algorithm,
+                    which runs with time complexity O(N ** 2), in both CPU & GPU executable form. Given that GPUs are massively parallel machines, multiple
+                    cells of resulting matrix can be computed at a time, while paying very low synchronization cost, given nature of problem at hand.
+                </p>
+                <p class="blogText">
+                    When computing matrix multiplication on CPU, I make use of two nested loops, where each iteration of inner most loop computes
+                    value at a certain cell of resulting matrix with formula
+                </p>
+                <div class="microlight">
+ C [i, j] = sum([A[i, k] * B[k, j] for k in 0..4])
+                </div>
+                <img class="imgCenter" src="../images/matrix-multiplication-on-cpu.jpg">
+                <p class="blogText">
+                    If I work with two 4 x 4 matrices, multiplication algorithm looks like 👇. For making it more generic, first LHS matrix's #-of columns
+                    & RHS matrix's #-of rows need to be equal. Otherwise, multiplication is not possible. Two nested loops iterate in a such a way so that
+                    it's possible to generate indices of each cell of resulting matrix of dimension M x P, when LHS<sub>(M x N)</sub> & RHS<sub>(N x P)</sub>.
+                </p>
+                <div class="microlight">
+ for i in 0..(M = 4) {
+     for j in 0..(P = 4) {
+        C [i, j] = sum([A[i, k] * B[k, j] for k in 0..(N = 4)])
+     }
+ }
+                </div>
+                <p class="blogText">
+                    It's clearly understandable that each cell of resulting matrix C can be computed independently, without any data dependency --- easily parallelizable.
+                    Now each invocation of compute shader ( read kernel running on GPU ) computes single cell of resulting matrix & exits; as many of these invocations can be run
+                    by GPU at same time speed up is quite noticeable.
+                </p>
+                <img class="imgCenter" src="../images/matrix-multiplication-on-gpu.jpg">
+                <p class="blogText">
+                    During each invocation of compute shader, following code snippet is run, which reads input from LHS, RHS matrix's respective rows & columns; computes result &
+                    finally writes computed value for cell (i, j) at respective memory location. Notice, how one dimensional array being used for respresenting/ accessing two
+                    dimensional matrix.
+                </p>
+                <div class="microlight">
+ // figure out which cell of resulting matrix is to be computed
+ // in this invocation
+ const uint row = gl_GlobalInvocationID.x;
+ const uint col = gl_GlobalInvocationID.y;
+
+ // better to check, so that memory bounds are well respected !
+ if(row >= 4 || col >= 4) {
+     return;
+ }
+
+ // compute value at cell (row, col) of resulting matrix
+ int sum = 0;
+ for(uint i = 0; i < 4; i++) {
+     // LHS => matrix_a ( 4 x 4 )
+     // RHS => matrix_b ( 4 x 4)
+     sum += matrix_a[row * 4 + i] * matrix_b[i * 4 + col];
+ }
+ 
+ // store at proper memory address
+ matrix_c[row * 4 + col] = sum;
+                </div>
+                <p class="blogText"></p>
+            </article>
+        </div>
+    </div>
+    <div id="footerDiv">
+        <footer>
+            <p id="footerText">
+                &copy <a href="https://github.com/itzmeanjan/itzmeanjan.github.io" id="footerLink"
+                    target="_blank"><big>A</big>njan Roy</a> ( <big>M</big>IT Licensed )
+            </p>
+        </footer>
+    </div>
+</body>
+
+</html>
