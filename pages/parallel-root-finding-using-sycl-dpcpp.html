@@ -130,6 +130,56 @@
  10
  >>> assert f(a) * f(b) < 0 # satisfied 👍
                 </div>
+                <p class="blogText">
+                    Evaluating f(x) at m = (-3 + 3) / 2 = 0, results in -5. I see f(a) * f(m) < 0
+                    evaluates to false, it's clear <b>z</b> must lie in interval (m, b) = (0, 3). In next iteration
+                    (a, b) = (0, 3) so m = 1.5. Evaluating f(0) * f(1.5) = -5 * -7.625 < 0, results in negative
+                    result, clearly <b>z</b> must be lying in interval (m, b) = (1.5, 3). In next iteration,
+                    a = 1.5, b = 3, m = 2.25, evaluation of f(1.5) * f(2.25) = -7.625 * -2.609375 < 0, hints
+                    root of equation f(x) i.e. <b>z</b> must be lying in inteval (2.25, 3). This way I keep trying
+                    to decrease width of interval until it goes below 10<sup>-5</sup>.
+                    <br>
+                    <br>
+                    Looking at above plot of f(x), I discover bisection method is progressing towards correct direction.
+                    Because plot says somewhere between (2, 3) root lies & I just found myself it must be somewhere between (2.25, 3).
+                    If I keep exploring for few more iterations I belive it must lead me to better approximated result.
+                    Instead of manually doing, I collect runlog of bisection method implementation.
+                    <br>
+                    <br>
+                    In final iteration it says root must lie in (2.4566689, 2.4566803). As evaluation of f(a) * f(m) < 0
+                    turns out to be negative, clearly solution must be in interval (m, b), where m = (2.4566689 + 2.4566803) / 2 = 2.4566746.
+                    Before moving to next iteration, I notice <b>|b-a|</b> has reached below 10<sup>-5</sup>, which denotes
+                    I must terminate algorithm now.
+                    <br>
+                    <br>
+                    Approximated root of f(x) = 2.4566746, with error 10<sup>-5</sup>.
+                </p>
+                <div class="microlight">
+a                       b                       m                       f(a)                    f(m)
+
+-3                      3                       0                       -20                     -5                  
+0                       3                       1.5                     -5                      -7.625              
+1.5                     3                       2.25                    -7.625                  -2.609375           
+2.25                    3                       2.625                   -2.609375               2.5878906           
+2.25                    2.625                   2.4375                  -2.609375               -0.26782227         
+2.4375                  2.625                   2.53125                 -0.26782227             1.0932922           
+2.4375                  2.53125                 2.484375                -0.26782227             0.3963585           
+2.4375                  2.484375                2.4609375               -0.26782227             0.06021309          
+2.4375                  2.4609375               2.4492188               -0.26782227             -0.104813576        
+2.4492188               2.4609375               2.4550781               -0.104813576            -0.022553444        
+2.4550781               2.4609375               2.4580078               -0.022553444            0.018766403         
+2.4550781               2.4580078               2.456543                -0.022553444            -0.0019102097       
+2.456543                2.4580078               2.4572754               -0.0019102097           0.008424759         
+2.456543                2.4572754               2.4569092               -0.0019102097           0.0032567978        
+2.456543                2.4569092               2.456726                -0.0019102097           0.00067329407       
+2.456543                2.456726                2.4566345               -0.0019102097           -0.00061798096      
+2.4566345               2.456726                2.4566803               -0.00061798096          0.00002861023       
+2.4566345               2.4566803               2.4566574               -0.00061798096          -0.00029468536      
+2.4566574               2.4566803               2.4566689               -0.00029468536          -0.0001335144       
+2.4566689               2.4566803               2.4566746               -0.0001335144           -0.000052452087     
+
+root: 2.4566746, found in 3.354849ms
+                </div>
             </article>
         </div>
     </div>
