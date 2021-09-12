@@ -10,7 +10,7 @@
     </title>
     <meta prefix="og: http://ogp.me/ns#" property="og:type" content="website">
     <meta prefix="og: http://ogp.me/ns#" property="og:title" content="Parallel Root Finding, using SYCL DPC++">
-    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="">
+    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="Finding roots of non-linear equations using Bisection Method in parallel, powered by SYCL DPC++">
     <meta prefix="og: http://ogp.me/ns#" property="og:url" content="https://itzmeanjan.in">
     <meta prefix="og: http://ogp.me/ns#" property="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
     <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url"
@@ -20,14 +20,14 @@
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="https://itzmeanjan.in/">
     <meta property="twitter:title" content="Parallel Root Finding, using SYCL DPC++">
-    <meta property="twitter:description" content="">
+    <meta property="twitter:description" content="Finding roots of non-linear equations using Bisection Method in parallel, powered by SYCL DPC++">
     <meta property="twitter:image" content="https://itzmeanjan.in/images/myImage.jpg">
     <meta property="twitter:site" content="@meanjanry">
-    <meta name="description" content="">
+    <meta name="description" content="Finding roots of non-linear equations using Bisection Method in parallel, powered by SYCL DPC++">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="author" content="Anjan Roy">
     <meta name="keywords"
-        content="anjan, roy, itzmeanjan, vulkan, gpgpu, matrix, algebra, matrix, multiplication, vulkano, compute, shader, rust">
+        content="dpc++, dpcpp, sycl, oneapi, gpgpu, accelerator, parallel, root, finding, bisection, method, cpp, rust">
     <meta name="theme-color" content="darkslategrey">
     <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
     <link rel="stylesheet" type="text/css" href="../styles/index.css">
@@ -55,12 +55,12 @@
         <div class="childDiv">
             <article>
                 <p class="blogText">
-                    For last several weeks I've been exploring SYCL DPC++, which is an open standard for accelerated computing,
+                    For last several weeks I've been exploring SYCL DPC++, which is an open standard for expressing accelerated computing logic,
                     targetting CPUs, GPUs, FPGAs etc. I find it easier to work with than Vulkan Compute, due to Vulkan
-                    requiring me to specify almost every single fine grained details regarding how to perform accelerated computation
+                    requiring me to specify almost every single fine grained detail regarding how to perform accelerated computation
                     on GPGPU. Here using SYCL DPC++, I enjoy quite a great level of flexibility in detailing, letting me specify
                     details only when required. This week I decided to implement root finding algorithm
-                    using SYCL DPC++, where I try to approximate root of single variable non-linear equation like 👇
+                    using SYCL DPC++, where I try to approximate root of single variable non-linear equations like 👇
                 </p>
                 <div class="microlight">
  f(x) = x ** 3 - 4 * x - 5
@@ -80,7 +80,7 @@
                     Assume <b>a</b>, <b>b</b> are two values for which f(x) has opposite signs.
                     So <span class="highlight">f(a) * f(b) < 0</span>. Input <b>z</b> for which f(x)
                     produces 0, must be living in (a, b) interval. For finding where exactly z lies
-                    ( read with better precision ), I split (a, b) interval in half & try to evaluate f(x) at <span class="highlight">m = (a + b) / 2</span>.
+                    ( read with better precision ), I split (a, b) interval into two equal halves & try to evaluate f(x) at <span class="highlight">m = (a + b) / 2</span>.
                     If it turns out that f(a) & f(m) has opposite signs ( read <span class="highlight">f(a) * f(m) < 0</span>),
                     clearly <b>z</b> lies in interval (a, m). If not, then <b>z</b> must be in interval (m, b).
                     I keep following same logic flow in updated interval, until I discover some (a, b) which has acceptable
@@ -155,6 +155,8 @@
                     Approximated root of f(x) = 2.4566746, with error 10<sup>-5</sup>.
                 </p>
                 <div class="microlight">
+    # collected run log
+
     a                       b                       m                       f(a)                    f(m)
 
     -3                      3                       0                       -20                     -5                  
@@ -183,7 +185,7 @@
                 <p class="blogText">
                     Now it's good time to implement SIMD form of bisection method. In sequential model, I was splitting
                     an interval in half at a time; then deciding which sub-interval to select; and again iterate with new interval --- 
-                    somewhat conforming to binary search. In parallel model, instead N-workers
+                    conforming to binary search style. In parallel model, instead N-workers
                     explore whole interval (a, b) consisting of (N-1)-many sub-intervals. If (-3, 3) is current
                     interval & 4 workers are available, it'll be splitted between them like 👇.
                 </p>
@@ -192,7 +194,7 @@
                     Each of those workers evaluate f(x) at <b>(a + ks)</b>, where a = -3, b = 3, k = worker index ∈ {0, 1, 2, 3} & s = <b>(b-a) / (N-1)</b> = 2.0.
                     For discovering which interval to explore in next iteration, each of them evaluates <b>f(a+ks) * f(a+(k-1)*s)</b>,
                     except k = 0 ( read worker_id 0 ). But notice, I've already made each of them evaluate f(x) at (a+ks)
-                    so instead of again doing same, they'll just read it from one memory unit which visible to all workers.
+                    so instead of again doing same, they'll just read it from one shared memory region which is visible to all workers.
                     So there's a need for synchronizing memory visibility for all workers. Because worker_3 will read
                     what's written by worker_2 & itself; worker_1 will read result computed by {worker_0, worker_1} etc..
                     Only one of them to evaluate it to true, which will update interval (a, b) for next iteration with
@@ -202,29 +204,115 @@
                     Let me step through the algorithm.
                 </p>
                 <div class="microlight">
-N = 4 // worker count
+    N = 4 // worker count
 
-a = -3
-b = 3
-s = (b-a) / (N-1) = 2.0
+    a = -3
+    b = 3
+    s = (b-a) / (N-1) = 2.0
 
-// parallel evaluation
-worker_0: f(-3) = -20
-worker_1: f(-1) = -2
-worker_2: f(1) = -8
-worker_3: f(3) = 10
+    // parallel evaluation
+    worker_0: f(-3) = -20
+    worker_1: f(-1) = -2
+    worker_2: f(1) = -8
+    worker_3: f(3) = 10
 
-// synchronizing memory visibility **IMPORTANT**
-barrier()
+    // synchronizing memory visibility **IMPORTANT**
+    barrier()
 
-// discover sub-interval for next iteration
-worker_0: /* does nothing */
-worker_1: f(-3) * f(-1) = -20 * -2 < 0 // false
-worker_2: f(-1) * f(1) = -2 * -8 < 0 // false
-worker_3: f(1) * f(3) = -8 * 10 < 0 // true
+    // discover sub-interval for next iteration
+    worker_0: /* does nothing */
+    worker_1: f(-3) * f(-1) = -20 * -2 < 0 // false
+    worker_2: f(-1) * f(1) = -2 * -8 < 0 // false
+    worker_3: f(1) * f(3) = -8 * 10 < 0 // true
 
-selected interval: (1, 3) ✅
+    selected interval: (1, 3) ✅
                 </div>
+                <p class="blogText">
+                    In next iteration, I again employ N(= 4) parallelly executing workers to explore interval
+                    (1, 3). Each of them works on sub-interval of width (b-a)/ (N-1) = (3-1)/ (4-1) = 2/ 3 = <b>0.667</b>.
+                    Work distribution looks like 👇 now.
+                </p>
+                <img class="imgCenter" src="../images/parallel-root-finding-sycl-2.jpg">
+                <p class="blogText">
+                    Each worker evaluates f(x) at <b>(a+ks)</b> & stores result in shared memory region, which will be
+                    explicitly made visible to all by using memory barrier.
+                </p>
+                <div class="microlight">
+    N = 4
+
+    a = 1
+    b = 3
+    s = (b-a) / (N-1) = 2 / 3 = 0.667
+
+    // parallel evaluation
+    worker_0: f(1) = -8
+    worker_1: f(1.667) = -7.0356
+    worker_2: f(2.333) = -1.634
+    worker_3: f(3) = 10
+
+    // synchronizing shared memory visibility
+    barrier()
+
+    // ... more ...
+                </div>
+                <p class="blogText">
+                    Now worker_{1,2,3} evaluates expression <span class="highlight">f(a+ks) * f(a+(k-1)*s) < 0</span>,
+                    turns out worker_3 only obtains true, which hints root must be living in interval (2.333, 3).
+                    In next iteration workers will collaboratively explore aforementioned interval. This will keep going on
+                    until I get to discover some interval which has width < 10<sup>-5</sup>.
+                    <br>
+                    <br>
+                    Though I've not yet executed parallel implementation of bisection method, I can clearly
+                    see it's progressing towards correct direction. In sequential version, I obtained ~2.457
+                    to be root of f(x), while parallel implementation points towards existence of root in interval
+                    (2.333, 3). A few more interations should take me to expected value.
+                    <br>
+                    <br>
+                    Parallel version of bisection method looks like 👇.
+                </p>
+                <div class="microlight">
+    // each worker has unique 0-based identifier
+    int idx = worker_index();
+    
+    // `evals` is aforementioned shared memory
+    evals[idx] = f(a + idx * s)
+    
+    // synchronizing visibility of `evals`
+    barrier();
+    // so that all workers can read latest values
+
+    if(idx != 0 && evals[idx-1] * evals[idx] < 0) {
+        a = a + (idx-1) * s
+        b = a + idx * s
+    }
+               </div>
+               <p class="blogText">
+                   SIMD root search algorithm when implemented in DPC++ & executed on accelerator, results into 👇.
+                   I notice sequential version of this algorithm is lot faster than SIMD version, due to need for synchronization
+                   in mid of execution; before next iteration can be begun values of a, b, s needs to be copied
+                   to host & inspected/ updated. Again next iteration can be begun only when values of a, b, s are available
+                   inside kernel, which is being executed on accelerator.
+               </p>
+               <div class="microlight">
+    $ dpcpp -fsycl bisect.parallel.cpp -o a.out
+    $ ./a.out
+
+    running on: Intel Xeon Processor (Skylake, IBRS)
+    root: 2.45668, in 27ms 🏷️
+               </div>
+               <p class="blogText">
+                   My interest behind implementing bisection method using DPC++ was not to obtain
+                   substaintial speedup, but rather understanding parallel execution model/ pattern including
+                   ND-range, execution/ memory synchronization, memory model, data movement, work-group local shared memory,
+                   accessors, buffers etc.
+                   <br>
+                   <br>
+                   I keep both sequential & parallel implementation <a class="blogLink" target="_blank" href="https://gist.github.com/itzmeanjan/6ee0ec55723f8df04b7260f65bc71ff6">here</a> for future reference.
+                   <br>
+                   <br>
+                   In coming days I plan to explore SYCL specification more deeply for understanding memory model, data management, synchronization etc. in better fashion,
+                   while implementing other parallel algorithms in DPC++. Have a great time !
+               </p>
             </article>
         </div>
     </div>
