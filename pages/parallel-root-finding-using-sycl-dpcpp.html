@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<!--
+  Author: Anjan Roy<hello@itzmeanjan.in>
+-->
+<html>
+
+<head>
+    <title>
+        Parallel Root Finding, using SYCL DPC++
+    </title>
+    <meta prefix="og: http://ogp.me/ns#" property="og:type" content="website">
+    <meta prefix="og: http://ogp.me/ns#" property="og:title" content="Parallel Root Finding, using SYCL DPC++">
+    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="">
+    <meta prefix="og: http://ogp.me/ns#" property="og:url" content="https://itzmeanjan.in">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url"
+        content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:width" content="950">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:height" content="735">
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://itzmeanjan.in/">
+    <meta property="twitter:title" content="Parallel Root Finding, using SYCL DPC++">
+    <meta property="twitter:description" content="">
+    <meta property="twitter:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta property="twitter:site" content="@meanjanry">
+    <meta name="description" content="">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="author" content="Anjan Roy">
+    <meta name="keywords"
+        content="anjan, roy, itzmeanjan, vulkan, gpgpu, matrix, algebra, matrix, multiplication, vulkano, compute, shader, rust">
+    <meta name="theme-color" content="darkslategrey">
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" type="text/css" href="../styles/index.css">
+    <script src="../styles/code.js"></script>
+</head>
+
+<body>
+    <div id="parentDiv">
+        <div id="navBar">
+            <nav>
+                <a class="navLink" href="/"><big>H</big>ome</a> |
+                <a class="navLink" href="https://github.com/itzmeanjan" target="_blank"><big>P</big>rojects</a> |
+                <a class="navLink" href="/pages/blog.html"><big>B</big>log</a> |
+                <a class="navLink" href="/pages/contact.html"><big>C</big>ontact</a>
+            </nav>
+        </div>
+        <div class="childDiv">
+            <article>
+                <h1 class="blogHeader">
+                    Parallel Root Finding, using SYCL DPC++
+                </h1>
+                <h3>Created : September 12, 2021</h3>
+            </article>
+        </div>
+        <div class="childDiv">
+            <article>
+                <p class="blogText">
+                    For last several weeks I've been exploring SYCL DPC++, which is an open standard for accelerated computing,
+                    targetting CPUs, GPUs, FPGAs etc. I find it easier to work with than Vulkan Compute, due to Vulkan
+                    requiring me to specify almost every single fine grained details regarding how to perform accelerated computation
+                    on GPGPU. Here using SYCL DPC++, I enjoy quite a great level of flexibility in detailing, letting me specify
+                    details only when required. This week I decided to implement root finding algorithm
+                    using SYCL DPC++, where I try to approximate root of single variable non-linear equation like 👇
+                </p>
+                <div class="microlight">
+ f(x) = x ** 3 - 4 * x - 5
+
+ f(x) = sin(x) - e ** x
+
+ f(x) = x ** 2 - cos(x)
+                </div>
+                <p class="blogText">
+                    I choose to go with standard way of doing it --- <span class="highlight">Bisection Method</span>.
+                    First I implement sequential form, then I implement SIMD parallel model of it using SYCL DPC++.
+                    I choose to work with <span class="highlight">f(x) = x ** 3 - 4 * x - 5</span> throughout this document.
+                    I begin by plotting aforementioned equation.
+                </p>
+                <img class="imgCenter" src="../images/parallel-root-finding-sycl-0.png">
+                <p class="blogText">
+                    Assume <b>a</b>, <b>b</b> are two values for which f(x) has opposite signs.
+                    So <span class="highlight">f(a) * f(b) < 0</span>. Input <b>z</b> for which f(x)
+                    produces 0, must be living in (a, b) interval. For finding where exactly z lies
+                    ( read with better precision ), I split (a, b) interval in half & try to evaluate f(x) at <span class="highlight">m = (a + b) / 2</span>.
+                    If it turns out that f(a) & f(m) has opposite signs ( read <span class="highlight">f(a) * f(m) < 0</span>),
+                    clearly <b>z</b> lies in interval (a, m). If not, then <b>z</b> must be in interval (m, b).
+                    I keep following same logic flow in updated interval, until I discover some (a, b) which has acceptable
+                    level of difference ( read |b - a| ). Let me also define, I'm open to accept |b-a| < 10<sup>-5</sup>.
+                    As soon as bisection method reaches this level of approximation, I terminate algorithm.
+                    <br>
+                    <br>
+                    Bisection method simply says 👇
+                </p>
+                <div class="microlight">
+ // f(x) = x ** 3 - 4 * x - 5
+ // Function whose root being approximated
+ fn f(x: f64) -> f64 {
+    x.powi(3) - 4f64 * x - 5f64
+ }
+ 
+ // sequential bisection method implementation
+ // for approximating non-linear equation's root
+ fn bisection(mut a: f64, mut b: f64, c: f64) -> f64 {
+    while (b - a).abs() >= c {
+        let m = (a + b) / 2f64; // bisection begins
+        if f(a) * f(m) < 0f64 {
+            b = m;
+        } else {
+            a = m;
+        }
+        // control flow for next iteration
+        // determined by this point
+    }
+
+    a
+ }                    
+                </div>
+                <p class="blogText">
+                    I want to step through this algorithm, where I input a = -3, b = 3 & c = 10<sup>-5</sup>.
+                    I evaluate f(x) at <b>a</b>, <b>b</b> obtaining 👇, which clearly says root must be
+                    in (-3, 3) interval.
+                </p>
+                <div class="microlight">
+ $ python3
+
+ >>> f = lambda x: x ** 3 - 4 * x - 5
+ >>> a, b = -3, 3
+ >>> f(a)
+ -20
+ >>> f(b)
+ 10
+ >>> assert f(a) * f(b) < 0 # satisfied 👍
+                </div>
+            </article>
+        </div>
+    </div>
+    <div id="footerDiv">
+        <footer>
+            <p id="footerText">
+                &copy <a href="https://github.com/itzmeanjan/itzmeanjan.github.io" id="footerLink"
+                    target="_blank"><big>A</big>njan Roy</a> ( <big>M</big>IT Licensed )
+            </p>
+        </footer>
+    </div>
+</body>
+
+</html>
