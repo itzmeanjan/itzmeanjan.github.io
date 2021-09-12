@@ -155,30 +155,75 @@
                     Approximated root of f(x) = 2.4566746, with error 10<sup>-5</sup>.
                 </p>
                 <div class="microlight">
-a                       b                       m                       f(a)                    f(m)
+    a                       b                       m                       f(a)                    f(m)
 
--3                      3                       0                       -20                     -5                  
-0                       3                       1.5                     -5                      -7.625              
-1.5                     3                       2.25                    -7.625                  -2.609375           
-2.25                    3                       2.625                   -2.609375               2.5878906           
-2.25                    2.625                   2.4375                  -2.609375               -0.26782227         
-2.4375                  2.625                   2.53125                 -0.26782227             1.0932922           
-2.4375                  2.53125                 2.484375                -0.26782227             0.3963585           
-2.4375                  2.484375                2.4609375               -0.26782227             0.06021309          
-2.4375                  2.4609375               2.4492188               -0.26782227             -0.104813576        
-2.4492188               2.4609375               2.4550781               -0.104813576            -0.022553444        
-2.4550781               2.4609375               2.4580078               -0.022553444            0.018766403         
-2.4550781               2.4580078               2.456543                -0.022553444            -0.0019102097       
-2.456543                2.4580078               2.4572754               -0.0019102097           0.008424759         
-2.456543                2.4572754               2.4569092               -0.0019102097           0.0032567978        
-2.456543                2.4569092               2.456726                -0.0019102097           0.00067329407       
-2.456543                2.456726                2.4566345               -0.0019102097           -0.00061798096      
-2.4566345               2.456726                2.4566803               -0.00061798096          0.00002861023       
-2.4566345               2.4566803               2.4566574               -0.00061798096          -0.00029468536      
-2.4566574               2.4566803               2.4566689               -0.00029468536          -0.0001335144       
-2.4566689               2.4566803               2.4566746               -0.0001335144           -0.000052452087     
+    -3                      3                       0                       -20                     -5                  
+    0                       3                       1.5                     -5                      -7.625              
+    1.5                     3                       2.25                    -7.625                  -2.609375           
+    2.25                    3                       2.625                   -2.609375               2.5878906           
+    2.25                    2.625                   2.4375                  -2.609375               -0.26782227         
+    2.4375                  2.625                   2.53125                 -0.26782227             1.0932922           
+    2.4375                  2.53125                 2.484375                -0.26782227             0.3963585           
+    2.4375                  2.484375                2.4609375               -0.26782227             0.06021309          
+    2.4375                  2.4609375               2.4492188               -0.26782227             -0.104813576        
+    2.4492188               2.4609375               2.4550781               -0.104813576            -0.022553444        
+    2.4550781               2.4609375               2.4580078               -0.022553444            0.018766403         
+    2.4550781               2.4580078               2.456543                -0.022553444            -0.0019102097       
+    2.456543                2.4580078               2.4572754               -0.0019102097           0.008424759         
+    2.456543                2.4572754               2.4569092               -0.0019102097           0.0032567978        
+    2.456543                2.4569092               2.456726                -0.0019102097           0.00067329407       
+    2.456543                2.456726                2.4566345               -0.0019102097           -0.00061798096      
+    2.4566345               2.456726                2.4566803               -0.00061798096          0.00002861023       
+    2.4566345               2.4566803               2.4566574               -0.00061798096          -0.00029468536      
+    2.4566574               2.4566803               2.4566689               -0.00029468536          -0.0001335144       
+    2.4566689               2.4566803               2.4566746               -0.0001335144           -0.000052452087     
 
-root: 2.4566746, found in 3.354849ms
+    root: 2.4566746, found in 3.354849ms
+                </div>
+                <p class="blogText">
+                    Now it's good time to implement SIMD form of bisection method. In sequential model, I was splitting
+                    an interval in half at a time; then deciding which sub-interval to select; and again iterate with new interval --- 
+                    somewhat conforming to binary search. In parallel model, instead N-workers
+                    explore whole interval (a, b) consisting of (N-1)-many sub-intervals. If (-3, 3) is current
+                    interval & 4 workers are available, it'll be splitted between them like 👇.
+                </p>
+                <img class="imgCenter" src="../images/parallel-root-finding-sycl-1.jpg">
+                <p class="blogText">
+                    Each of those workers evaluate f(x) at <b>(a + ks)</b>, where a = -3, b = 3, k = worker index ∈ {0, 1, 2, 3} & s = <b>(b-a) / (N-1)</b> = 2.0.
+                    For discovering which interval to explore in next iteration, each of them evaluates <b>f(a+ks) * f(a+(k-1)*s)</b>,
+                    except k = 0 ( read worker_id 0 ). But notice, I've already made each of them evaluate f(x) at (a+ks)
+                    so instead of again doing same, they'll just read it from one memory unit which visible to all workers.
+                    So there's a need for synchronizing memory visibility for all workers. Because worker_3 will read
+                    what's written by worker_2 & itself; worker_1 will read result computed by {worker_0, worker_1} etc..
+                    Only one of them to evaluate it to true, which will update interval (a, b) for next iteration with
+                    (a+(k-1)s, a+ks).
+                    <br>
+                    <br>
+                    Let me step through the algorithm.
+                </p>
+                <div class="microlight">
+N = 4 // worker count
+
+a = -3
+b = 3
+s = (b-a) / (N-1) = 2.0
+
+// parallel evaluation
+worker_0: f(-3) = -20
+worker_1: f(-1) = -2
+worker_2: f(1) = -8
+worker_3: f(3) = 10
+
+// synchronizing memory visibility **IMPORTANT**
+barrier()
+
+// discover sub-interval for next iteration
+worker_0: /* does nothing */
+worker_1: f(-3) * f(-1) = -20 * -2 < 0 // false
+worker_2: f(-1) * f(1) = -2 * -8 < 0 // false
+worker_3: f(1) * f(3) = -8 * 10 < 0 // true
+
+selected interval: (1, 3) ✅
                 </div>
             </article>
         </div>
