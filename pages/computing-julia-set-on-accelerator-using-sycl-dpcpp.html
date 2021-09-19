@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<!--
+  Author: Anjan Roy<hello@itzmeanjan.in>
+-->
+<html>
+
+<head>
+    <title>
+        Computing Julia Set on Accelerator, using SYCL DPC++
+    </title>
+    <meta prefix="og: http://ogp.me/ns#" property="og:type" content="website">
+    <meta prefix="og: http://ogp.me/ns#" property="og:title" content="Computing Julia Set on Accelerator, using SYCL DPC++">
+    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="">
+    <meta prefix="og: http://ogp.me/ns#" property="og:url" content="https://itzmeanjan.in">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url"
+        content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:width" content="950">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:height" content="735">
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://itzmeanjan.in/">
+    <meta property="twitter:title" content="Computing Julia Set on Accelerator, using SYCL DPC++">
+    <meta property="twitter:description" content="">
+    <meta property="twitter:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta property="twitter:site" content="@meanjanry">
+    <meta name="description" content="">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="author" content="Anjan Roy">
+    <meta name="keywords"
+        content="dpc++, dpcpp, sycl, oneapi, gpgpu, accelerator, parallel, root, finding, bisection, method, cpp, rust">
+    <meta name="theme-color" content="darkslategrey">
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" type="text/css" href="../styles/index.css">
+    <script src="../styles/code.js"></script>
+</head>
+
+<body>
+    <div id="parentDiv">
+        <div id="navBar">
+            <nav>
+                <a class="navLink" href="/"><big>H</big>ome</a> |
+                <a class="navLink" href="https://github.com/itzmeanjan" target="_blank"><big>P</big>rojects</a> |
+                <a class="navLink" href="/pages/blog.html"><big>B</big>log</a> |
+                <a class="navLink" href="/pages/contact.html"><big>C</big>ontact</a>
+            </nav>
+        </div>
+        <div class="childDiv">
+            <article>
+                <h1 class="blogHeader">
+                    Computing Julia Set on Accelerator, using SYCL DPC++
+                </h1>
+                <h3>Created : September 19, 2021</h3>
+            </article>
+        </div>
+        <div class="childDiv">
+            <article>
+                <p class="blogText">
+                    This week I was exploring fractals - specifically computing fractals using Julia Set
+                    quadratic equation. I considered using SYCL DPC++ for implementation, which I've been
+                    working on for few weeks now. I was interested in using <span class="highlight">image</span> interface of DPC++, which
+                    just same as <span class="highlight">buffer</span> interface, creates an abstraction over raw memory address based
+                    data read/ write ( read pointer arithmetic ), while providing some image specific functionality for data interpretation,
+                    reading & writing. I find buffer & image interfaces easier to work with rather than raw pointers,
+                    allocated using <b>U</b>nified <b>S</b>hared <b>M</b>emory, due to their elegance in design; accessor based
+                    data read/ write on device/ host, providing implicit data movement/ visibility, which in-turn
+                    lets me implicitly define task graph dependencies. So it's <i>good, nice, powerful</i> abstraction.
+                    <br>
+                    <br>
+                    I'll now spend some time explaining how to sequentially compute Julia Set fractal.
+                </p>
+                <div class="microlight">
+    z = z ** 2 + c, where z, c ∈ ℂ && c is a constant
+                </div>
+                <p class="blogText">
+                    I sequentially apply aforementioned equation on each pixel of target fractal image
+                    as long as certain conditions satisfy. Let us assume, I'm working with an image of dimension
+                    4 x 4. This is how each cell ( read pixel ) is addressed in 4 x 4 image. Notice the origin
+                    of reference frame in use. These indices can easily be generated using two nested for loops.
+                </p>
+                <div class="microlight">
+    (uint, uint) A[4][4];
+    for i in 0..4 {
+        for j in 0..4 {
+            A[i][j] = (i, j);
+        }
+    }
+                </div>
+                <img class="imgCenter" src="../images/computing-julia-set-using-sycl-0.jpg">
+                <p class="blogText">
+                    But for computing fractal, I've to reinterpret indices in a way where origin of reference frame should move
+                    to center of image. And those points on 2D cartesian plane to be interpreted as complex numbers
+                    ( read a + ib, where a, b are components of 2D point along X & Y-axis respectively ). It can be
+                    easily generated using meshgrid method.
+                </p>
+                <div class="microlight">
+    $ python3
+ 
+    >>> w = np.linspace(-2, 1, 4); w // along X-axis
+    array([-2., -1.,  0.,  1.])
+
+    >>> h = np.linspace(2, -1, 4); h // along Y-axis
+    array([ 2.,  1.,  0., -1.])
+    
+    >>> a, b = np.meshgrid(w, h)
+
+    >>> a // visualise 4 X-axes placed along rows of matrix
+    array([[-2., -1.,  0.,  1.],
+        [-2., -1.,  0.,  1.],
+        [-2., -1.,  0.,  1.],
+        [-2., -1.,  0.,  1.]])
+    
+    >>> b // visualise 4 Y-axes placed along columns of matrix
+    array([[ 2.,  2.,  2.,  2.],
+        [ 1.,  1.,  1.,  1.],
+        [ 0.,  0.,  0.,  0.],
+        [-1., -1., -1., -1.]])
+
+    >>> a + b*1j // complex numbers, required for fractal computation
+    array([[-2.+2.j, -1.+2.j,  0.+2.j,  1.+2.j],
+            [-2.+1.j, -1.+1.j,  0.+1.j,  1.+1.j],
+            [-2.+0.j, -1.+0.j,  0.+0.j,  1.+0.j],
+            [-2.-1.j, -1.-1.j,  0.-1.j,  1.-1.j]])
+                </div>
+                <img class="imgCenter" src="../images/computing-julia-set-using-sycl-1.jpg">
+                <p class="blogText">
+                    Notice along X-axis points are in range [-2, 2), while along Y-axis they're
+                    in range [2, -2). For scaling them to <b>S</b>, I first take them to (-1, 1) interval & then
+                    multiply by <b>S</b>. Now as I've these complex numbers in matrix form properly scaled, I'd like to go to
+                    actual fractal computation part.
+                </p>
+                <div class="microlight">
+    >>> W, H = 4, 4 // image dimensions
+
+    >>> factor = ((W/2) ** 2 + (H/2) ** 2) ** 0.5; factor // √((w/2) ** 2 + (h/2) ** 2)
+    2.8284271247461903
+
+    >>> a / factor // all values in interval (-1, 1)
+    array([[-0.70710678, -0.35355339,  0.        ,  0.35355339],
+           [-0.70710678, -0.35355339,  0.        ,  0.35355339],
+           [-0.70710678, -0.35355339,  0.        ,  0.35355339],
+           [-0.70710678, -0.35355339,  0.        ,  0.35355339]])
+    
+    >>> # do same for b i.e. `b / factor`
+
+    >>> a / factor * S + (b/factor * S) * 1j // S = scale, here 2.f
+    array([[-1.41421356+1.41421356j, -0.70710678+1.41421356j, 0.+1.41421356j, 0.70710678+1.41421356j],
+           [-1.41421356+0.70710678j, -0.70710678+0.70710678j, 0.+0.70710678j, 0.70710678+0.70710678j],
+           [-1.41421356+0.j        , -0.70710678+0.j        , 0.        +0.j, 0.70710678+0.j        ],
+           [-1.41421356-0.70710678j, -0.70710678-0.70710678j, 0.-0.70710678j, 0.70710678-0.70710678j]])
+                </div>
+                <p class="blogText">
+                    Quadratic iteration based Julia Set computation can be encapsulated in following function. As long
+                    as z.real()<sup>2</sup> + z.imag()<sup>2</sup> < S<sup>2</sup>, I keep applying z = z<sup>2</sup> + c.
+                    There is another bound on number of iterations that can be performed.
+                </p>
+                <div class="microlight">
+    const uint MAX_ITR = 1 << 10; // 1024
+    const float S = 2.f; // scale
+
+    func length(complex z) -> float {
+        return (z.real() ** 2 + z.imag() ** 2) ** .5f; // z = a + ib; √(a**2 + b**2)
+    }
+
+    func quadratic_iteration(complex z, c) {}
+        uint i = 0;
+        for ; i < MAX_ITR; i++ {
+            z = z ** 2 + c;
+
+            if (length(z) > S) {
+                break;
+            }
+        }
+        return i;
+    }
+                </div>
+                <p class="blogText">
+                    I choose <b>S</b> ( = scale ) such that S<sup>2</sup> - S >= abs(c), where c is a constant complex number.
+                    Say, I choose to work with c = (-0.8+0.156j), in that case setting S = 2.f, satisfies aforementioned constraint.
+                </p>
+                <div class="microlight">
+    >>> S = 2.; S // scale
+    2.0
+
+    >>> c = -0.8 + 0.156j; c // constant
+    (-0.8+0.156j)
+
+    >>> S ** 2 - S >= abs(c)
+    True ✅
+                </div>
+                <p class="blogText">
+                    From <span class="highlight"><i>quadratic_iteration(...)</i></span>, I obtain #-of evaluations it takes for <b>z</b>
+                    to determine whether it's in set with radius <b>S</b> or not. Depending upon #-of evaluations for certain
+                    <b>z</b>, I assign different color to respective image pixel. Recently I discovered a nice way to assign
+                    beautiful colors to each pixel of image using cosine function. It simply requires me to
+                    evaluate <span class="highlight"><i>color(t) = a + b * cos[ 2 * pi * (c * t + d)]</i></span>, where I can variate
+                    <b>a</b>, <b>b</b>, <b>c</b>, <b>d</b> which are 3-element tuples of floats.
+                    In this case <span class="highlight"><i>t = quadratic_iteration(...) / MAX_ITR</i></span>.
+                    <br>
+                    <br>
+                    I recommend reading more about cosine palette based color generation techinique 
+                    <a class="blogLink" target="_blank" href="https://iquilezles.org/www/articles/palettes/palettes.htm">here</a>.
+                    <br>
+                    <br>
+                    Today I'm using following method for colorizing each pixel of fractal.
+                </p>
+                <div class="microlight">
+    [float; 4] colorize(uint itr) {
+        [float; 3] d = {0.5, 0.5, 0.5};
+        [float; 3] e = {0.5, 0.5, 0.5};
+        [float; 3] f = {2.0, 1.0, 0.0};
+        [float; 3] g = {1.3, 0.66, 0.33};
+
+        // last 1.f dictates α channel value of RGBA image
+        [float; 4] pixel_val = {d + e * cos(6.28318f * (f * ((float)itr / (float)(MAX_ITR)) + g)), 1.f};
+        return pixel_val;
+    }
+                </div>
+                <p class="blogText">
+                    Now I've one sequential program which computes Julia Set Fractal of dimension 512x512, by evaluating
+                    quadratic equation z = z<sup>2</sup> + c. Following is the computed fractal with c = (-0.8 + 0.156j).
+                </p>
+                <img class="imgJuliaSetFractal" src="../images/computing-julia-set-using-sycl-2.png">
+            </article>
+        </div>
+    </div>
+    <div id="footerDiv">
+        <footer>
+            <p id="footerText">
+                &copy <a href="https://github.com/itzmeanjan/itzmeanjan.github.io" id="footerLink"
+                    target="_blank"><big>A</big>njan Roy</a> ( <big>M</big>IT Licensed )
+            </p>
+        </footer>
+    </div>
+</body>
+
+</html>
