@@ -10,7 +10,7 @@
     </title>
     <meta prefix="og: http://ogp.me/ns#" property="og:type" content="website">
     <meta prefix="og: http://ogp.me/ns#" property="og:title" content="Computing Julia Set on Accelerator, using SYCL DPC++">
-    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="">
+    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="In depth exploration of computing Julia Set Fractal in both Sequential & Parallel Model, using SYCL DPC++">
     <meta prefix="og: http://ogp.me/ns#" property="og:url" content="https://itzmeanjan.in">
     <meta prefix="og: http://ogp.me/ns#" property="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
     <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url"
@@ -20,14 +20,14 @@
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="https://itzmeanjan.in/">
     <meta property="twitter:title" content="Computing Julia Set on Accelerator, using SYCL DPC++">
-    <meta property="twitter:description" content="">
+    <meta property="twitter:description" content="In depth exploration of computing Julia Set Fractal in both Sequential & Parallel Model, using SYCL DPC++">
     <meta property="twitter:image" content="https://itzmeanjan.in/images/myImage.jpg">
     <meta property="twitter:site" content="@meanjanry">
-    <meta name="description" content="">
+    <meta name="description" content="In depth exploration of computing Julia Set Fractal in both Sequential & Parallel Model, using SYCL DPC++">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="author" content="Anjan Roy">
     <meta name="keywords"
-        content="dpc++, dpcpp, sycl, oneapi, gpgpu, accelerator, parallel, root, finding, bisection, method, cpp, rust">
+        content="dpc++, dpcpp, sycl, oneapi, gpgpu, fpga, accelerator, parallel, julia, set, fractal, cpp">
     <meta name="theme-color" content="darkslategrey">
     <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
     <link rel="stylesheet" type="text/css" href="../styles/index.css">
@@ -58,11 +58,11 @@
                     This week I was exploring fractals - specifically computing fractals using Julia Set
                     quadratic equation. I considered using SYCL DPC++ for implementation, which I've been
                     working on for few weeks now. I was interested in using <span class="highlight">image</span> interface of DPC++, which
-                    just same as <span class="highlight">buffer</span> interface, creates an abstraction over raw memory address based
+                    just same as <span class="highlight">buffer</span> interface creates an abstraction over raw memory address based
                     data read/ write ( read pointer arithmetic ), while providing some image specific functionality for data interpretation,
                     reading & writing. I find buffer & image interfaces easier to work with rather than raw pointers,
                     allocated using <b>U</b>nified <b>S</b>hared <b>M</b>emory, due to their elegance in design; accessor based
-                    data read/ write on device/ host, providing implicit data movement/ visibility, which in-turn
+                    data read/ write on device/ host, providing implicit data movement/ synchronization/ visibility, which in-turn
                     lets me implicitly define task graph dependencies. So it's <i>good, nice, powerful</i> abstraction.
                     <br>
                     <br>
@@ -191,12 +191,20 @@
                 <p class="blogText">
                     From <span class="highlight"><i>quadratic_iteration(...)</i></span>, I obtain #-of evaluations it takes for <b>z</b>
                     to determine whether it's in set with radius <b>S</b> or not. Depending upon #-of evaluations for certain
-                    <b>z</b>, I assign different color to respective image pixel. Recently I discovered a nice way to assign
-                    beautiful colors to each pixel of image using cosine function. It simply requires me to
-                    evaluate <span class="highlight"><i>color(t) = a + b * cos[ 2 * pi * (c * t + d)]</i></span>, where I can variate
-                    <b>a</b>, <b>b</b>, <b>c</b>, <b>d</b> which are 3-element tuples of floats.
-                    In this case <span class="highlight"><i>t = quadratic_iteration(...) / MAX_ITR</i></span>.
+                    <b>z</b>, I assign different color to respective image pixel. #-of iterations denote how many of it
+                    is required by <b>z</b> to get outside of Julia Set with radius <b>S</b>, which is alongside capped
+                    at maximum number of iterations ( = MAX_ITR ). After every evaluation of z = z<sup>2</sup> + c, I check
+                    whether distance of updated <b>z</b> from center (0.+0j) is still less than radius of Julia Set defined on
+                    complex plane. This way I keep increasing z by (z<sup>2</sup> + c) in each iteration & in some time <b>z</b> will reach
+                    some value in complex plane, which goes outside of set. I take that certain iteration number & use it to represent
+                    color.
                     <br>
+                    <br>
+                    Recently I discovered a nice way to assign
+                    beautiful colors to each pixel of image using cosine function. It simply requires me to
+                    evaluate <span class="highlight"><i>color(t) = a + b * cos(2 * pi * (c * t + d))</i></span>, where I can variate
+                    <b>a</b>, <b>b</b>, <b>c</b>, <b>d</b> ( 3-element floating point tuples ) to get different palettes.
+                    In this case <span class="highlight"><i>t = quadratic_iteration(...) / MAX_ITR</i></span>.
                     <br>
                     I recommend reading more about cosine palette based color generation technique 
                     <a class="blogLink" target="_blank" href="https://iquilezles.org/www/articles/palettes/palettes.htm">here</a>.
@@ -225,12 +233,12 @@
                     It's good time to move to parallel implementation of Julia Set computation on heterogeneous accelerators ( read CPU, GPGPU, FPGA etc. ).
                     Being a good candidate for SIMD model, Julia Set computation fits well in data parallel programming domain, where each pixel
                     of resulting image is processed independently & RGBA pixel value is written in respective memory location.
-                    The only challenge I see --- <i>how to compute complex number (a + ib) located in pixel location (a, b) ?</i>
+                    The only challenge I see --- <i>how to compute complex number (a + ib) located in pixel location (r, c) ?</i>
                     <br>
                     <br>
                     In previous iteration, I was using meshgrid method to do so, this time I've to implement it manually.
                     Each kernel invocation processes single ( unique ) pixel of image, so certain invocation has knowledge
-                    of which certain pixel it is responsible of processing. Let me assume certain kernel invocation knows, it has to process
+                    of which pixel it is responsible of processing. Let me assume certain kernel invocation knows, it has to process
                     image pixel (r, c). Again my interest is to move reference frame to center of image.
                 </p>
                 <div class="microlight">
@@ -238,16 +246,18 @@
     c ∈ [0, W) && W = image width
                 </div>
                 <p class="blogText">
-                    Notice each (x, y) point on 2D cartesian plane, centered at middle of image matrix, 
+                    Notice each (x, y) point on 2D cartesian plane, 
                     is seperated by distance 1, so I can compute what should be (x, y) in current pixel
-                    location (r, c), with formula <i>a + k * s</i>.
+                    location (r, c), with following formula.
                 </p>
                 <div class="microlight">
     w = h = 4 // image dimension
     
     func f(r, c) {
         step = 1.;
-        return -(w/2) + step * c, (h/2) - step * r; // a + s * k
+
+        // a + s * k
+        return -(w/2) + step * c, (h/2) - step * r;
     }
 
     >>> assert f(0, 0) == (-2., 2.)     ✔ // top left
