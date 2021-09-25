@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<!--
+  Author: Anjan Roy<hello@itzmeanjan.in>
+-->
+<html>
+
+<head>
+    <title>
+        Speeding up Matrix Multiplication on GPGPU, using SYCL DPC++
+    </title>
+    <meta prefix="og: http://ogp.me/ns#" property="og:type" content="website">
+    <meta prefix="og: http://ogp.me/ns#" property="og:title" content="Speeding up Matrix Multiplication on GPGPU, using SYCL DPC++">
+    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="Faster Parallel Matrix Multiplication on GPGPU leveraging powerof subgroup collective functions, using SYCL DPC++">
+    <meta prefix="og: http://ogp.me/ns#" property="og:url" content="https://itzmeanjan.in">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url"
+        content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:width" content="950">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:height" content="735">
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://itzmeanjan.in/">
+    <meta property="twitter:title" content="Speeding up Matrix Multiplication on GPGPU, using SYCL DPC++">
+    <meta property="twitter:description" content="Faster Parallel Matrix Multiplication on GPGPU leveraging powerof subgroup collective functions, using SYCL DPC++">
+    <meta property="twitter:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta property="twitter:site" content="@meanjanry">
+    <meta name="description" content="Faster Parallel Matrix Multiplication on GPGPU leveraging powerof subgroup collective functions, using SYCL DPC++">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="author" content="Anjan Roy">
+    <meta name="keywords"
+        content="dpc++, dpcpp, sycl, oneapi, gpgpu, fpga, accelerator, parallel, matrix, multiplication, subgroup, collective, function, broadcast, cpp">
+    <meta name="theme-color" content="darkslategrey">
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" type="text/css" href="../styles/index.css">
+    <script src="../styles/code.js"></script>
+</head>
+
+<body>
+    <div id="parentDiv">
+        <div id="navBar">
+            <nav>
+                <a class="navLink" href="/"><big>H</big>ome</a> |
+                <a class="navLink" href="https://github.com/itzmeanjan" target="_blank"><big>P</big>rojects</a> |
+                <a class="navLink" href="/pages/blog.html"><big>B</big>log</a> |
+                <a class="navLink" href="/pages/contact.html"><big>C</big>ontact</a>
+            </nav>
+        </div>
+        <div class="childDiv">
+            <article>
+                <h1 class="blogHeader">
+                    Speeding up Matrix Multiplication on GPGPU, using SYCL DPC++
+                </h1>
+                <h3>Created : September 25, 2021</h3>
+            </article>
+        </div>
+        <div class="childDiv">
+            <article>
+                <p class="blogText">
+                    A few weeks ago I wrote one <a class="blogLink" target="_blank" href="../pages/parallel-matrix-multiplication-with-vulkan-compute.html">post</a>,
+                    demonstrating parallel matrix multiplication on GPGPU using
+                    Vulkan Compute API, where the speed up obtained compared to single threaded version was quite
+                    substantial. But last week while working on some other problem, where matrix multiplication was
+                    a necessary step, I discovered there are other ways to perform matrix multiplication, which gives
+                    better speed up. These ways leverage GPGPU hardware capabilities in a better fashion, which essentially
+                    speeds up this data parallel computation. Matrix multiplication itself is easily parallelizable
+                    due to absence of dependencies among computational steps, which requires lesser synchronization,
+                    meaning all employed threads can work on a single ( unique ) memory location, without resulting into
+                    conflict ( read data races ).
+                    <br>
+                    <br>
+                    Today I'd like to spend sometime in explaining what I've discovered.
+                </p>
+                <p class="blogText">
+                    In all version of matrix multiplication each cell of resulting matrix is computed
+                    independently, by element-wise multiplying & summing respective row & col. If C[i, j] is being computed
+                    then respective thread will read elements from A[i, ] & B[ , j] i.e. i-th row of A & j-th column of B
+                    and multiply them element-wise, sum of those will be stored in C[i, j]. For square matrices of dimension N x N,
+                    it'll result into 2*N-many reads from different memory locations. Each worker thread does same i.e. N*N-many worker
+                    threads each to read 2*N values. Operand matrices are stored in global memory, accessing those introduces
+                    high latency, resulting into slowed down computation.
+                    This issue can be resolved to some extent by making use of local memory available
+                    to each work group.
+                    <br>
+                    <br>
+                    This is how a naive matrix multiplication kernel can be written.
+                </p>
+                <div class="microlight">
+    // a naive approach
+
+    h.parallel_for(nd_range<2>{{N, N}, {B, 1}}, [=](nd_item<2> it) {
+        // figure out which cell to be worked on
+        const size_t r = it.get_global_id(0);
+        const size_t c = it.get_global_id(1);
+
+        // perform element-wise multiplication & keep summing
+        float sum = 0.f;
+        for (uint k = 0; k < N; k++) {
+            sum += acc_matrix_a[r][k] * acc_matrix_b[k][c];
+        }
+
+        // store result into respective cell
+        acc_matrix_c[r][c] = sum;
+    });
+                </div>
+                <img class="imgCenterUpdt" src="../images/speeding-up-matmul-on-gpgpu-0.jpg">
+                <p class="blogText">
+                    Notice, when WorkGroup<sub>0</sub> computes cells (0, 0) & (0, 1), it accesses same row i.e. A<sub>0</sub>
+                    twice. Similarly when cell (1, 0) & (1, 1) are computed, row A<sub>1</sub> is accessed twice, from global
+                    memory. I can club some memory access of cells living in same row of resulting matrix C. I make use of
+                    local memory where I store common portion of matrix_A i.e. A<sub>0</sub> while computing cell (0, 0) & (0, 1).
+                    In this tiled matrix multiplication, each work group uses 1-dimensional local buffer to store tile ( read portion of cells
+                    from left multiplicand matrix ). When computing cells, operands are read from local memory, which is
+                    faster than global memory, resulting into speed up. But also notice, if I'm going to make use of
+                    local memory, I should first make sure this local memory is filled up, before it's being used
+                    as operand store. This calls for making use of barriers, which provides me with nice
+                    synchronization technique among all work items of work group in execution. Using barrier, ensures
+                    all work items are going to see all side effects, performed by other work items in same work group.
+                    Along with memory visibility guarantee, it also gives one execution flow guarantee, where it's ensured that until all work items
+                    of same work group arrive at that barrier, none will be able to proceed. After this barrier, each work item
+                    can proceed with tiled cell computation. Only I need to make sure tile width properly
+                    divides width of matrix i.e. N.
+                    <br>
+                    <br>
+                    I notice one more thing, if I consider using 1D local buffer along with
+                    2D workgroup size, it'll result into data race. If I keep using 2D workgroup size,
+                    WorkGroup<sub>0</sub> computes cell (0, 0), (0, 1), (1, 0) & (1, 1). Now cell (0, 0) & (0, 1)
+                    are interested in same row of operand matrix A, while cell (1, 0) & (1, 1) are not.
+                    With 1D local buffer, work items computing cell (0, 0) & (0, 1) attempts to fill up buffer with elements of A<sub>0</sub>, whereas
+                    work items (1, 0) & (1, 1) attempt to do same on same memory slice --- data race.
+                    <br>
+                    <br>
+                    For avoiding this problem, I simply use 1D local buffer of width <b>B</b> along with workgroup size of (1, B), so that
+                    only cells across same row are computed by work items in same workgroup --- no more data race.
+                </p>
+                <div class="microlight">
+    // a better approach, with local memory
+                
+    // 1D local buffer of length B ( aka tile )
+    accessor<float, 1, access::mode::read_write, access::target::local> acc_local(range<1>{B}, h);
+
+    h.parallel_for(nd_range<2>{{N, N}, {1, B}}, [=](nd_item<2> it) {
+        // which cell to be computed
+        const size_t r = it.get_global_id(0);
+        const size_t c = it.get_global_id(1);
+
+        // which element in tile to fill up
+        const size_t l = it.get_local_id(1);
+
+        float sum = 0.f;
+        // compute single tile per iteration, N/B many of those
+        for (uint k = 0; k < N; k += B) {
+            
+            // fill up cell of 1D local buffer
+            acc_local[l] = acc_matrix_a[r][k + l];
+            // wait for all work items to complete ( work group scope )
+            it.barrier();
+
+            // multiply & sum tile elements
+            for (uint k_ = 0; k_ < B; k_++) {
+                sum += acc_local[k_] * acc_matrix_b[k + k_][c];
+            }
+            // wait for all work items to complete ( work group scope )
+            it.barrier();
+        }
+
+        // store computed cell in resulting matrix
+        acc_matrix_c[r][c] = sum;
+    });
+                </div>
+                <img class="imgCenterUpdt" src="../images/speeding-up-matmul-on-gpgpu-1.jpg">
+                <p class="blogText">
+                    I found, introduction of local memory buffer in matrix multiplication kernel
+                    speeds up computation but it calls for more synchronization among work-items in a work-group,
+                    using barrier(s). Synchronization burdens work items, lowering speedup which could be obtained
+                    in absence of them. 
+                    <br>
+                    <br>
+                    So I discovered subgroups, which can be considered subset of work-items
+                    in a work-group. Subgroups provide me with powerful in-built functions, which can be applied
+                    on work group itself, rather than each work item applying on self & then synchronizing using other
+                    means like barrier. Notice, I'm using 1D local buffer of width B, where B work items access
+                    B memory locations from local buffer --- resulting into total B*B memory accesses for each tile.
+                    Let's take a look at this code snippet from last kernel.
+                </p>
+                <div class="microlight">
+    ...
+
+    // `acc_local[0]` is accessed by each of B work items, resulting into
+    // B-many memory accesses of same address from different work items
+    for (uint k_ = 0; k_ < B; k_++) {
+        sum += acc_local[k_] * acc_matrix_b[k + k_][c];
+    }
+
+    it.barrier();
+
+    ...
+                </div>
+                <p class="blogText">
+                    As I mentioned subgroup collective functions can be applied on whole subgroup, instead of each
+                    individual work items, this can be leveraged for reducing B*B memory accesses for each tile to
+                    only B many of those. Single work item reads memory address <span class="highlight">acc_local[i]</span>,
+                    remaining (B-1)-many work items hear broadcast. Broadcast collective function gives me way to
+                    avoid barriers --- substantiallly decreasing explicit synchronization cost. This approach indeed enhances computational
+                    speed up obtained.
+                </p>
+                <div class="microlight">
+    // another better approach with subgroup
+    // collective function
+
+    h.parallel_for(nd_range<2>{{N, N}, {1, B}}, [=](nd_item<2> it) {
+        // figure out which sub group this work item is part of
+        sycl::ONEAPI::sub_group sg = it.get_sub_group();
+        
+        // figure out which cell being computed
+        const size_t r = it.get_global_id(0);
+        const size_t c = it.get_global_id(1);
+
+        // l ∈ [0, B)
+        const size_t l = it.get_local_id(1);
+
+        float sum = 0.f;
+        for (uint k = 0; k < N; k += B) {
+            float tile = acc_matrix_a[r][k + l];
+
+            // broadcast common cell of interest ( of matrix A )
+            // to all work items
+            //
+            // provides with inbuilt sychronization ! 🔥
+            for (uint k_ = 0; k_ < B; k_++) {
+                sum += sycl::ONEAPI::broadcast(sg, tile, k_) * acc_matrix_b[k + k_][c];
+            }
+        }
+
+        acc_matrix_c[r][c] = sum;
+    });
+                </div>
+                <img class="imgCenterUpdt" src="../images/speeding-up-matmul-on-gpgpu-2.jpg">
+                <p class="blogText">
+                    I run 3 parallel matrix multiplication implementations with 1024x1024 operand matrices, in order, on both CPU & GPGPU and obtain following result. It's clearly understandable
+                    that subgroup collective function based implementation produces impressive result on GPGPU, due to in-built hardware support for low-cost synchronized
+                    computation/ communication.
+                    When running on CPU, I use workgroup size of B = 4, on the other hand when running on GPU, I use workgroup size of B = 32. These are
+                    preferred subgroup sizes, which is implementation defined.
+                </p>
+                <div class="microlight">
+ $ dpcpp -fsycl mat_mul.cpp && ./a.out # on CPU node
+
+    running on Intel Xeon Processor (Skylake, IBRS)
+    matmul_v0, in 519 ms
+    matmul_v1, in 330 ms
+    matmul_v2, in 119 ms 🌟
+
+ $ dpcpp -fsycl mat_mul.cpp && ./a.out # on GPU node
+
+    running on Intel(R) Iris(R) Xe MAX Graphics [0x4905]
+    matmul_v0, in 225 ms
+    matmul_v1, in 21 ms
+    matmul_v2, in 18 ms 🔥
+                </div>
+                <p class="blogText">
+                    I keep all these implementations <a class="blogLink" target="_blank" href="https://gist.github.com/itzmeanjan/ca258ec1479e88837e1cd9451c9ff54c">here</a> for future reference.
+                    In coming days, I plan to explore heterogeneous parallel programming with SYCL DPC++ more, while implementing other algorithms & sharing my understanding.
+                    <br>
+                    <br>
+                    Have a great time !
+                </p>
+            </article>
+        </div>
+    </div>
+    <div id="footerDiv">
+        <footer>
+            <p id="footerText">
+                &copy <a href="https://github.com/itzmeanjan/itzmeanjan.github.io" id="footerLink"
+                    target="_blank"><big>A</big>njan Roy</a> ( <big>M</big>IT Licensed )
+            </p>
+        </footer>
+    </div>
+</body>
+
+</html>
