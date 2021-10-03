@@ -133,11 +133,13 @@
                 </p>
                 <img class="imgCenterUpdt" src="../images/solving-system-of-linear-equations-gauss-jordan-5.jpg">
                 <p class="blogText">
-                    If I've N unknowns to find, I've to run N elimination steps ( eliminate elements below & above pivot cell in currently active row )
-                    which themselves can be run parallelly. But each elimination step is dependent on previous one, so they can't be
+                    If I've N unknowns to find, I've to run N elimination steps ( eliminate elements below & above pivot cell in currently active row ),
+                    each of them can perform all encapsulated computations in parallel. But each elimination step is dependent on previous one, so they can't be
                     independently scheduled for execution, rather I can use in-order execution queue when submitting task to accelerator device.
-                    During elimination step j, a submatrix of dimension (N - 1) x (N + 1 - j) is modified. So it's easy to understand
-                    as we progress forward, size of computation submatrix reduces. In above diagram, I mark this submatrix of computation in <span class="highlight">blue</span>.
+                    It's fine to use out-of-order execution queues because task graph will automatically figure out dependency chain from
+                    usage pattern of buffer objects.
+                    During elimination step j, a submatrix of dimension (N - 1) x (N + 1 - j) is operated on. So it's easy to understand
+                    as we progress forward, size of computable submatrix reduces. In above diagram, I mark this submatrix of computation in <span class="highlight">blue</span>.
                     All cells of certain submatrix can be computed in parallel.
                     <br>
                     <br>
@@ -155,9 +157,9 @@
                 <p class="blogText">
                     Now I construct an augmented matrix from A<sub>N x N</sub> & b<sub>N x 1</sub>, which I solve using aforementioned algorithm, in parallel.
                     Finally I compare computed solution with expected one to check for deviation, which is inevitable as I see
-                    <b>dpcpp</b> compiler enables lots of optimizations, which is reflected on results of floating point operations.
-                    I ran same implementation on 3 different platforms, with N = 1024, obtaining following performance.
-                    In all these runs, I used local workgroup size of 32, which is generally good fit when targeting GPGPUs.
+                    <b>dpcpp</b> compiler enables quite a lot of optimization, which is reflected on results of floating point operations.
+                    I ran same implementation on 3 different platforms, with <b>N = 1024</b>, obtaining following performance.
+                    In all these runs, I used local workgroup size of <b>32</b>, which is generally good fit when targeting GPGPUs.
                 </p>
                 <div class="microlight">
     $ dpcpp -fsycl gauss-jordan.cpp && ./a.out
