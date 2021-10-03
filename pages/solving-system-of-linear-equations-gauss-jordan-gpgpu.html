@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<!--
+  Author: Anjan Roy<hello@itzmeanjan.in>
+-->
+<html>
+
+<head>
+    <title>
+        Solving System of Linear Equations using SYCL DPC++ (Gauss Jordan Method)
+    </title>
+    <meta prefix="og: http://ogp.me/ns#" property="og:type" content="website">
+    <meta prefix="og: http://ogp.me/ns#" property="og:title" content="Solving System of Linear Equations using SYCL DPC++ (Gauss Jordan Method)">
+    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="Solving system of linear equations with large number of unknowns on CPU/ GPGPU using SYCL DPC++">
+    <meta prefix="og: http://ogp.me/ns#" property="og:url" content="https://itzmeanjan.in">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url"
+        content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:width" content="950">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:height" content="735">
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://itzmeanjan.in/">
+    <meta property="twitter:title" content="Solving System of Linear Equations using SYCL DPC++ (Gauss Jordan Method)">
+    <meta property="twitter:description" content="Solving system of linear equations with large number of unknowns on CPU/ GPGPU using SYCL DPC++">
+    <meta property="twitter:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta property="twitter:site" content="@meanjanry">
+    <meta name="description" content="Solving system of linear equations with large number of unknowns on CPU/ GPGPU using SYCL DPC++">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="author" content="Anjan Roy">
+    <meta name="keywords"
+        content="dpc++, dpcpp, sycl, oneapi, gpgpu, fpga, accelerator, parallel, matrix, multiplication, subgroup, collective, function, broadcast, cpp">
+    <meta name="theme-color" content="darkslategrey">
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" type="text/css" href="../styles/index.css">
+    <script src="../styles/code.js"></script>
+</head>
+
+<body>
+    <div id="parentDiv">
+        <div id="navBar">
+            <nav>
+                <a class="navLink" href="/"><big>H</big>ome</a> |
+                <a class="navLink" href="https://github.com/itzmeanjan" target="_blank"><big>P</big>rojects</a> |
+                <a class="navLink" href="/pages/blog.html"><big>B</big>log</a> |
+                <a class="navLink" href="/pages/contact.html"><big>C</big>ontact</a>
+            </nav>
+        </div>
+        <div class="childDiv">
+            <article>
+                <h1 class="blogHeader">
+                    Solving System of Linear Equations using SYCL DPC++ (Gauss Jordan Method)
+                </h1>
+                <h3>Created : October 03, 2021</h3>
+            </article>
+        </div>
+        <div class="childDiv">
+            <article>
+                <p class="blogText">
+                    This week I spent sometime writing an implementation in SYCL DPC++ for solving a system
+                    of linear equations, using Gauss Jordan Method. It is pretty well known sequential
+                    algorithm for solving this problem, but with little tweaking it can be parallelized. I plan to
+                    target GPGPU sitting on my computer for finding large number of unknowns ( read N >= 1 << 10 ),
+                    so I decide to implement it in SYCL DPC++, which gives me a nice parallel programming framework, targeting heterogeneous platforms.
+                    I'll first take an example to demonstrate how this method works & later I'll talk about how I implement it in SIMD model.
+                </p>
+                <p class="blogText">
+                    Let me start with following set of linear equations.
+                </p>
+                <div class="microlight">
+    -1 * x_1 + 7 * x_2 - 3 * x_3 = 3
+    2 * x_1 + 3 * x_2 + 5 * x_3 = 17
+    3 * x_1 + 7 * x_2 + 9 * x_3 = 23
+                </div>
+                <p class="blogText">
+                    I'll work on 👇 augmented matrix of dimension N x (N+1), here N = 3.
+                </p>
+                <img class="imgCenterUpdt" src="../images/solving-system-of-linear-equations-gauss-jordan-0.png">
+                <p class="blogText">
+                    In first iteration, I'll modify only elements present in rows other than row<sub>0</sub>, using following 
+                    formula, as I'm interested in eliminating all elements below pivot ( read cell A<sup>*</sup><sub>j,j</sub> ).
+                </p>
+                <div class="microlight">
+    b[i][k] = a[i][k] - (a[i][j] / a[j][j]) * a[j][k], where i = {1, 2}; k = {0, 1, 2, 3}; j = 0 // j is row identifier
+
+
+    def f(j, i, k):
+        b[i][k] = a[i][k] - (a[i][j] / a[j][j]) * a[j][k]
+                </div>
+                <img class="imgCenterUpdt" src="../images/solving-system-of-linear-equations-gauss-jordan-1.png">
+                <p class="blogText">
+                    In next iteration, my interest is to eliminate elements below & above pivot A<sup>*</sup><sub>j,j</sub> where j = 1.
+                    I run following code snippet to do so.
+                </p>
+                <div class="microlight">
+    // current pivot of interest lives in this row
+    j = 1
+    for i in [0, 2]:
+        for k in range(j, 4):
+            f(j, i, k)
+                </div>
+                <img class="imgCenterUpdt" src="../images/solving-system-of-linear-equations-gauss-jordan-2.png">
+                <p class="blogText">
+                    I've eliminated all elements below & above pivot A<sup>*</sup><sub>j,j</sub> where j = {0, 1}, remaining
+                    is row<sub>2</sub>, where I've to zero out all elements above pivot A<sup>*</sup><sub>2,2</sub>.
+                </p>
+                <img class="imgCenterUpdt" src="../images/solving-system-of-linear-equations-gauss-jordan-3.png">
+                <p class="blogText">
+                    Gauss Jordan method requires me to convert N x N submatrix of augmented matrix A<sup>*</sup><sub>N x (N+1)</sub>
+                    to identity matrix I<sub>N x N</sub>. I've already eliminated all elements below & above pivot elements
+                    A<sup>*</sup><sub>j, j</sub> where j ∈ {0, 1, 2}. For obtaining identity matrix, I divide each cell across all rows
+                    by pivot element of that row. After this I should get solution to system of linear equations
+                    along column<sub>N</sub> of augmented matrix. As I'm just interested in solution, I use following code snippet.
+                </p>
+                <div class="microlight">
+    # only update cell in solution column,
+    # leave others !
+    def f(i):
+        a[i][n] /= a[i][i]
+
+    n = 3 // 3 unknowns !
+    for i in range(n):
+        f(i)
+                </div>
+                <p class="blogText">
+                    Solution to system of linear equations using sequential Gauss Jordan method is easy to find.
+                    I notice there's potential for making this method parallel, though I also note there needs to be 3 iterations
+                    i.e. 3 kernel invocations, which are data dependent on previous one --- effectively reducing scope
+                    of parallelism. But inside each of these N iteration of eliminations, no data dependency exists & that's what I aim
+                    to parallelize.
+                </p>
+                <img class="imgCenterUpdt" src="../images/solving-system-of-linear-equations-gauss-jordan-4.png">
+                <p class="blogText">
+                    If I put all three elimination steps along with final identity matrix conversion step, in single diagram it'll be easier to visualise.
+                </p>
+                <img class="imgCenterUpdt" src="../images/solving-system-of-linear-equations-gauss-jordan-5.jpg">
+                <p class="blogText">
+                    If I've N unknowns to find, I've to run N elimination steps ( eliminate elements below & above pivot cell in currently active row )
+                    which themselves can be run parallelly. But each elimination step is dependent on previous one, so they can't be
+                    independently scheduled for execution, rather I can use in-order execution queue when submitting task to accelerator device.
+                    During elimination step j, a submatrix of dimension (N - 1) x (N + 1 - j) is modified. So it's easy to understand
+                    as we progress forward, size of computation submatrix reduces. In above diagram, I mark this submatrix of computation in <span class="highlight">blue</span>.
+                    All cells of certain submatrix can be computed in parallel.
+                    <br>
+                    <br>
+                    Keeping this in mind I write one data parallel implementation in DPC++ for solving system of linear equations.
+                    For ease of assertion, I first generate two random matrices. From them I compute, Ax = b.
+                </p>
+                <ul>
+                    <li>
+                        <b>A</b><sub>N x N</sub>
+                    </li>
+                    <li>
+                        <b>x</b><sub>N x 1</sub>
+                    </li>
+                </ul>
+                <p class="blogText">
+                    Now I construct an augmented matrix from A<sub>N x N</sub> & b<sub>N x 1</sub>, which I solve using aforementioned algorithm, in parallel.
+                    Finally I compare computed solution with expected one to check for deviation, which is inevitable as I see
+                    <b>dpcpp</b> compiler enables lots of optimizations, which is reflected on results of floating point operations.
+                    I ran same implementation on 3 different platforms, with N = 1024, obtaining following performance.
+                    In all these runs, I used local workgroup size of 32, which is generally good fit when targeting GPGPUs.
+                </p>
+                <div class="microlight">
+    $ dpcpp -fsycl gauss-jordan.cpp && ./a.out
+    running on Intel(R) Xeon(R) CPU E5-2686 v4 @ 2.30GHz
+    solved in 5147 ms       |       max error 0.0246608
+
+    // ---
+    
+    $ dpcpp -fsycl gauss-jordan.cpp && ./a.out
+    running on Intel Xeon Processor (Skylake, IBRS)
+    solved in 2312 ms       |       max error 0.0704146
+
+    // ---
+    
+    $ dpcpp -fsycl gauss-jordan.cpp && ./a.out
+    running on Intel(R) Iris(R) Xe MAX Graphics [0x4905]
+    solved in 1065 ms       |       max error 0.0953298
+                </div>
+                <p class="blogText">
+                    I keep DPC++ implementation <a class="blogLink" target="_blank" href="https://gist.github.com/itzmeanjan/fe0b58643ecf1c4dc3eef992625413b6">here</a> for future reference.
+                    In coming days, I'll implement iterative methods for solving system of linear equations like Jacobi method or Gauss Seidel method, using data parallel model that SYCL provides.
+                    <br>
+                    <br>
+                    Have a great time !
+                </p>
+            </article>
+        </div>
+    </div>
+    <div id="footerDiv">
+        <footer>
+            <p id="footerText">
+                &copy <a href="https://github.com/itzmeanjan/itzmeanjan.github.io" id="footerLink"
+                    target="_blank"><big>A</big>njan Roy</a> ( <big>M</big>IT Licensed )
+            </p>
+        </footer>
+    </div>
+</body>
+
+</html>
