@@ -134,7 +134,7 @@
                 <div class="microlight">
     >>> import numpy as np
 
-    >>> l = array([[ 1,  0,  0,  0],
+    >>> l = np.array([[ 1,  0,  0,  0],
             [-2,  1,  0,  0],
             [ 3, -4,  1,  0],
             [ 2,  1,  3,  1]])
@@ -150,6 +150,38 @@
             [ 6,  8,  2,  9],
             [ 4,  9, -2, 14]]) # asserted !
                 </div>
+                <p class="blogText">
+                    As LU decomposition has data dependency on previous iterations, I have to offload computation
+                    into GPGPU in multiple iterations. Selecting each pivot is done on host machine, while processing
+                    of selected pivot i.e. forward elimination in U & recording of respective elementary row operations in L
+                    are performed on GPGPU. Another thing to notice, in each iteration during elimination of cells below selected pivot,
+                    dimension of submatrix under operation keeps decreasing.
+                    <br>
+                    <br>
+                    I can express scope of parallelism in LU decomposition using following diagram.
+                </p>
+                <img class="imgCenter" src="../images/parallel-lu-decomposition-image-7.jpg">
+                <p class="blogText">
+                    SIMD LU decomposition's performance turns out to be satisfactory. I was expecting better performance with a 1024 x 1024 random dense matrix.
+                    I note, one definite reason behind not-so-good performance is after each iteration I'm performing large copy from U<sub>N x N</sub> to A<sub>N x N</sub>.
+                    Also as dimension of operable sub-matrix keeps decreasing after each iteration, lots of work items are just doing nothing useful --- <b>huge loss</b> !
+                </p>
+                <div class="microlight">
+    $ dpcpp -fsycl lu_decomposition.cpp && ./a.out
+
+    running on Intel Xeon Processor (Skylake, IBRS)
+    LU decomposition: 3840 ms 😕
+    max deviation: 0.0765064
+                </div>
+                <p class="blogText">
+                    My interest in coming days will be to figure out a way to reduce lost computation cycles, where lots of work items are doing nothing as they're pointing to cell
+                    which doesn't belong to current operable sub-matrix.
+                    I'll also like to take a look at how I can reduce amount of back and forth <b>memcpy</b>(s), which are expensive. I keep current SIMD implementation of LU factorization
+                    <a class="blogLink" target="_blank" href="https://gist.github.com/itzmeanjan/4dbf1a81f2136fa1f847233192e930ac">here</a> for future reference.
+                    <br>
+                    <br>
+                    Have a great time !
+                </p>
             </article>
         </div>
     </div>
