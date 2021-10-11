@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<!--
+  Author: Anjan Roy<hello@itzmeanjan.in>
+-->
+<html>
+
+<head>
+    <title>
+        Parallel LU Decomposition on GPGPU
+    </title>
+    <meta prefix="og: http://ogp.me/ns#" property="og:type" content="website">
+    <meta prefix="og: http://ogp.me/ns#" property="og:title" content="Parallel LU Decomposition on GPGPU">
+    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="...">
+    <meta prefix="og: http://ogp.me/ns#" property="og:url" content="https://itzmeanjan.in">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url"
+        content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:width" content="950">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:height" content="735">
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://itzmeanjan.in/">
+    <meta property="twitter:title" content="Parallel LU Decomposition on GPGPU">
+    <meta property="twitter:description" content="...">
+    <meta property="twitter:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta property="twitter:site" content="@meanjanry">
+    <meta name="description" content="...">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="author" content="Anjan Roy">
+    <meta name="keywords"
+        content="dpc++, dpcpp, sycl, oneapi, gpgpu, fpga, accelerator, parallel, matrix, multiplication, subgroup, collective, function, broadcast, cpp">
+    <meta name="theme-color" content="darkslategrey">
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" type="text/css" href="../styles/index.css">
+    <script src="../styles/code.js"></script>
+</head>
+
+<body>
+    <div id="parentDiv">
+        <div id="navBar">
+            <nav>
+                <a class="navLink" href="/"><big>H</big>ome</a> |
+                <a class="navLink" href="https://github.com/itzmeanjan" target="_blank"><big>P</big>rojects</a> |
+                <a class="navLink" href="/pages/blog.html"><big>B</big>log</a> |
+                <a class="navLink" href="/pages/contact.html"><big>C</big>ontact</a>
+            </nav>
+        </div>
+        <div class="childDiv">
+            <article>
+                <h1 class="blogHeader">
+                    Parallel LU Decomposition on GPGPU
+                </h1>
+                <h3>Created : October 11, 2021</h3>
+            </article>
+        </div>
+        <div class="childDiv">
+            <article>
+                <p class="blogText">
+                    Last week I worked on implementing LU decomposition on GPGPU using SYCL DPC++. Being a pretty useful method for
+                    solving system of linear equations, finding determinant & inverse  of matrix, I thought it is worth
+                    taking a look at this problem, where I attempt to implement its SIMD form, capable of running in high throughput machine --- GPGPUs.
+                    My objective will be to split a given matrix A<sub>N x N</sub> into lower & upper triangular matrices L<sub>N x N</sub>, U<sub>N x N</sub> respectively such that
+                </p>
+                <div class="microlight">
+    A_(N x N) = L_(N x N) x U_(N x N)
+                </div>
+                <p class="blogText">
+                    I'll start working with an example, where I go through steps of algorithm while talking about its respective SIMD implementation. I choose to work with following matrix.
+                </p>
+                <img class="imgCenterUpdt" src="../images/parallel-lu-decomposition-image-0.png">
+                <p class="blogText">
+                    As I know I've to split A into L & U, I start by taking two square matrices, initially setting L = I<sub>N x N</sub> & U = A.
+                </p>
+                <img class="imgCenterUpdt" src="../images/parallel-lu-decomposition-image-1.png">
+                <p class="blogText">
+                    As LU decomposition is just forward elimination step of Gauss-Jordan method, used for solving system of linear equations, while
+                    recording elementary row operation's in L<sub>N x N</sub> --- I start working on column<sub>0</sub>, hoping to zero out
+                    all cells below pivot U<sub>0, 0</sub>. First I record these elementary row operations in L<sub>N x N</sub>, which has all pivots set to 1.
+                </p>
+                <div class="microlight">
+    // record elementary row operations in L
+    col = 0
+    N = 4
+
+    for row in range(col+1, N):
+        L[row][col] = A[row][col] / A[col][col]
+                </div>
+                <p class="blogText">
+                    Resulting L<sub>N x N</sub> looks like below
+                </p>
+                <img class="imgCenterUpdt" src="../images/parallel-lu-decomposition-image-2.png">
+                <p class="blogText">
+                    Now I zero out all elements below U<sub>0, 0</sub> while applying row operation across whole rows of submatrix of U<sub>N x N</sub>.
+                    I can express it in following snippet of pseudocode.
+                </p>
+                <div class="microlight">
+    // perform actual row operations & update U
+    col = 0
+    N = 4
+
+    for row in range(col+1, N):
+        factor = A[row][col] / A[col][col]
+
+        for c in range(col, N):
+            U[row][c] = A[row][c] - (A[col][c] * factor)
+                </div>
+                <p class="blogText">
+                    Resulting U<sub>N x N</sub> must look like below, where marked submatrix was operated on.
+                </p>
+                <img class="imgCenterUpdt" src="../images/parallel-lu-decomposition-image-3.png">
+                <p class="blogText">
+                    From first iteration of elimination step, where I worked to zero out elements below U<sub>0, 0</sub> , it can clearly
+                    understood updation of L & U can go side by side. After each round of elimination where U<sub>i, i</sub> is chosen to be 
+                    pivot of interest, original matrix A can be updated by content of updated U as my interest during next iteration ( when U<sub>i+1, i+1</sub> becomes pivot )
+                    will be to clean up cells below chosen pivot U<sub>i+1, i+1</sub>, while recording elementary row operations in L<sub>N x N</sub>.
+                </p>
+                <p class="blogText">
+                    Current pivot is U<sub>1, 1</sub> & I record elimination steps in L<sub>N x N</sub>, resulting into following L.
+                </p>
+                <img class="imgCenterUpdt" src="../images/parallel-lu-decomposition-image-4.png">
+                <p class="blogText">
+                    In parallel I also update marked submatrix of U<sub>N x N</sub>, resulting into following.
+                </p>
+                <img class="imgCenterUpdt" src="../images/parallel-lu-decomposition-image-5.png">
+                <p class="blogText">
+                    After copying U<sub>N x N</sub> into A<sub>N x N</sub>, I select U<sub>2, 2</sub> as pivot in final elimination step.
+                    In parallel updation of both L & U results into following matrices.
+                </p>
+                <img class="imgCenterUpdt" src="../images/parallel-lu-decomposition-image-6.png">
+                <p class="blogText">
+                    There's one more pivot in U i.e. U<sub>3, 3</sub>, which doesn't need to be processed anyhow as there's no forward
+                    elimination step which can be performed with this pivot. Also both L & U are in desired triangular form. Just to assert that
+                    LU decomposition worked, I do L x U, resulting into A.
+                </p>
+                <div class="microlight">
+    >>> import numpy as np
+
+    >>> l = array([[ 1,  0,  0,  0],
+            [-2,  1,  0,  0],
+            [ 3, -4,  1,  0],
+            [ 2,  1,  3,  1]])
+
+    >>> u = np.array([[  2,  4,  3,  5],
+            [  0,  1,  1,  18],
+            [  0,  0,  -3,  66],
+            [  0,  0,  0,  -212]])
+    
+    >>> np.matmul(l, u)
+    array([[ 2,  4,  3,  5],
+            [-4, -7, -5,  8],
+            [ 6,  8,  2,  9],
+            [ 4,  9, -2, 14]]) # asserted !
+                </div>
+            </article>
+        </div>
+    </div>
+    <div id="footerDiv">
+        <footer>
+            <p id="footerText">
+                &copy <a href="https://github.com/itzmeanjan/itzmeanjan.github.io" id="footerLink"
+                    target="_blank"><big>A</big>njan Roy</a> ( <big>M</big>IT Licensed )
+            </p>
+        </footer>
+    </div>
+</body>
+
+</html>
