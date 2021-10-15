@@ -130,12 +130,41 @@
                 <div class="microlight">
     ...
 
-    accessor<float, 2, access::mode::write, access::target::global_buffer> acc_matrix{b_matrix, h, range<2>{N - (i + 1), N - i}, id<2>{i + 1, i}}; // sub-buffer
-    accessor<float, 2, access::mode::read, access::target::global_buffer> acc_udiag{b_udiag, h, range<2>{N - (i + 1), N - i}, id<2>{i + 1, i}}; // spanning over only modified cells of U
+    accessor acc_matrix{b_matrix, h, range<2>{N - (i + 1), N - i}, id<2>{i + 1, i}}; // sub-buffer
+    accessor acc_udiag{b_udiag, h, range<2>{N - (i + 1), N - i}, id<2>{i + 1, i}}; // spanning over only modified cells of U
 
     h.copy(acc_udiag, acc_matrix); // copy(src, dst)
 
     ...
+                </div>
+                <br>
+                <p class="blogText">
+                    I also notice in each iteration pivot A<sub>i, i</sub> is loaded multiple times from global memory, which is high latency, so I introduced work group local memory,
+                    which is much faster, for reading A<sub>i, i</sub> only once & all other work items in subgroup read from fast local memory. I select subgroup leader
+                    to load A<sub>i, i</sub> from global memory and store in designated address in local memory.
+                </p>
+                <div class="microlight">
+    ...
+    
+    const sycl::ONEAPI::sub_group sg = it.get_sub_group();
+    
+    if (sycl::ONEAPI::leader(sg)) {
+        acc_lds[0] = acc_udiag[i][i]; // storing in local memory
+    }
+
+    ...
+                </div>
+                <p class="blogText">
+                    This also comes at a cost, requiring me to synchronize all work items in subgroup so that everyone sees same modification performed in <span class="highlight">acc_lds[0]</span>.
+                    I use subgroup barrier to explicitly synchronize all work items in subgroup.
+                </p>
+                <div class="microlight">
+    ...
+
+    sg.barrier(); // synchronization point
+
+    ...
+    // all work items reading from `acc_lds[0]`
                 </div>
             </article>
         </div>
