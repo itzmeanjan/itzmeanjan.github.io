@@ -146,12 +146,12 @@
                 <div class="microlight">
     ...
     
-    const sycl::ONEAPI::sub_group sg = it.get_sub_group();
-    
-    if (sycl::ONEAPI::leader(sg)) {
-        acc_lds[0] = acc_udiag[i][i]; // storing in local memory
-    }
-
+    1| const sycl::ONEAPI::sub_group sg = it.get_sub_group();
+    2| 
+    3| if (sycl::ONEAPI::leader(sg)) {
+    4|    acc_lds[0] = acc_udiag[i][i]; // storing in local memory
+    5| }
+    6|
     ...
                 </div>
                 <p class="blogText">
@@ -160,12 +160,29 @@
                 </p>
                 <div class="microlight">
     ...
-
-    sg.barrier(); // synchronization point
-
+    6|
+    7| sg.barrier(); // synchronization point
+    8|
     ...
     // all work items reading from `acc_lds[0]`
                 </div>
+                <br>
+                <p class="blogText">
+                    At beginning of LU decomposition, L matrix is prepared by initializing to I<sub>N x N</sub>. In previous version of LU factorization implementation,
+                    I was launching a 2D kernel for covering all indices in N x N index space, where work items with <span class="highlight">r == c</span> only did something useful, where r, c = indices along Y, X -axis respectively.
+                    I see this can be improved by launching a 1D kernel with index space N, where every invocation does useful work by storing 1 in pivot ( read A[i, i], where i ∈ [0, N) ).
+                </p>
+                <p class="blogText">
+                    At this point, most expensive part is copying <span class="highlight">(N - (i +1 )) x (N - i)</span> elements from U to A, at end of each iteration. Though with increase of <b>i</b>,
+                    submatrix dimension keeps decreasing, it's still not negligible for large N.
+                    I found in each iteration, the cells of U matrix which are modified without any computational dependency with others can be encapsulated
+                    inside <span class="highlight">(N - (i + 1)) x (N - (i + 1))</span> submatrix, while another submatrix of dimension <span class="highlight">(N - (i + 1)) x 1</span>
+                    can be computed after first one is computed, effectively establishing one dependency. These splitted computation brings benefit that each work-item
+                    can be computed in parallel without any data dependency. Effectively in U matrix <span class="highlight">(N - (i +1 )) x (N - i)</span> cells are
+                    being modified in each iteration, just splitted in two ordered steps.
+                </p>
+                <img class="imgCenter" src="../images/improved-parallel-lu-decomposition-image-3.jpg">
+                <p class="blogText"></p>
             </article>
         </div>
     </div>
