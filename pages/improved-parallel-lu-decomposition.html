@@ -182,7 +182,34 @@
                     being modified in each iteration, just splitted in two ordered steps.
                 </p>
                 <img class="imgCenter" src="../images/improved-parallel-lu-decomposition-image-3.jpg">
-                <p class="blogText"></p>
+                <p class="blogText">
+                    With all these improvements, I'm ready to compare LU factorization's performance for 1024 x 1024 matrix. First I run naive version
+                    with work group size 64.
+                </p>
+                <div class="microlight">
+    $ dpcpp -fsycl lu_decomposition.cpp && ./a.out
+
+    running on Intel Xeon Processor (Skylake, IBRS)
+    LU decomposition: 3870 ms
+    max deviation: 0.0339518
+                </div>
+                <p class="blogText">
+                    Now running improved LU factorization implementation with same work group size.
+                </p>
+                <div class="microlight">
+    $ dpcpp -fsycl lu_decomposition.cpp && ./a.out
+
+    running on Intel Xeon Processor (Skylake, IBRS)
+    LU decomposition: 162 ms
+    max deviation: 0.498501
+                </div>
+                <p class="blogText">
+                    <span class="highlight">~23x</span> speed up gained after fine tuning SYCL DPC++ implementation. I keep optimized version of LU factorization <a class="blogLink" target="_blank" href="https://gist.github.com/itzmeanjan/82e57b64420c417d55133bd443aebdf6">here</a> for future reference.
+                    In coming days, I plan to work on other parallel algorithms targeting accelerators, while also optimizing them by considering small details.
+                    <br>
+                    <br>
+                    Have a great time !
+                </p>
             </article>
         </div>
     </div>
