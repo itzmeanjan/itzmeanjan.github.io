@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<!--
+  Author: Anjan Roy<hello@itzmeanjan.in>
+-->
+<html>
+
+<head>
+    <title>
+        Improving Parallel LU Decomposition by ~20x
+    </title>
+    <meta prefix="og: http://ogp.me/ns#" property="og:type" content="website">
+    <meta prefix="og: http://ogp.me/ns#" property="og:title" content="Improving Parallel LU Decomposition by ~20x">
+    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="---">
+    <meta prefix="og: http://ogp.me/ns#" property="og:url" content="https://itzmeanjan.in">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url"
+        content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:width" content="950">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:height" content="735">
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://itzmeanjan.in/">
+    <meta property="twitter:title" content="Improving Parallel LU Decomposition by ~20x">
+    <meta property="twitter:description" content="---">
+    <meta property="twitter:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta property="twitter:site" content="@meanjanry">
+    <meta name="description" content="---">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="author" content="Anjan Roy">
+    <meta name="keywords"
+        content="dpc++, dpcpp, sycl, oneapi, gpgpu, fpga, accelerator, parallel, lu, factorization, decomposition, cpp, forward, elimination">
+    <meta name="theme-color" content="darkslategrey">
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" type="text/css" href="../styles/index.css">
+    <script src="../styles/code.js"></script>
+</head>
+
+<body>
+    <div id="parentDiv">
+        <div id="navBar">
+            <nav>
+                <a class="navLink" href="/"><big>H</big>ome</a> |
+                <a class="navLink" href="https://github.com/itzmeanjan" target="_blank"><big>P</big>rojects</a> |
+                <a class="navLink" href="/pages/blog.html"><big>B</big>log</a> |
+                <a class="navLink" href="/pages/contact.html"><big>C</big>ontact</a>
+            </nav>
+        </div>
+        <div class="childDiv">
+            <article>
+                <h1 class="blogHeader">
+                    Improving Parallel LU Decomposition by ~20x
+                </h1>
+                <h3>Created : October 15, 2021</h3>
+            </article>
+        </div>
+        <div class="childDiv">
+            <article>
+                <p class="blogText">
+                    Early this week I was working on Parallel LU factorization implementation for GPGPU, where I discovered obtained
+                    performance was not satisfactory. I also noted main reasons behind it can be
+                </p>
+                <ol>
+                    <li>In each iteration a <b>pivot</b> is chosen to be worked on, decreasing dimension of operable submatrix, which in turn reduces scope of parallelism because lots of code paths are doing nothing !</li>
+                    <li>On completion of each <b>pivot</b> processing, U<sub>N x N</sub> is copied to A<sub>N x N</sub>, in preparation for next iteration. When N is large, cost of copying is high !</li>
+                </ol>
+                <p class="blogText">
+                    Yesterday I planned to take a look at optimizing parallel LU factorization implementation, mainly focusing on aforementioned two points. Now I've an improved
+                    LU factorization implementation which is <span class="highlight">~20x</span> faster than previous one. If you're interested in previous implementation, I recommend
+                    taking a look at <a class="blogLink" target="_blank" href="https://itzmeanjan.in/pages/parallel-lu-decomposition.html">here</a>.
+                    <br>
+                    <br>
+                    I'll step by step improve current implementation.
+                </p>
+                <p class="blogText">
+                    Starting with first point, in each iteration I'm working on a submatrix of size <span class="highlight">(N - (i + 1)) x (N - i)</span>
+                    where i = {0, 1, 2 ... N-2}. LU decomposition selects a pivot ( read A<sub>i, i</sub> in i<sup>th</sup> iteration ) to work on and then reduces all cells below it to zero, while doing so it
+                    records multiplication factors in L matrix ( read lower triangular one ) and respectively updates cells in U matrix ( read upper triangular one ).
+                    Say in iteration i = 0, I'm working on pivot A<sub>0, 0</sub>, requiring me to operate on following submatrices.
+                </p>
+                <img class="imgCenterUpdt" src="../images/improved-parallel-lu-decomposition-image-0.png">
+                <p class="blogText">
+                    Similarly in iteration i = 1, when selected pivot is A<sub>1, 1</sub>, operable submatrix dimension for L reduces to (N - 2) x 1 and for U it becomes
+                    (N -2) x (N - 1).
+                </p>
+                <img class="imgCenterUpdt" src="../images/improved-parallel-lu-decomposition-image-1.png">
+                <p class="blogText">
+                    This way it keeps reducing and finally reaches submatrix size of 1 x 2 when N = 4, in iteration i = 2. Point I want to make here, although dimension of operable
+                    submatrix keeps reducing, I enqueue all commands with index space of dimension N x N, requiring me to use conditional statements to determine whether
+                    certain work-item needs to be active or can be deactivated because its index is out of range. If index of some work item is (r, c) it can be deactivated
+                    if <span class="highlight">!(r > i && c >= i)</span>, as it's representing some cell which doesn't need to be processed for selected pivot A<sub>i, i</sub>.
+                    For these cases where cells don't need to be processed, it results into code paths doing nothing useful --- reducing throughput. When N is large, in each
+                    iteration ( read as <b>i</b> keeps increasing ) disabled code path scope keeps increasing, as operable submatrix dimension is (N - (i+1)) x (N - i), lots of work items
+                    doing nothing, a huge number of work groups are just launched without doing anything helpful for speeding up computation.
+                </p>
+                <img class="imgCenterUpdt" src="../images/improved-parallel-lu-decomposition-image-2.png">
+                <p class="blogText">
+                    I solve this problem using offsets & non-uniform workgroup sizes. Offsets help me in launching kernels with index space dimension (N - (i + 1)) x (N - i) and work-items pointing to only operable cells --- exactly
+                    what is desired, which stops the need for using conditional statements in kernel. Now no code paths resulting into disabled work-items, all launched work items
+                    doing useful work --- better throughput as GPGPU has enough work to do.
+                    <br>
+                    <br>
+                    Kernel operating on lower triangular matrix is launched with following index space dimension, where i = current iteration index.
+                </p>
+                <div class="microlight">
+    h.parallel_for(nd_range<1>{range<1>{N - (i + 1)}, range<1>{B}, id<1>{i + 1}}, [=](nd_item<1> it) {
+        ...
+    });
+                </div>
+                <p class="blogText">
+                    While upper triangular matrix is processed with following index space & offset settings.
+                </p>
+                <div class="microlight">
+    h.parallel_for(nd_range<2>{range<2>{N - (i + 1), N - i}, range<2>{1, B}, id<2>{i + 1, i}}, [=](nd_item<2> it) {
+        ...
+    });
+                </div>
+            </article>
+        </div>
+    </div>
+    <div id="footerDiv">
+        <footer>
+            <p id="footerText">
+                &copy <a href="https://github.com/itzmeanjan/itzmeanjan.github.io" id="footerLink"
+                    target="_blank"><big>A</big>njan Roy</a> ( <big>M</big>IT Licensed )
+            </p>
+        </footer>
+    </div>
+</body>
+
+</html>
