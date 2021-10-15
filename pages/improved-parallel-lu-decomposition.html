@@ -113,6 +113,30 @@
         ...
     });
                 </div>
+                <br>
+                <p class="blogText">
+                    Now I'd like to focus on second point, which can help me in improving performance. At end of each iteration, I'm copying N x N many elements
+                    from updated U matrix to A matrix, so that in iteration i+1, I can load from A matrix & compute/ store results in L & U matrices. Note as L matrix
+                    just records multiplication factors, no back and forth copying is required. On other hand, U matrix will eventually become upper triangular matrix, at end of iteration i = (N - 2),
+                    until that point it's used as intermediate storage so that parallel modification by some work-items doesn't affect computation of others, which were expecting
+                    to read unmodified value at some cell (r, c). So at end of each iteration N x N many elements are copied back to A --- which is indeed expensive.
+                    <br>
+                    <br>
+                    A closer look at which cells are computed/ stored in U reveals only <span class="highlight">(N - (i + 1)) x (N - i)</span> many of N x N total cells are required
+                    to be copied back to A. In each iteration as <b>i</b> keeps increasing, dimension of copyable submatrix keeps decreasing --- reducing cost. I implement this using
+                    sub-buffers, which are pointing to only required cells of U & A. Now in each iteration <span class="highlight">((N - (i + 1)) x (N - i))</span> many elements are copied from U to A,
+                    where i = {0, 1, 2 ... , N - 2}.
+                </p>
+                <div class="microlight">
+    ...
+
+    accessor<float, 2, access::mode::write, access::target::global_buffer> acc_matrix{b_matrix, h, range<2>{N - (i + 1), N - i}, id<2>{i + 1, i}}; // sub-buffer
+    accessor<float, 2, access::mode::read, access::target::global_buffer> acc_udiag{b_udiag, h, range<2>{N - (i + 1), N - i}, id<2>{i + 1, i}}; // spanning over only modified cells of U
+
+    h.copy(acc_udiag, acc_matrix); // copy(src, dst)
+
+    ...
+                </div>
             </article>
         </div>
     </div>
