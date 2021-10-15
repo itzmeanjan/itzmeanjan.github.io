@@ -10,7 +10,7 @@
     </title>
     <meta prefix="og: http://ogp.me/ns#" property="og:type" content="website">
     <meta prefix="og: http://ogp.me/ns#" property="og:title" content="Improving Parallel LU Decomposition by ~20x">
-    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="---">
+    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="Improving performance of Parallel LU factorization by considering small details, gaining ~20x performance boost">
     <meta prefix="og: http://ogp.me/ns#" property="og:url" content="https://itzmeanjan.in">
     <meta prefix="og: http://ogp.me/ns#" property="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
     <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url"
@@ -20,14 +20,14 @@
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="https://itzmeanjan.in/">
     <meta property="twitter:title" content="Improving Parallel LU Decomposition by ~20x">
-    <meta property="twitter:description" content="---">
+    <meta property="twitter:description" content="Improving performance of Parallel LU factorization by considering small details, gaining ~20x performance boost">
     <meta property="twitter:image" content="https://itzmeanjan.in/images/myImage.jpg">
     <meta property="twitter:site" content="@meanjanry">
-    <meta name="description" content="---">
+    <meta name="description" content="Improving performance of Parallel LU factorization by considering small details, gaining ~20x performance boost">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="author" content="Anjan Roy">
     <meta name="keywords"
-        content="dpc++, dpcpp, sycl, oneapi, gpgpu, fpga, accelerator, parallel, lu, factorization, decomposition, cpp, forward, elimination">
+        content="dpc++, dpcpp, sycl, oneapi, gpgpu, fpga, accelerator, improving, parallel, lu, factorization, decomposition, cpp, forward, elimination, subgroup, functions, scope, of, parallelism">
     <meta name="theme-color" content="darkslategrey">
     <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
     <link rel="stylesheet" type="text/css" href="../styles/index.css">
@@ -84,7 +84,7 @@
                 <img class="imgCenterUpdt" src="../images/improved-parallel-lu-decomposition-image-1.png">
                 <p class="blogText">
                     This way it keeps reducing and finally reaches submatrix size of 1 x 2 when N = 4, in iteration i = 2. Point I want to make here, although dimension of operable
-                    submatrix keeps reducing, I enqueue all commands with index space of dimension N x N, requiring me to use conditional statements to determine whether
+                    submatrix keeps reducing, I enqueue all kernel invocation commands with index space of dimension N x N, requiring me to use conditional statements to determine whether
                     certain work-item needs to be active or can be deactivated because its index is out of range. If index of some work item is (r, c) it can be deactivated
                     if <span class="highlight">!(r > i && c >= i)</span>, as it's representing some cell which doesn't need to be processed for selected pivot A<sub>i, i</sub>.
                     For these cases where cells don't need to be processed, it results into code paths doing nothing useful --- reducing throughput. When N is large, in each
@@ -140,7 +140,7 @@
                 <br>
                 <p class="blogText">
                     I also notice in each iteration pivot A<sub>i, i</sub> is loaded multiple times from global memory, which is high latency, so I introduced work group local memory,
-                    which is much faster, for reading A<sub>i, i</sub> only once & all other work items in subgroup read from fast local memory. I select subgroup leader
+                    which is much faster, for reading A<sub>i, i</sub> only once & afterwards all work items in subgroup reading from fast local memory. I select subgroup leader
                     to load A<sub>i, i</sub> from global memory and store in designated address in local memory.
                 </p>
                 <div class="microlight">
@@ -197,7 +197,7 @@
                     Now running improved LU factorization implementation with same work group size.
                 </p>
                 <div class="microlight">
-    $ dpcpp -fsycl lu_decomposition.cpp && ./a.out
+    $ dpcpp -fsycl improved_lu_decomposition.cpp && ./a.out
 
     running on Intel Xeon Processor (Skylake, IBRS)
     LU decomposition: 162 ms
