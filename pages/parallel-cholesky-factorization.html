@@ -146,6 +146,17 @@
                     It produces updated matrix as below, with upper triangular portion of first two rows as supposed to be in factorized matrix.
                 </p>
                 <img class="imgCenterUpdt" src="../images/parallel-cholesky-factorization-6.png">
+                <p class="blogText">
+                    In final iteration where I work on pivot A<sub>2, 2</sub> just first two steps are what required. As no non-pivot column with
+                    column index <span class="highlight">> (k = 2)</span> exists, I'm skipping last step. During first step, two cells above selected
+                    pivot, in same column, are accessed for computing updated pivot. Finally step two follows.
+                </p>
+                <img class="imgCenterUpdt" src="../images/parallel-cholesky-factorization-7.png">
+                <p class="blogText">
+                    This way I get upper triangular matrix from factorization, transposing same gives me lower triangular one.
+                    Multiplication of them ensures Cholesky Factorization worked as expected !
+                </p>
+                <img class="imgCenterUpdt" src="../images/parallel-cholesky-factorization-8.png">
             </article>
         </div>
     </div>
