@@ -85,8 +85,10 @@
                 </p>
                 <div class="microlight">
     // step one
-
+    
+    N = 3
     k = 0
+
     sum = 0.
     for i in range(0, k):
         sum += a[i][k] ** 2.
@@ -188,6 +190,52 @@
     >>> np.all(np.linalg.eigvals(m) > 0) // ensures `m` is positive definite matrix
     >>> np.all(np.tranpose(m) == m)      // ensuring `m` is symmetric
                 </div>
+                <p class="blogText">
+                    Reviewing whole flow of factorization makes it easy to figure out how to parallelize portions
+                    of algorithm without introducing any data race. I put following data dependency diagram for making it more clear.
+                </p>
+                <img class="imgCenter" src="../images/parallel-cholesky-factorization-9.jpg">
+                <p class="blogText">
+                    For a matrix of dimension N x N, I've to go through N steps of execution in-order, where during each iteration I schedule three
+                    kernels for computing above main diagonal cells along selected row ( i.e. pivot row ) of final upper triangular matrix.
+                    I implement parallel cholesky factorization in SYCL DPC++ & run it on multiple hardwares.
+                </p>
+                <div class="microlight">
+    $ dpcpp -fsycl cholesky_factorization.cpp && ./a.out 🥉
+    running on Intel(R) UHD Graphics P630 [0x3e96]
+
+    random symmetric positive definite matrix generated, in 155 ms
+    cholesky factorization, in 1302 ms      |       max deviation 0.00476074 😔
+    
+    /* ----- */
+
+    $ dpcpp -fsycl cholesky_factorization.cpp && ./a.out 🥈
+    running on Intel(R) Xeon(R) CPU E5-2686 v4 @ 2.30GHz
+
+    random symmetric positive definite matrix generated, in 302 ms
+    cholesky factorization, in 400 ms       |       max deviation 0.00463867 (•_•) 
+
+    /* ----- */
+
+    $ dpcpp -fsycl cholesky_factorization.cpp && ./a.out 🥇
+    running on Intel(R) Xeon(R) Gold 6128 CPU @ 3.40GHz
+
+    random symmetric positive definite matrix generated, in 176 ms
+    cholesky factorization, in 221 ms       |       max deviation 0.00512695 🌟
+                </div>
+                <p class="blogText">
+                    I see performance is not impressive and I've some ideas how it can be improved. In current implementation,
+                    scope of parallelism is not well respected. In each iteration when a pivot is selected and cells on same row are computed, only
+                    a subset of elements are accessed, not requiring me to make whole matrix available to compute unit. Currently usage of conditional
+                    statements in kernel body produces divergent control flow, reducing achievable parallelism. In coming days, I'd like
+                    to improve Cholesky Factorization implementation while keeping aforementioned points in mind.
+                    <br>
+                    <br>
+                    I keep current implementation <a class="blogLink" target="_blank" href="https://gist.github.com/itzmeanjan/1ec00ae788dfc077c73d3bff17549db0">here</a> for future reference.
+                    <br>
+                    <br>
+                    Have a great time !
+                </p>
             </article>
         </div>
     </div>
