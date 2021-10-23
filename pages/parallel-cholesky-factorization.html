@@ -157,6 +157,37 @@
                     Multiplication of them ensures Cholesky Factorization worked as expected !
                 </p>
                 <img class="imgCenterUpdt" src="../images/parallel-cholesky-factorization-8.png">
+                <p class="blogText">
+                    Before I start with SIMT implementation of Cholesky Factorization, I'd like to mention about an algorithm
+                    for producing symmetric positive definite matrix, which is required here. Let me start with a random matrix.
+                </p>
+                <div class="microlight">
+    // generating symmetric positive definite matrix
+
+    >>> a = np.random.random((3, 3)); a
+    array([[0.67869109, 0.19194503, 0.76081322],
+            [0.53779097, 0.38546904, 0.19214424],
+            [0.0920523 , 0.30155419, 0.39195979]])
+    
+    >>> b = np.transpose(a)
+    >>> c = a + b; c
+    array([[1.35738219, 0.729736  , 0.85286552],
+            [0.729736  , 0.77093808, 0.49369843],
+            [0.85286552, 0.49369843, 0.78391958]])
+            
+    >>> d = c * .5; d
+    array([[0.67869109, 0.364868  , 0.42643276],
+            [0.364868  , 0.38546904, 0.24684922],
+            [0.42643276, 0.24684922, 0.39195979]])
+
+    >>> e = np.diag((1, 1, 1)); m = d + e; m
+    array([[1.67869109, 0.364868  , 0.42643276],
+            [0.364868  , 1.38546904, 0.24684922],
+            [0.42643276, 0.24684922, 1.39195979]])
+    
+    >>> np.all(np.linalg.eigvals(m) > 0) // ensures `m` is positive definite matrix
+    >>> np.all(np.tranpose(m) == m)      // ensuring `m` is symmetric
+                </div>
             </article>
         </div>
     </div>
