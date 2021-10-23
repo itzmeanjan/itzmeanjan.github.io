@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<!--
+  Author: Anjan Roy<hello@itzmeanjan.in>
+-->
+<html>
+
+<head>
+    <title>
+        Parallel Cholesky Factorization on GPGPU
+    </title>
+    <meta prefix="og: http://ogp.me/ns#" property="og:type" content="website">
+    <meta prefix="og: http://ogp.me/ns#" property="og:title" content="Parallel Cholesky Factorization on GPGPU">
+    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="In depth step-by-step explanation of Cholesky Factorization, accompanied by its SIMT implementation, targeting Accelerators">
+    <meta prefix="og: http://ogp.me/ns#" property="og:url" content="https://itzmeanjan.in">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url"
+        content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:width" content="950">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:height" content="735">
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://itzmeanjan.in/">
+    <meta property="twitter:title" content="Parallel Cholesky Factorization on GPGPU">
+    <meta property="twitter:description" content="In depth step-by-step explanation of Cholesky Factorization, accompanied by its SIMT implementation, targeting Accelerators">
+    <meta property="twitter:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta property="twitter:site" content="@meanjanry">
+    <meta name="description" content="In depth step-by-step explanation of Cholesky Factorization, accompanied by its SIMT implementation, targeting Accelerators">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="author" content="Anjan Roy">
+    <meta name="keywords"
+        content="dpc++, dpcpp, sycl, oneapi, gpgpu, fpga, accelerator, parallel, cholesky, factorization, simt, cpp">
+    <meta name="theme-color" content="darkslategrey">
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" type="text/css" href="../styles/index.css">
+    <script src="../styles/code.js"></script>
+</head>
+
+<body>
+    <div id="parentDiv">
+        <div id="navBar">
+            <nav>
+                <a class="navLink" href="/"><big>H</big>ome</a> |
+                <a class="navLink" href="https://github.com/itzmeanjan" target="_blank"><big>P</big>rojects</a> |
+                <a class="navLink" href="/pages/blog.html"><big>B</big>log</a> |
+                <a class="navLink" href="/pages/contact.html"><big>C</big>ontact</a>
+            </nav>
+        </div>
+        <div class="childDiv">
+            <article>
+                <h1 class="blogHeader">
+                    Parallel Cholesky Factorization on GPGPU
+                </h1>
+                <h3>Created : October 23, 2021</h3>
+            </article>
+        </div>
+        <div class="childDiv">
+            <article>
+                <p class="blogText">
+                    This week I decided to take a look at another matrix decomposition method i.e. <span class="highlight">Cholesky Factorization</span>, which is useful
+                    when working with symmetric positive definite matrices. It helps in splitting A<sub>N x N</sub> into L<sub>N x N</sub>, U<sub>N x N</sub> such that 👇
+                </p>
+                <img class="imgCenterUpdt" src="../images/parallel-cholesky-factorization-0.png">
+                <p class="blogText">
+                    My interest is in implementing it targeting accelerators i.e. OpenCL enabled CPUs and GPGPUs. I'd like to start with how this
+                    factorization works and then move to its SIMT implementation technique. While explaining, I'll factorize 👇 symmetric positive definite matrix by hand.
+                </p>
+                <div class="microlight">
+    >>> import numpy as np
+    >>> a = np.array([[5.2, 3, 0.5], [3, 6.3, -2], [0.5, -2, 8]]); a
+    array([[ 5.2,  3. ,  0.5],
+            [ 3. ,  6.3, -2. ],
+            [ 0.5, -2. ,  8. ]])
+    >>> np.all(np.linalg.eigvals(a) > 0) and np.all(a == np.transpose(a)) ✅
+    True
+                </div>
+                <img class="imgCenterUpdt" src="../images/parallel-cholesky-factorization-1.png">
+                <p class="blogText">
+                    After this factorization I'd like to produce one upper triangular matrix, so I've to iterate over all pivots of matrix A
+                    in-order and process elements along row of current selected pivot. After N iterations, I must get desired result. I start with pivot
+                    A<sub>0, 0</sub>, then after this iteration I should get row A<sub>0, _</sub> in desired form --- that's how it should be
+                    in final U<sub>N x N</sub>.
+                    <br>
+                    <br>
+                    First step is updating pivot while performing some arithmetics with elements living in same column above pivot A<sub>0, 0</sub>.
+                    As there's no element above selected pivot, I just move to second step. I can programmatically represent first step as 👇.
+                </p>
+                <div class="microlight">
+    // step one
+    
+    N = 3
+    k = 0
+
+    sum = 0.
+    for i in range(0, k):
+        sum += a[i][k] ** 2.
+    
+    a[k][k] -= sum // updated pivot
+                </div>
+                <p class="blogText">
+                    In second step, I've to update pivot with square root of it. This produces 👇 updated matrix, which is to be operated on during step three,
+                    due to computational dependency.
+                </p>
+                <div class="microlight">
+    // step two
+
+    a[k][k] = a[k][k] ** .5
+                </div>
+                <img class="imgCenterUpdt" src="../images/parallel-cholesky-factorization-2.png">
+                <p class="blogText">
+                    In final step of first iteration, I'd like to update remaining elements in first row, as pivot is already in shape.
+                    I programmatically show what needs to be done.
+                </p>
+                <div class="microlight">
+    // step three
+
+    for i in range(k + 1, N):
+        sum = 0.
+        for j in range(0, k):
+            sum += a[j][k] * a[j][i]
+        a[k][i] -= sum
+        a[k][i] /= a[k][k]
+                </div>
+                <p class="blogText">
+                    After step three, I obtain matrix with updated non-pivot columns of first row, which looks like 👇.
+                </p>
+                <img class="imgCenterUpdt" src="../images/parallel-cholesky-factorization-3.png">
+                <p class="blogText">
+                    It's time to move to next pivot i.e. sitting at A<sub>1, 1</sub>. Applying step one of algorithm, I get following matrix
+                    with pivot cell updated to 👇. Blue marked cell, just above selected pivot, is what accessed during pivot updation.
+                </p>
+                <img class="imgCenterUpdt" src="../images/parallel-cholesky-factorization-4.png">
+                <p class="blogText">
+                    Step two is easy, producing following matrix, while only updating selected pivot.
+                </p>
+                <img class="imgCenterUpdt" src="../images/parallel-cholesky-factorization-5.png">
+                <p class="blogText">
+                    During last step, I update only single cell i.e. non-pivot column in second row with column index <span class="highlight">> k</span>.
+                    Following snippet depicts what I do.
+                </p>
+                <div class="microlight">
+    k = 1 // pivot column
+    i = 2 // selected non-pivot column
+
+    /* j = row identifier above selected pivot */
+
+    sum = a[j][1] * a[j][2], where j = [0, k) // selected columns 1 (pivot), 2 (non-pivot)
+                </div>
+                <p class="blogText">
+                    It produces updated matrix as below, with upper triangular portion of first two rows as supposed to be in factorized matrix.
+                </p>
+                <img class="imgCenterUpdt" src="../images/parallel-cholesky-factorization-6.png">
+                <p class="blogText">
+                    In final iteration where I work on pivot A<sub>2, 2</sub> just first two steps are what required. As no non-pivot column with
+                    column index <span class="highlight">> (k = 2)</span> exists, I'm skipping last step. During first step, two cells above selected
+                    pivot, in same column, are accessed for computing updated pivot. Finally step two follows.
+                </p>
+                <img class="imgCenterUpdt" src="../images/parallel-cholesky-factorization-7.png">
+                <p class="blogText">
+                    This way I get upper triangular matrix from factorization, transposing same gives me lower triangular one.
+                    Multiplication of them ensures Cholesky Factorization worked as expected !
+                </p>
+                <img class="imgCenterUpdt" src="../images/parallel-cholesky-factorization-8.png">
+                <p class="blogText">
+                    Before I start with SIMT implementation of Cholesky Factorization, I'd like to mention about an algorithm
+                    for producing symmetric positive definite matrix, which is required here. Let me start with a random matrix.
+                </p>
+                <div class="microlight">
+    // generating symmetric positive definite matrix
+
+    >>> a = np.random.random((3, 3)); a
+    array([[0.67869109, 0.19194503, 0.76081322],
+            [0.53779097, 0.38546904, 0.19214424],
+            [0.0920523 , 0.30155419, 0.39195979]])
+    
+    >>> b = np.transpose(a)
+    >>> c = a + b; c
+    array([[1.35738219, 0.729736  , 0.85286552],
+            [0.729736  , 0.77093808, 0.49369843],
+            [0.85286552, 0.49369843, 0.78391958]])
+            
+    >>> d = c * .5; d
+    array([[0.67869109, 0.364868  , 0.42643276],
+            [0.364868  , 0.38546904, 0.24684922],
+            [0.42643276, 0.24684922, 0.39195979]])
+
+    >>> e = np.diag((1, 1, 1)); m = d + e; m
+    array([[1.67869109, 0.364868  , 0.42643276],
+            [0.364868  , 1.38546904, 0.24684922],
+            [0.42643276, 0.24684922, 1.39195979]])
+    
+    >>> np.all(np.linalg.eigvals(m) > 0) // ensures `m` is positive definite matrix
+    >>> np.all(np.tranpose(m) == m)      // ensuring `m` is symmetric
+                </div>
+                <p class="blogText">
+                    Reviewing whole flow of factorization makes it easy to figure out how to parallelize portions
+                    of algorithm without introducing any data race. I put following data dependency diagram for making it more clear.
+                </p>
+                <img class="imgCenter" src="../images/parallel-cholesky-factorization-9.jpg">
+                <p class="blogText">
+                    For a matrix of dimension N x N, I've to go through N steps of execution in-order, where during each iteration I schedule three
+                    kernels for computing above main diagonal cells along selected row ( i.e. pivot row ) of final upper triangular matrix.
+                    I implement parallel cholesky factorization in SYCL DPC++ & run it on multiple hardwares.
+                </p>
+                <div class="microlight">
+    $ dpcpp -fsycl cholesky_factorization.cpp && ./a.out 🥉
+    running on Intel(R) UHD Graphics P630 [0x3e96]
+
+    random symmetric positive definite matrix generated, in 155 ms
+    cholesky factorization, in 1302 ms      |       max deviation 0.00476074 😔
+    
+    /* ----- */
+
+    $ dpcpp -fsycl cholesky_factorization.cpp && ./a.out 🥈
+    running on Intel(R) Xeon(R) CPU E5-2686 v4 @ 2.30GHz
+
+    random symmetric positive definite matrix generated, in 302 ms
+    cholesky factorization, in 400 ms       |       max deviation 0.00463867 (•_•) 
+
+    /* ----- */
+
+    $ dpcpp -fsycl cholesky_factorization.cpp && ./a.out 🥇
+    running on Intel(R) Xeon(R) Gold 6128 CPU @ 3.40GHz
+
+    random symmetric positive definite matrix generated, in 176 ms
+    cholesky factorization, in 221 ms       |       max deviation 0.00512695 🌟
+                </div>
+                <p class="blogText">
+                    I see performance is not impressive and I've some ideas how it can be improved. In current implementation,
+                    scope of parallelism is not well respected. In each iteration when a pivot is selected and cells on same row are computed, only
+                    a subset of elements are accessed, not requiring me to make whole matrix available to compute unit. Currently usage of conditional
+                    statements in kernel body produces divergent control flow, reducing achievable parallelism. In coming days, I'd like
+                    to improve Cholesky Factorization implementation while keeping aforementioned points in mind.
+                    <br>
+                    <br>
+                    I keep current implementation <a class="blogLink" target="_blank" href="https://gist.github.com/itzmeanjan/1ec00ae788dfc077c73d3bff17549db0">here</a> for future reference.
+                    <br>
+                    <br>
+                    Have a great time !
+                </p>
+            </article>
+        </div>
+    </div>
+    <div id="footerDiv">
+        <footer>
+            <p id="footerText">
+                &copy <a href="https://github.com/itzmeanjan/itzmeanjan.github.io" id="footerLink"
+                    target="_blank"><big>A</big>njan Roy</a> ( <big>M</big>IT Licensed )
+            </p>
+        </footer>
+    </div>
+</body>
+
+</html>
