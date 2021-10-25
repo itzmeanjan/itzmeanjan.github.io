@@ -49,7 +49,7 @@
                 <h1 class="blogHeader">
                     Parallel Cholesky Factorization on GPGPU
                 </h1>
-                <h3>Created : October 23, 2021</h3>
+                <h3>Created : October 23, 2021 | Updated: October 25, 2021</h3>
             </article>
         </div>
         <div class="childDiv">
@@ -198,7 +198,8 @@
                 <p class="blogText">
                     For a matrix of dimension N x N, I've to go through N steps of execution in-order, where during each iteration I schedule three
                     kernels for computing above main diagonal cells along selected row ( i.e. pivot row ) of final upper triangular matrix.
-                    I implement parallel cholesky factorization in SYCL DPC++ & run it on multiple hardwares.
+                    I implement parallel cholesky factorization in SYCL DPC++ & run it on multiple hardwares with a random matrix of dimension 1024 x 1024
+                    and work group size of 32.
                 </p>
                 <div class="microlight">
     $ dpcpp -fsycl cholesky_factorization.cpp && ./a.out 🥉
