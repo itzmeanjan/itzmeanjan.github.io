@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<!--
+  Author: Anjan Roy<hello@itzmeanjan.in>
+-->
+<html>
+
+<head>
+    <title>
+        Improving Parallel Cholesky Factorization
+    </title>
+    <meta prefix="og: http://ogp.me/ns#" property="og:type" content="website">
+    <meta prefix="og: http://ogp.me/ns#" property="og:title" content="Improving Parallel Cholesky Factorization">
+    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="---">
+    <meta prefix="og: http://ogp.me/ns#" property="og:url" content="https://itzmeanjan.in">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url"
+        content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:width" content="950">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:height" content="735">
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://itzmeanjan.in/">
+    <meta property="twitter:title" content="Improving Parallel Cholesky Factorization">
+    <meta property="twitter:description" content="---">
+    <meta property="twitter:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta property="twitter:site" content="@meanjanry">
+    <meta name="description" content="---">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="author" content="Anjan Roy">
+    <meta name="keywords"
+        content="dpc++, dpcpp, sycl, oneapi, gpgpu, fpga, accelerator, parallel, cholesky, factorization, simt, cpp">
+    <meta name="theme-color" content="darkslategrey">
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" type="text/css" href="../styles/index.css">
+    <script src="../styles/code.js"></script>
+</head>
+
+<body>
+    <div id="parentDiv">
+        <div id="navBar">
+            <nav>
+                <a class="navLink" href="/"><big>H</big>ome</a> |
+                <a class="navLink" href="https://github.com/itzmeanjan" target="_blank"><big>P</big>rojects</a> |
+                <a class="navLink" href="/pages/blog.html"><big>B</big>log</a> |
+                <a class="navLink" href="/pages/contact.html"><big>C</big>ontact</a>
+            </nav>
+        </div>
+        <div class="childDiv">
+            <article>
+                <h1 class="blogHeader">
+                    Improving Parallel Cholesky Factorization
+                </h1>
+                <h3>Created : November 01, 2021</h3>
+            </article>
+        </div>
+        <div class="childDiv">
+            <article>
+                <p class="blogText">
+                    Last week I was working on implementing parallel cholesky factorization on accelerators, using SYCL DPC++, though obtained
+                    performance was not impressive due to some points I recognized and noted <a class="blogLink" target="_blank" href="../pages/parallel-cholesky-factorization.html">here</a>.
+                    Today I plan to expand on those points, while splitting factorization into computationally ordered and dependent steps, which eventually proves to
+                    attain better speed up than previous implementation of mine.
+                    <br>
+                    <br>
+                    I abstractly start working with one symmetric positive definite square matrix A<sub>N x N</sub>, which I convert into U<sub>N x N</sub>. Obtaining the other
+                    half is as easy as performing a transpose of U<sub>N x N</sub>, giving me L<sub>N x N</sub>.
+                    Once both of these halves are computed, 👇 can be checked, while keeping it in mind that as these computations are performed on accelerated
+                    environments, some floating point errors are inevitable.
+                </p>
+                <img class="imgCenterUpdt" src="../images/improving-parallel-cholesky-factorization-0.png">
+                <p class="blogText">
+                    I begin with an easy step, where I first initialise U<sub>N x N</sub> with A<sub>N x N</sub> and then parallely zero out lower triangular portion ( read cells below pivots ) of U<sub>N x N</sub>. During the further course
+                    of computation, I'll never need to access those memory locations. As lower triangular portion of matrix is not rectangular shaped, I have to
+                    spawn <span class="highlight"><i>N x N</i></span> parallel work-items to zero out cells below pivots, though a substantial number of work-items will do nothing useful,
+                    which I ensure using conditional statement.
+                    <br>
+                    <br>
+                    I write the respective kernel as 👇
+                </p>
+                <div class="microlight">
+    // see https://github.com/itzmeanjan/matrix_factorization/blob/master/cholesky_factorization.cpp#L15
+
+    19| h.parallel_for<class kernelZeroLower>(
+    20|    nd_range<2>{range<2>{dim, dim}, range<2>{1, wg_size}},
+        [=](nd_item<2> it) {
+            const uint i = it.get_global_id(0);
+            const uint j = it.get_global_id(1);
+
+            if (i > j) {
+            a_mat_out[i][j] = 0.f;
+    27|        }
+    28| });
+                </div>
+            </article>
+        </div>
+    </div>
+    <div id="footerDiv">
+        <footer>
+            <p id="footerText">
+                &copy <a href="https://github.com/itzmeanjan/itzmeanjan.github.io" id="footerLink"
+                    target="_blank"><big>A</big>njan Roy</a> ( <big>M</big>IT Licensed )
+            </p>
+        </footer>
+    </div>
+</body>
+
+</html>
