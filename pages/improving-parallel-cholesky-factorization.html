@@ -90,6 +90,35 @@
     27|        }
     28| });
                 </div>
+                <p class="blogText">
+                    Next I've to run through a set of steps for N-many rounds, as matrix dimension is N x N. During each round, I go through following 2 steps of computations, in-order, as they have
+                    computational dependency.
+                </p>
+                <ol>
+                    <li>Pivot Calculation</li>
+                    <li>Pivot Row Calculation</li>
+                </ol>
+                <p class="blogText">
+                    Actually during each of these N-rounds, a pivot is selected and all operations are performed around it. These operations only compute/ access cells above (or including)
+                    pivots i.e. upper triangular portion of matrix.
+                    <br>
+                    <br>
+                    In first step of round-k, say pivot U<sub>k, k</sub> is selected, all I do is atomically compute updated pivot value by subtracting squared value at cells U<sub>i, k</sub>
+                    where 0 <= i < k, from selected pivot. Primarily I spawned <span class="highlight">N x N</span> work-items for this step and was using conditional statements 
+                    so that only work-items representing cells above selected pivot are able to atomically update pivot, by subtracting squared value of self. But this
+                    results into divergent control flow, costing high, as most of work-items do nothing useful after work-groups are fetched for computation. But one thing I noticed,
+                    during this step only cells above/ including selected pivot are accessed, which opens up opportunity for only spawning <span class="highlight">k</span>
+                    work-items, parallely (and atomically) computing updated value of selected pivot U<sub>k, k</sub>.
+                    In following diagram, I depict this step of round-k (= 2), by only spawning <span class="highlight">k(= 2)</span> work-items, atomically computing selected pivot U<sub>2, 2</sub>,
+                    by subtracting U<sub>i, 2</sub><sup>2</sup>, where i = {0, 1}.
+                </p>
+                <img class="imgCenterUpdt" src="../images/improving-parallel-cholesky-factorization-1.jpg">
+                <p class="blogText">
+                    Before step one is completed, I've to spawn another kernel, for computing a single cell of U<sub>N x N</sub>, by performing square root of selected pivot
+                    U<sub>k, k</sub>. It's easy and cheap to spawn a kernel, which accesses single pivot cell and computes updated value, rather than implicitly transferring matrix
+                    data to host and computing same. Data movement is expensive and I aim to minimize so, which is why for improving performance I decide to spawn a single
+                    task kernel, which just updates selected pivot --- low cost !
+                </p>
             </article>
         </div>
     </div>
