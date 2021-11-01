@@ -119,6 +119,64 @@
                     data to host and computing same. Data movement is expensive and I aim to minimize so, which is why for improving performance I decide to spawn a single
                     task kernel, which just updates selected pivot --- low cost !
                 </p>
+                <p class="blogText">
+                    In second step, I compute updated values of cells, living on selected pivot row ( i.e. A<sub>k, _</sub> ), to be more specific
+                    only those rightwards from pivot cell A<sub>k, k</sub>. During this step, I need to access cells from a submatrix of dimension 
+                    <span class="highlight">(k + 1) x (N - k)</span>. Following same logic, as mentioned before I decide to only spawn <span class="highlight">N - (k + 1)</span>
+                    work-items, which removes need of using conditional statements, required when spawning <span class="highlight">N x N</span> work-items, resulting into
+                    most work-items sitting idle. Notice, for any selected <span class="highlight">k</span>, only <span class="highlight">N - (k + 1)</span> columns have column index
+                    higher than pivot on same row --- so this time no divergence in control flow, all work-items do something useful.
+                    <br>
+                    <br>
+                    In following depiction, I use k = 1 i.e. in round-1 of cholesky factorization, I compute N - (k + 1) = 2 cells on pivot row i.e. U<sub>1, i</sub> where i = {2, 3}, while
+                    accessing cells from marked submatrix. You may want to take a look at what exactly is computed by each of <span class="highlight">N - (k+1)</span> work-items
+                    <a class="blogLink" target="_blank" href="https://github.com/itzmeanjan/matrix_factorization/blob/51b46fc2a49342d5be7d3dfd235bcb956c2b670f/cholesky_factorization.cpp#L76-L82">here</a>.
+                </p>
+                <img class="imgCenterUpdt" src="../images/improving-parallel-cholesky-factorization-2.jpg">
+                <p class="blogText">
+                    After completion of both steps, in each round, all cells of pivot row U<sub>k, _</sub> hold final value i.e. what it's supposed to be in upper triangular portion after factorization.
+                    And after N-many rounds, upper triangular portion is stored in U<sub>N x N</sub>. I decide to run benchmarks on updated cholesky factorization implementation.
+                    Previous implementation on same hardware performed worse for N = 1024, completing in ~400ms, which is now improved to ~370ms. You may also notice, as matrix dimension
+                    keeps increasing, floating point math error also keeps increasing, which is found when comparing L<sub>N x N</sub> x U<sub>N x N</sub> with A<sub>N x N</sub>. As I compile
+                    DPCPP program with <span class="highlight">-ffast-math</span> option, allowing fast, aggressive, lossy floating point computation, I expect deviation of this scale.
+                </p>
+                <div class="microlight">
+    running on Intel(R) Xeon(R) CPU E5-2686 v4 @ 2.30GHz
+
+    Cholesky Factorization:
+    
+    dimension			        time			max deviation
+    32   x   32			         5 ms			7.62939e-06
+    64   x   64			         5 ms			3.05176e-05
+    128  x  128			        10 ms			0.00012207
+    256  x  256			        20 ms			0.000305176
+    512  x  512			        67 ms			 0.0012207
+    1024 x 1024			       370 ms			0.00610352
+                </div>
+                <p class="blogText">
+                    Finally I run improved implementation on another CPU, getting to much better performance of ~172ms of completion time, for N = 1024.
+                    Previous unoptimised version on same hardware with same launch configurations resulted into completion time of ~221ms --- <span class="highlight">~22% performance boost !</span>
+                </p>
+                <div class="microlight">
+    running on Intel(R) Xeon(R) Gold 6128 CPU @ 3.40GHz
+
+    Cholesky Factorization:
+    
+    dimension			        time			max deviation
+    32   x   32			         8 ms			1.14441e-05
+    64   x   64			         6 ms			3.8147e-05
+    128  x  128			        10 ms			9.15527e-05
+    256  x  256			        21 ms			0.000305176
+    512  x  512			        52 ms			0.000976562
+    1024 x 1024			       172 ms			0.00524902                    
+                </div>
+                <p class="blogText">
+                    I keep optimised implementation of cholesky factorization <a class="blogLink" target="_blank" href="https://github.com/itzmeanjan/matrix_factorization">here</a> for future reference.
+                    In coming days, I'll take up other problems for solving them on accelerated environments, as I generally do.
+                    <br>
+                    <br>
+                    Have a great time !
+                </p>
             </article>
         </div>
     </div>
