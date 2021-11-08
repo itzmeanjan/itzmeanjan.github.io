@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<!--
+  Author: Anjan Roy<hello@itzmeanjan.in>
+-->
+<html>
+
+<head>
+    <title>
+        Improving Parallel Cholesky Factorization
+    </title>
+    <meta prefix="og: http://ogp.me/ns#" property="og:type" content="website">
+    <meta prefix="og: http://ogp.me/ns#" property="og:title" content="Improving Parallel Cholesky Factorization">
+    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="Step-by-step Parallel Cholesky Factorization improvements, gaining ~22% performance boost !">
+    <meta prefix="og: http://ogp.me/ns#" property="og:url" content="https://itzmeanjan.in">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url"
+        content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:width" content="950">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:height" content="735">
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://itzmeanjan.in/">
+    <meta property="twitter:title" content="Improving Parallel Cholesky Factorization">
+    <meta property="twitter:description" content="Step-by-step Parallel Cholesky Factorization improvements, gaining ~22% performance boost !">
+    <meta property="twitter:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta property="twitter:site" content="@meanjanry">
+    <meta name="description" content="Step-by-step Parallel Cholesky Factorization improvements, gaining ~22% performance boost !">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="author" content="Anjan Roy">
+    <meta name="keywords"
+        content="dpc++, dpcpp, sycl, oneapi, gpgpu, fpga, accelerator, improving, parallel, cholesky, factorization, simt, cpp">
+    <meta name="theme-color" content="darkslategrey">
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" type="text/css" href="../styles/index.css">
+    <script src="../styles/code.js"></script>
+</head>
+
+<body>
+    <div id="parentDiv">
+        <div id="navBar">
+            <nav>
+                <a class="navLink" href="/"><big>H</big>ome</a> |
+                <a class="navLink" href="https://github.com/itzmeanjan" target="_blank"><big>P</big>rojects</a> |
+                <a class="navLink" href="/pages/blog.html"><big>B</big>log</a> |
+                <a class="navLink" href="/pages/contact.html"><big>C</big>ontact</a>
+            </nav>
+        </div>
+        <div class="childDiv">
+            <article>
+                <h1 class="blogHeader">
+                    Finding Maximum Eigen Value using Parallel Similarity Transform Method
+                </h1>
+                <h3>Created : November 08, 2021</h3>
+            </article>
+        </div>
+        <div class="childDiv">
+            <article>
+                <p class="blogText">
+                    Last week I started working on implementing Similarity Transform Method, which is an iterative method
+                    for quickly finding maximum eigen value along with respective eigen vector for a positive square matrix. Today
+                    I plan to go through this method step-by-step, while first developing its sequential implementation and finally
+                    moving to parallel implementation, written targeting heterogeneous platforms i.e. CPU, GPU, FPGA etc. using SYCL DPC++.
+                    Finally I'd like to do some performance comparison between sequential and parallel implementations, both written by me.
+                </p>
+                <p class="blogText">
+                    As Similarity Transform works with positive square matrices, I'd like to fix one matrix, which I'll work on. Let me call it A<sub>N x N</sub>, where N = 3.
+                </p>
+                <img class="imgCenterUpdt" src="../images/parallel-similarity-transform-method-0.png">
+                <p class="blogText">
+                    I start with finding sum of elements across each row of A<sub>N x N</sub>. I can write 👇 code snippet for computing that.
+                </p>
+                <div class="microlight">
+    def sum_across_rows(mat):
+        n = mat.shape[1]
+        v = np.array([np.sum(mat[i]) for i in range(n)])
+        return v
+                </div>
+                <img class="imgCenterUpdt" src="../images/parallel-similarity-transform-method-1.png">
+                <p class="blogText">
+                    Notice, I mark maximum row sum as we've to use it for computing eigen vector ( iteratively ) in next step.
+                    I initialise iteratively computed eigen vector with <span class="highlight">[1; N]</span> and during each iteration
+                    following function is used for updating eigen vector, while reaching closer to desired values.
+                </p>
+                <div class="microlight">
+    eigen_vec = np.ones(3) // == [1] * 3
+    sum_across_rows = [6, 9, 12]
+    
+    def compute_eigen_vector(eigen_vec, sum_across_rows):
+        max_row = np.max(sum_across_rows) // == 12
+        return np.array([j * (sum_across_rows[i]/max_row) for i, j in enumerate(eigen_vec)])
+                </div>
+                <p class="blogText">
+                    Now I'd like to present next step where I check whether we've converged to maximum eigen value or not. It's as simple
+                    as checking whether all consecutive absolute differences between cells of <i>sum_across_rows</i> vector are below of preset
+                    epsilon value, which I consider to be error induced during floating point arithmetics. If all consecutive differences are below
+                    say, <b>EPS = 1e-5</b>, it denotes it's good time to stop this iterative method, as we've converged to maximum eigen value
+                    of given matrix. I can take very first element of <i>sum_across_rows</i> vector ( in final round ) and consider it to be
+                    maximum eigen value, we're looking for.
+                    <br>
+                    <br>
+                    I write convergence criteria checker function as below. In very first iteration, we're far from convergence, as our row sum vector looks like
+                    <span class="highlight">[6, 9, 12]</span> --- so answer is negative and we'll continue to next iteration.
+                </p>
+                <div class="microlight">
+    EPS = 1e-5
+
+    def converged(sum_vec) -> bool:
+        return all(map(lambda e: e < EPS, [abs(sum_vec[i] - sum_vec[i-1]) for i in range(1, len(sum_vec))]))
+                </div>
+                <p class="blogText">
+                    Before I prepare A<sub>N x N</sub> for next iteration, this is how current eigen vector looks like.
+                </p>
+                <img class="imgCenterUpdt" src="../images/parallel-similarity-transform-method-2.png">
+                <p class="blogText">
+                    In final step, I take <i>sum_across_rows</i> vector and prepare diagonal matrix D<sub>N x N</sub> and D<sub>N x N</sub><sup>-1</sup>, 
+                    using those I compute A<sup>'</sup><sub>N x N</sub> for next iteration. I programmatically express that logic 👇.
+                </p>
+                <img class="imgCenterUpdt" src="../images/parallel-similarity-transform-method-3.png">
+                <div class="microlight">
+    def compute_next(mat, sum_vec):
+        sigma = np.diag(sum_vec)
+        sigma_inv = np.diag(1/ sum_vec)
+        return np.matmul(np.matmul(sigma_inv, mat), sigma)
+                </div>
+                <p class="blogText">
+                    With completion of this step, I've following matrix, which is to be worked on during next iteration.
+                </p>
+                <img class="imgCenterUpdt" src="../images/parallel-similarity-transform-method-4.png">
+            </article>
+        </div>
+    </div>
+    <div id="footerDiv">
+        <footer>
+            <p id="footerText">
+                &copy <a href="https://github.com/itzmeanjan/itzmeanjan.github.io" id="footerLink"
+                    target="_blank"><big>A</big>njan Roy</a> ( <big>M</big>IT Licensed )
+            </p>
+        </footer>
+    </div>
+</body>
+
+</html>
