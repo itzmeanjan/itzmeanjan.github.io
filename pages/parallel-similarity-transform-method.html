@@ -159,14 +159,14 @@
                     work-items, each reading value from cell A<sub>i, i</sub> and atomically summing up values along each row. In second step, I find maximum
                     value from just computed N-element vector i.e. <i>sum_across_rows</i>. Here also I make use of atomic instructions for parallelly
                     computing maximum element of vector. Third step consists of updating eigen vector with <i>sum_across_rows</i> of this iteration, which is
-                    also a good candidate of parallel computing. Each of N-many work-items updates a single cell of eigen vector. Finally, it requires me to
-                    compute two matrix multiplications, but given that two of those operands are diagonal matrices, I can compute final matrix using 👇 trick.
+                    also a good candidate of parallel computing. Each of N-many work-items updating a single cell of eigen vector. Finally, it requires me to
+                    perform two matrix multiplications in last step, but given that two of these three operands are diagonal matrices and one is inverse of another, I can compute matrix for next round using 👇 trick.
                     This trick lends itself to heavy parallelism and each cell of A<sub> N x N</sub> matrix can be computed independently using
                     <span class="highlight">N x N</span> work-items.
                 </p>
                 <img class="imgCenterUpdt" src="../images/parallel-similarity-transform-method-7.png">
                 <p class="blogText">
-                    I've also parallel implementation for checking whether iterative round has reached convergence criteria or not, using atomic
+                    I've also parallel implementation for checking whether current round has reached convergence criteria or not, using atomic
                     instructions. Empowered with these, I'm ready to run both sequential and data parallel implementation for performance comparison.
                     Starting with sequential implementation I wrote in Python. This is a single threaded implementation using <i>numpy</i> for doing
                     matrix algebra. Note performance when N = 1024 ( read last row ).
@@ -224,10 +224,10 @@
                     <li>I'm making use of atomic instructions a lot, which limits scalability by underlying device's atomic instruction execution ability</li>
                     <li>I will consider using blocked reading from global memory using vectors of width 2/ 4/ 8, which will promote usage of coalesced memory access</li>
                     <li>While computing matrix for next iteration, I'm accessing same cells of <i>sum_across_rows</i> vector multiple times, which results into duplicate, improperly strided global memory reads</li>
-                    <li>Speaking of previous note, I'll consider using cheaper & faster local scratch pad memory in better way, so that I don't end up generating duplicate global memory accesses</li>
+                    <li>Speaking of previous note, I'll consider using cheaper & faster local scratch pad memory in better way, so that I don't end up generating many duplicate global memory accesses</li>
                 </ol>
                 <p class="blogText">
-                    Keeping aforementioned points in mind, I end today's journey. I keep full implementation of both sequential and parallel similarity transform methods
+                    Keeping aforementioned points in mind, I end today's discussion. I keep full implementation of both sequential and parallel similarity transform methods
                     in this <a class="blogLink" target="_blank" href="https://github.com/itzmeanjan/eigen_value/tree/964695e">repository</a>. In coming days, I'll try to
                     improve data parallel implementation, while also sharing my findings.
                     <br>
