@@ -125,6 +125,37 @@
                     With completion of this step, I've following matrix, which is to be worked on during next iteration.
                 </p>
                 <img class="imgCenterUpdt" src="../images/parallel-similarity-transform-method-4.png">
+                <p class="blogText">
+                    In second iteration, I already find <i>sum_across_rows</i> vector having lesser consecutive absolute differences --- tending to converge.
+                </p>
+                <img class="imgCenterUpdt" src="../images/parallel-similarity-transform-method-5.png">
+                <p class="blogText">
+                    After going through each of these steps, during 5<sup>th</sup> iteration, convergence criteria is fully satisfied, resulting into following eigen value and corresponding eigen vector.
+                </p>
+                <img class="imgCenterUpdt" src="../images/parallel-similarity-transform-method-6.png">
+                <p class="blogText">
+                    Just to check that these are correct, I assert following, while considering some floating point arithmetics error will
+                    probably be present.
+                </p>
+                <div class="microlight">
+    Av = λv // must satisfy !
+
+    A = np.array([[1, 2, 3], [2, 3, 4], [3, 4, 5]])
+    v = np.array([0.49835378, 0.72407576, 0.94979774])
+    λ = 9.623376623376622
+
+    // set `atol` to EPS
+    // during demonstration EPS = 1e-3
+    >>> assert np.allclose(np.dot(a, vec), np.dot(v, vec), atol=1e-3)
+    >>> print(f'Av = {np.dot(A, v)}\nλv = {np.dot(λ, v)}')
+    
+    Av = [4.79589852 6.9681258  9.14035308]
+    λv = [4.79584612 6.96805374 9.14026137]
+                </div>
+                <p class="blogText">
+                    I keep full sequential implementation of Similarity Transform Method <a class="blogLink" target="_blank" href="https://github.com/itzmeanjan/eigen_value/blob/master/main.py">here</a> for future reference.
+                    Now it's good time to talk about parallel implementation of this method.
+                </p>
             </article>
         </div>
     </div>
