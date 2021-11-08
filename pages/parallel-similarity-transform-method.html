@@ -153,8 +153,86 @@
     λv = [4.79584612 6.96805374 9.14026137]
                 </div>
                 <p class="blogText">
-                    I keep full sequential implementation of Similarity Transform Method <a class="blogLink" target="_blank" href="https://github.com/itzmeanjan/eigen_value/blob/master/main.py">here</a> for future reference.
-                    Now it's good time to talk about parallel implementation of this method.
+                    I keep full sequential implementation of Similarity Transform Method <a class="blogLink" target="_blank" href="https://github.com/itzmeanjan/eigen_value/blob/964695e244f122cca8bed73b8f68364e9ee6a154/main.py">here</a> for future reference.
+                    Now it's good time to talk about parallel implementation of this method. First step i.e. summing N-many elements across N-many rows
+                    is easily parallelizable. I'm currently making use of atomic instructions for spawning <span class="highlight">N x N</span>
+                    work-items, each reading value from cell A<sub>i, i</sub> and atomically summing up values along each row. In second step, I find maximum
+                    value from just computed N-element vector i.e. <i>sum_across_rows</i>. Here also I make use of atomic instructions for parallelly
+                    computing maximum element of vector. Third step consists of updating eigen vector with <i>sum_across_rows</i> of this iteration, which is
+                    also a good candidate of parallel computing. Each of N-many work-items updates a single cell of eigen vector. Finally, it requires me to
+                    compute two matrix multiplications, but given that two of those operands are diagonal matrices, I can compute final matrix using 👇 trick.
+                    This trick lends itself to heavy parallelism and each cell of A<sub> N x N</sub> matrix can be computed independently using
+                    <span class="highlight">N x N</span> work-items.
+                </p>
+                <img class="imgCenterUpdt" src="../images/parallel-similarity-transform-method-7.png">
+                <p class="blogText">
+                    I've also parallel implementation for checking whether iterative round has reached convergence criteria or not, using atomic
+                    instructions. Empowered with these, I'm ready to run both sequential and data parallel implementation for performance comparison.
+                    Starting with sequential implementation I wrote in Python. This is a single threaded implementation using <i>numpy</i> for doing
+                    matrix algebra. Note performance when N = 1024 ( read last row ).
+                </p>
+                <div class="microlight">
+    // check https://github.com/itzmeanjan/eigen_value/tree/964695e#sequential-reference-implementation
+    $ python3 main.py
+
+    Sequential Similarity Transform, for finding maximum eigen value ( with vector )
+
+    32   x   32               1.27 ms                      5 round(s)
+    64   x   64               2.44 ms                      5 round(s)
+    128  x  128               9.67 ms                      5 round(s)
+    256  x  256              20.58 ms                      4 round(s)
+    512  x  512              74.24 ms                      4 round(s)
+    1024 x 1024             335.77 ms                      4 round(s)                    
+                </div>
+                <p class="blogText">
+                    Data parallel implementation powered by <b>U</b>nified <b>S</b>hared <b>M</b>emory and atomics doesn't perform very well, compared
+                    to previous one. Note, for both data parallel and sequential implementations, I'm using randomly generated positive square matrices
+                    with each cell taking value from [0, 1).
+                </p>
+                <div class="microlight">
+    // check https://github.com/itzmeanjan/eigen_value/tree/964695e#benchmark
+    $ make && ./run
+    running on Intel(R) Xeon(R) CPU E5-2686 v4 @ 2.30GHz
+
+    Parallel Algorithm using Similarity Transform for finding max eigen value (with vector)
+    
+    32   x   32                              4 ms
+    64   x   64                            200 ms
+    128  x  128                            203 ms
+    256  x  256                            442 ms
+    512  x  512                            755 ms
+    1024 x 1024                           1860 ms
+    
+    --- --- --- --- --- --- --- --- --- --- --- ---
+    
+    $ make && ./run
+    running on Intel(R) Xeon(R) Gold 6128 CPU @ 3.40GHz
+
+    Parallel Algorithm using Similarity Transform for finding max eigen value (with vector)
+    
+    32   x   32                            150 ms
+    64   x   64                            117 ms
+    128  x  128                            159 ms
+    256  x  256                            182 ms
+    512  x  512                            270 ms
+    1024 x 1024                            440 ms
+                </div>
+                <p class="blogText">
+                    I'd like to note few points, regarding why data parallel implementation doesn't do better than sequential one.
+                </p>
+                <ol>
+                    <li>I'm making use of atomic instructions a lot, which limits scalability by underlying device's atomic instruction execution ability</li>
+                    <li>I will consider using blocked reading from global memory using vectors of width 2/ 4/ 8, which will promote usage of coalesced memory access</li>
+                    <li>While computing matrix for next iteration, I'm accessing same cells of <i>sum_across_rows</i> vector multiple times, which results into duplicate, improperly strided global memory reads</li>
+                    <li>Speaking of previous note, I'll consider using cheaper & faster local scratch pad memory in better way, so that I don't end up generating duplicate global memory accesses</li>
+                </ol>
+                <p class="blogText">
+                    Keeping aforementioned points in mind, I end today's journey. I keep full implementation of both sequential and parallel similarity transform methods
+                    in this <a class="blogLink" target="_blank" href="https://github.com/itzmeanjan/eigen_value/tree/964695e">repository</a>. In coming days, I'll try to
+                    improve data parallel implementation, while also sharing my findings.
+                    <br>
+                    <br>
+                    Have a great time !
                 </p>
             </article>
         </div>
