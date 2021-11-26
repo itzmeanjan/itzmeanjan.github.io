@@ -88,6 +88,9 @@
                 </p>
                 <div class="microlight">
     // @note this is a pseudocode !
+    // kernelSumAcrossRows_v0
+    //
+    // check https://github.com/itzmeanjan/eigen_value/blob/e584beda3b05759673bce5af7ebed95fd262dff2/benchmarks/benchmark_similarity_transform.cpp#L39-L53
 
     float *mat = ...; // matrix I'm operating on of dimension N x N
     float *vec = ...; // row sum result vector of length N
@@ -108,53 +111,50 @@
                     A high-level look at this kernel reveals it's not good idea to atomically compute sum of all elements along each row of A<sub>N x N</sub>. 
                     N-many memory locations of result vector of length N, are being operated on atomically to avoid any chance of data race. Each cell of result
                     vector of length N, will be accessed N-many times by N-many designated work-items. This results into N<sup>2</sup> global memory access, which is expensive.
-                    I'd like to reduce global memory access as much as possible. One simple way to do this in current context is to make use of local memory
-                    so that atomically work-group local row sum can be computed by accessing faster local memory atomically. After all work-items of work-group
-                    are done, work-group local sum will be written by work-group leader to global memory with single memory access. With this I should be able
-                    to reduce global memory access to #-of work-group(s) = N<sup>2</sup> / B, where B = work-group size. I'll express this with following kernel.
+                    I'd like to reduce global memory access as much as possible. One simple way to do this in current context is to make use of reduction function
+                    of SYCL DPC++, which will help me in computing sum of all elements held by all work-items of subgroup. Using this subgroup method maps
+                    well to underlying SIMD assembly function, which reduces communication cost, but does compute sum of all values held by subgroup participants. 
+                    Finally I'll use atomic write to update sum in designated row of result vector, living in global memory, helping me to reduce global memory access
+                    to N<sup>2</sup> / B, given that B is subgroup width. I'll express this with following kernel.
                 </p>
                 <div class="microlight">
     // @note this is a pseudocode
-    
-    float *local_memory = ...; // local-data-share of size 1
+    // kernelSumAcrossRows_v1
+    //
+    // check https://github.com/itzmeanjan/eigen_value/blob/e584beda3b05759673bce5af7ebed95fd262dff2/benchmarks/benchmark_similarity_transform.cpp#L86-L106
 
     q.parallel_for(nd_range<2>{{N, N}, {1, B}}, [=] (nd_item<2> it) {
-
-        if(leader()) {
-            // initialised by work-group leader
-            //
-            // if not done, it might prove costly 
-            *local_memory = 0.f;
-        }
-
         const size_t r = it.get_global_id(0);
         const size_t c = it.get_global_id(1);
 
         float cell = *(mat + r * N + c);
 
-        atomic_add(*local_memory, cell);
+        // reduction method called over subgroup work-items
+        //
+        // should result into better SIMD usage
+        float subgroup_sum = reduce_sum(cell);
 
-        // only after all work-items of work-group 
-        // reaches this point, move forward !
-        barrier();
-
-        // only work-group leader accesses global memory one time !
+        // only sub-group leader accesses global memory one time !
         if(leader()) {
-            atomic_add(*(vec + r), *local_memory);
+            atomic_add(*(vec + r), subgroup_sum);
         }
     });
                 </div>
                 <p class="blogText">
                     This kernel is indeed better than previous matrix row sum kernel, where N<sup>2</sup> global memory accesses were performed. But I see
-                    one way to optimize it further. I want to make use of SYCL DPC++ reduction function, so that all work-items of a subgroup are able to compute
-                    sum of row values it's pointing to using SIMD intrinsics. Then subgroup leader should atomically update work-group sum in designated local memory.
-                    It's possible to have multiple subgroups in a work-group, that way I'm able to reduce local memory access to great extent. Now only subgroup leaders
+                    one more way to attempt further optimization. I want to make use of faster local memory so that subgroup leader can atomically 
+                    update respective work-group's sum, stored in designated local memory.
+                    It's possible to have multiple subgroups in a work-group, that way I'm able to reduce global memory access to another factor. Now only subgroup leaders
                     are accessing local memory to update respective work-group's row sum, with their own subgroup level row sum. Finally after all work-items of
-                    some work-group are done, only work-group leader will access designated cell of global memory to atomically update respective row sum. My final update
-                    to matrix row sum kernel looks like below.
+                    some work-group are done, only work-group leader will access designated cell of global memory to atomically update respective row sum. 
+                    With this update kernel should only access global memory N<sup>2</sup> / B times, when B = work-group size, which should preferrably be greater than subgroup size. 
+                    My final update to matrix row sum kernel looks like below.
                 </p>
                 <div class="microlight">
     // @note this is a pseudocode
+    // kernelSumAcrossRows_v2
+    //
+    // check https://github.com/itzmeanjan/eigen_value/blob/d27f64c27a7a38c7b1038a49563ec4ce47e9ac19/similarity_transform.cpp#L90-L135
 
     float *local_memory = ...; // local-data-share of size 1
 
@@ -166,6 +166,10 @@
             // if not done, it might prove costly 
             *local_memory = 0.f;
         }
+
+        // only after all work-items of work-group 
+        // reaches this point, move forward !
+        barrier();
 
         const size_t r = it.get_global_id(0);
         const size_t c = it.get_global_id(1);
@@ -194,7 +198,90 @@
         }
     });
                 </div>
-            </article>
+                <p class="blogText">
+                    Now it's good time to run these three kernels on both CPU and GPU, with various matrix dimension, to see how they perform. Following section shows
+                    result of running three variants of row sum kernel on CPU.
+                </p>
+                <div class="microlight">
+    running on Intel(R) Xeon(R) CPU E5-2686 v4 @ 2.30GHz
+
+    [kernel] Sum Across Rows of Matrix (v0)
+
+    128  x  128			     2.688 ms
+    256  x  256			     0.602 ms
+    512  x  512			     1.294 ms
+    1024 x 1024			     5.474 ms
+    2048 x 2048			    20.816 ms
+    4096 x 4096			    79.719 ms
+    8192 x 8192			     315.3 ms
+
+    [kernel] Sum Across Rows of Matrix (v1)
+
+    128  x  128			     1.235 ms
+    256  x  256			     0.219 ms
+    512  x  512			     0.363 ms
+    1024 x 1024			      1.04 ms
+    2048 x 2048			     3.746 ms
+    4096 x 4096			    14.896 ms
+    8192 x 8192			     59.13 ms
+
+    [kernel] Sum Across Rows of Matrix (v2)
+
+    128  x  128			      0.23 ms
+    256  x  256			     0.431 ms
+    512  x  512			     0.683 ms
+    1024 x 1024			      2.12 ms
+    2048 x 2048			     8.167 ms
+    4096 x 4096			    32.721 ms
+    8192 x 8192			   126.747 ms
+                </div>
+                <p class="blogText">
+                    I see for random square matrix of dimension N x N, second variant of row summation kernel performs best. I expected third variant to
+                    perform at least as same as second one, though it seems second one is ~2x faster compared to last kernel. I compiled these kernels Ahead of Time,
+                    so that runtime kernel compilation time can be saved and launch will be faster. As I've access to GPU, I've also ran it there and following are benchmark
+                    results I obtained.
+                </p>
+                <div class="microlight">
+    running on Intel(R) Iris(R) Xe MAX Graphics [0x4905]
+
+    [kernel] Sum Across Rows of Matrix (v0)
+
+    128  x  128			     7.844 ms
+    256  x  256			    47.783 ms
+    512  x  512			   298.784 ms
+    1024 x 1024			   1652.19 ms
+    2048 x 2048			    7182.5 ms
+    4096 x 4096			   35201.8 ms
+    8192 x 8192			    191747 ms
+
+    [kernel] Sum Across Rows of Matrix (v1)
+
+    128  x  128			     0.536 ms
+    256  x  256			     0.531 ms
+    512  x  512			     1.395 ms
+    1024 x 1024			     5.726 ms
+    2048 x 2048			    22.359 ms
+    4096 x 4096			   101.141 ms
+    8192 x 8192			   502.316 ms
+
+    [kernel] Sum Across Rows of Matrix (v2)
+
+    128  x  128			     0.617 ms
+    256  x  256			     0.624 ms
+    512  x  512			     1.378 ms
+    1024 x 1024			     3.934 ms
+    2048 x 2048			    14.186 ms
+    4096 x 4096			    54.654 ms
+    8192 x 8192			   220.202 ms
+                </div>
+                <p class="blogText">
+                    Naive implementation i.e. first variant is performing much poor on GPU, but that's what I expected as all work-items are attempting
+                    to update global memory atomically, congestion should be high. I see this time third variant shines ! As I understand, in GPU it has
+                    dedicated local memory, which provides faster access compared to global memory. That's why third variant, where I make use of local memory
+                    to reduce global memory access and only work-group leaders access global memory one time to atomically update total row sum, performs better than others
+                    --- ~2x faster than second variant, its closest competitor.
+                </p>
+           </article>
         </div>
     </div>
     <div id="footerDiv">
