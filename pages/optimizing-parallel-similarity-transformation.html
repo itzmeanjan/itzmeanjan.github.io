@@ -279,8 +279,139 @@
                     to update global memory atomically, congestion should be high. I see this time third variant shines ! As I understand, in GPU it has
                     dedicated local memory, which provides faster access compared to global memory. That's why third variant, where I make use of local memory
                     to reduce global memory access and only work-group leaders access global memory one time to atomically update total row sum, performs better than others
-                    --- ~2x faster than second variant, its closest competitor.
+                    --- almost 2x faster than second variant, its closest competitor.
                 </p>
+                <p class="blogText">
+                    Now I'd like to spend some time in explaining how I'd attempt to write second kernel i.e. <span class="highlight">kernelMaxInVector</span>.
+                    Business logic of this kernel should just find out maximum value from a given vector of size N. A naive way that comes to my mind first,
+                    is using atomic maximum value finder, where each work-item ( respresenting each cell of vector ) attempts to atomically compare
+                    its holding with some known global memory location, where finally maximum value is supposed to be stored. As my interest is finding out
+                    maximum value of vector, I'll have to initialize result memory location with 0. I'll write following kernel, depicting my naive attempt.
+                </p>
+                <div class="microlight">
+    // check https://github.com/itzmeanjan/eigen_value/blob/cbbe178cc36bfe3b3e4a7e9d38d311145a9ff742/benchmarks/benchmark_similarity_transform.cpp#L164-L175
+
+    float *vec = ...; // source vector of length N
+    float *max = ...; // result memory location
+
+    *max = 0.f; // zero initialise
+
+    N = 1 << 10;
+    B = 1 << 5;
+
+    q.parallel_for(nd_range<1>{N, B}, [=] (nd_item<1> it) {
+        const size_t r = it.get_global_id(0);
+
+        float cell = *(vec + r);
+        
+        // each work-item attempts to atomically compare
+        // its holding with designated result memory location
+        //
+        // only if this work-item's holding has value larger than
+        // what's currently stored in result, it'll be updated with
+        // this work-item's held value
+        atomic_max(*max, cell);
+    });
+                </div>
+                <p class="blogText">
+                    A next step that comes to my mind, for improving max value in vector finder kernel, is using SYCL DPC++ reduction kernel
+                    for finding maximum value among all work-items of certain subgroup. This results in better mapping to underlying SIMD instructions.
+                    Finally only subgroup leader will attempt to compare subgroup's maximum value with result in global memory location, which naturally
+                    results into reduced access of global memory. In previous kernel, all work-items would have to compare their holding
+                    with target in global memory, which must result into N-many global memory accesses. But with this improvement, global memory access should
+                    be reduced to N / B, when N = vector size, B = subgroup size.
+                    <br>
+                    Following is my attempt in writing this improved variant of kernel.
+                </p>
+                <div class="microlight">
+    // check https://github.com/itzmeanjan/eigen_value/blob/cbbe178cc36bfe3b3e4a7e9d38d311145a9ff742/benchmarks/benchmark_similarity_transform.cpp#L208-L226
+
+    q.parallel_for(nd_range<1>{N, B}, [=] (nd_item<1> it) {
+        const size_t r = it.get_global_id(0);
+
+        float cell = *(vec + r);
+        
+        // subgroup level maximum value
+        // computed using SYCL DPC++ reduction function
+        float sub_max = reduce_max(cell);
+
+        // only subgroup leader attempts to
+        // compare subgroup's maximum value with global memory
+        // 
+        // updates same only if atomic comparison says target 
+        // global memory has smaller value compared to 
+        // subgroup's maximum value
+        if(leader()) {
+            atomic_max(*max, sub_max);
+        }
+    });
+                </div>
+                <p class="blogText">
+                    As I understand, second variant of max in vector kernel should perform better than first variant, but I've another idea
+                    which I'd like to implement and benchmark. In quest of finding a way to reduce global memory access as much as possible,
+                    I bring in idea of local memory, where all subgroups of certain work-group will help in storing maximum value of work-group
+                    itself. And finally when all work-items of that work-group are done, only work-group leader will attempt to access
+                    global memory and perform atomic comparison to decide whether updation to result can be performed or not. This kernel
+                    should reduce global memory access to N / B, when N = vector size, B = work-group size. Note, this technique will only
+                    prove fruitful if work-group size is larger than subgroup size, specifally I'll set work-group such that it's evenly
+                    divisible by subgroup size, which I'll specify using attribute understandable by <span class="highlight">dpcpp</span> compiler.
+                    <br>
+                    <br>
+                    Following is the attribute required for fixing subgroup size for some kernel.
+                </p>
+                <div class="microlight">
+    // check https://github.com/itzmeanjan/eigen_value/blob/cbbe178cc36bfe3b3e4a7e9d38d311145a9ff742/similarity_transform.cpp#L161
+
+    q.parallel_for(nd_range<1>{N, B}, [=] (nd_item<1> it) [[intel::reqd_sub_group_size(32)]] { 
+        // kernel body
+    });
+                </div>
+                <p class="blogText">
+                    My final attempt in improving vector max value finder kernel is as below.
+                </p>
+                <div class="microlight">
+    // check https://github.com/itzmeanjan/eigen_value/blob/cbbe178cc36bfe3b3e4a7e9d38d311145a9ff742/similarity_transform.cpp#L159-L203
+
+    float *local_memory = ...; // local-data-share of size 1
+
+    q.parallel_for(nd_range<1>{N, B}, [=] (nd_item<1> it) {
+
+        // only work-group leader executes this block
+        if(leader()) {
+            // explicit initialisation of local memory
+            //
+            // otherwise result might be wrong
+            // if we rely on default initialised value
+            *local_memory = 0.f;
+        }
+
+        // only after all work-items of work-group 
+        // reaches this point, move forward !
+        barrier();
+
+        const size_t r = it.get_global_id(0);
+
+        float cell = *(vec + r);
+
+        float sub_max = reduce_max(cell);
+
+        // subgroup leader should only update
+        // subgroup level row sum in work-group
+        // local memory
+        if (leader()) {
+            atomic_max(*local_memory, sub_max);
+        }
+
+        // only after all work-items of work-group 
+        // reaches this point, move forward !
+        barrier();
+
+        // only work-group leader accesses global memory one time !
+        if(leader()) {
+            atomic_add(*max, *local_memory);
+        }
+    });                    
+                </div>
            </article>
         </div>
     </div>
