@@ -412,6 +412,111 @@
         }
     });                    
                 </div>
+                <p class="blogText">
+                    This is a time to benchmark three implementations for finding maximum value in vector. AOT compiled kernels
+                    on CPU perform as below.
+                </p>
+                <div class="microlight">
+    running on Intel(R) Xeon(R) CPU E5-2686 v4 @ 2.30GHz
+
+    [kernel] Max Value in Vector (v0)
+
+    65536			     0.153 ms
+    131072			     0.207 ms
+    262144			     0.319 ms
+    524288			      0.54 ms
+    1048576			     0.981 ms
+    2097152			     1.853 ms
+    4194304			     3.622 ms
+    8388608			     7.379 ms
+    16777216			    14.867 ms
+    33554432			    28.477 ms
+
+    [kernel] Max Value in Vector (v1)
+
+    65536			     0.149 ms
+    131072			     0.197 ms
+    262144			     0.303 ms
+    524288			     0.509 ms
+    1048576			     0.928 ms
+    2097152			     1.756 ms
+    4194304			     3.421 ms
+    8388608			     7.159 ms
+    16777216			    14.027 ms
+    33554432			    27.881 ms
+
+    [kernel] Max Value in Vector (v2)
+
+    65536			     0.217 ms
+    131072			     0.328 ms
+    262144			     0.506 ms
+    524288			     0.873 ms
+    1048576			     1.439 ms
+    2097152			      2.78 ms
+    4194304			     5.298 ms
+    8388608			    11.136 ms
+    16777216			    22.701 ms
+    33554432			    44.979 ms
+                </div>
+                <p class="blogText">
+                    I notice first variant, where all work-items are atomically comparing self value with global memory's
+                    target value, doesn't perform that bad on CPU. It may be due to that CPU has better atomic operation support.
+                    The final variant, which I expected to do better, is probably sufferring from the fact that on CPU, there's no
+                    explicit local memory. Making subgroup leaders to write to local memory first, for finding work-group local maximum value
+                    and then only work-group leader contributing in finding maximum value of vector by accessing/ comparing global memory ---
+                    is incurring more cost than benefit, on CPU.
+                    <br>
+                    <br>
+                    In below table, I present you with benchmark results I obtain after running same kernels on GPU. As GPU is less capable
+                    in executing atomic operations, compared to CPU, I see first variant performing  worst on GPU. In second variant, subgroup's
+                    work-items find maximum value using SYCL DPC++ reduction function, which is performing lot better as I expected. In this case,
+                    contention should also be lower, as only subgroup leaders are supposed to be atomically accessing global memory. The final
+                    variant, where I introduced local memory, so that I can reduce scope of global memory access by another factor, letting only
+                    workgroup leaders atomically access global memory, performs almost as same as second variant. May be third technique doesn't bring
+                    much on table, but it's another sound & efficient way to write this kernel.
+                </p>
+                <div class="microlight">
+    running on Intel(R) Iris(R) Xe MAX Graphics [0x4905]
+
+    [kernel] Max Value in Vector (v0)
+
+    65536			     0.588 ms
+    131072			     0.758 ms
+    262144			     1.096 ms
+    524288			     1.832 ms
+    1048576			     3.315 ms
+    2097152			     6.373 ms
+    4194304			    12.108 ms
+    8388608			    23.492 ms
+    16777216			    46.511 ms
+    33554432			    91.242 ms
+    
+    [kernel] Max Value in Vector (v1)
+    
+    65536			     0.459 ms
+    131072			     0.609 ms
+    262144			     0.815 ms
+    524288			       1.2 ms
+    1048576			     2.101 ms
+    2097152			     3.853 ms
+    4194304			     7.278 ms
+    8388608			     13.92 ms
+    16777216			    26.941 ms
+    33554432			    53.695 ms
+    
+    [kernel] Max Value in Vector (v2)
+    
+    65536			     0.475 ms
+    131072			     0.613 ms
+    262144			     0.834 ms
+    524288			     1.222 ms
+    1048576			     2.155 ms
+    2097152			     3.893 ms
+    4194304			     7.303 ms
+    8388608			    13.961 ms
+    16777216			    27.154 ms
+    33554432			    53.736 ms
+                </div>
            </article>
         </div>
     </div>
