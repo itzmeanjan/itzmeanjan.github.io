@@ -517,6 +517,125 @@
     16777216			    27.154 ms
     33554432			    53.736 ms
                 </div>
+                <p class="blogText">
+                    Next kernel in my list, <span class="highlight">kernelComputeEigenVector</span>, is very simple to implement,
+                    where each element of result vector is computed using following formula.
+                </p>
+                <div class=microlight>
+    max_val = max(src_vec);
+
+    for i in 0..n {
+        res_vec[i] *= src_vec[i] / max_val;
+    }
+                </div>
+                <p class="blogText">
+                    This problem itself is very parallel, no data dependency, so I'll write following kernel for parallelly
+                    computing result eigen vector from row sum vector and max value in row sum vector.
+                </p>
+                <div class="microlight">
+    // check https://github.com/itzmeanjan/eigen_value/blob/cbbe178cc36bfe3b3e4a7e9d38d311145a9ff742/benchmarks/benchmark_similarity_transform.cpp#L289-L294
+    
+    float *row_sum_vec = ...; // row summations of matrix of dimension N x N
+    float *max_val = ...; // max value in above row sum vector
+    float *res_vec = ...; // result vector of size N
+    
+    N = 1 << 10;
+    B = 1 << 5;
+
+    q.parallel_for(nd_range<1>{N, B}, [=] (nd_item<1> it) {
+        const size_t r = it.get_global_id(0);
+
+        *(res_vec + r) *= *(row_sum_vec + r) / *max_val;
+    });
+                </div>
+                <p class="blogText">
+                    Notice, value stored in <i>max_val</i> memory location is in global memory, which is accessed N-many
+                    times during execution of this kernel. But this value is somewhat constant in this context, so I'd like
+                    to use some technique which will help me in reading this value from global memory only once. After that
+                    read value will be distributed among a set of work-items, not requiring each of them to read from global memory.
+                    This will result into reduced global memory access, which contributes in making whole compute pipeline faster.
+                    The set of work-items which will read from global memory only once, is called subgroup. As subgroups map well
+                    to underlying SIMD intrinsics, resulting code running on accelerator should perform better. My take at modifying
+                    this kernel is as simple as adding <i>group_broadcast</i> method when reading from memory location held behind <i>max_val</i>.
+                </p>
+                <div class="microlight">
+    // check https://github.com/itzmeanjan/eigen_value/blob/1d189ac2973d69ac330785bc74335c8101ff0bee/similarity_transform.cpp#L222-L236
+
+    q.parallel_for(nd_range<1>{N, B}, [=] (nd_item<1> it) {
+        const size_t r = it.get_global_id(0);
+        
+        // this will result into only one work-item in subgroup
+        // reading from global memory location, behind `max_val`
+        *(res_vec + r) *= *(row_sum_vec + r) / group_broadcast(*max_val);
+    });
+                </div>
+                <p class="blogText">
+                    Benchmarking last two kernels, used for computing eigen vector, on CPU gives me following result. It looks
+                    both kernel variants perform almost same on CPU and my speculation of resulting into better SIMD usage
+                    in case of second variant of kernel, doesn't seem to be true.
+                </p>
+                <div class="microlight">
+    running on Intel(R) Xeon(R) CPU E5-2686 v4 @ 2.30GHz
+
+    [kernel] Eigen Vector Computation (v0)
+
+    65536			     1.057 ms
+    131072			     0.122 ms
+    262144			     0.169 ms
+    524288			     0.236 ms
+    1048576			     0.397 ms
+    2097152			      0.71 ms
+    4194304			     1.682 ms
+    8388608			     4.186 ms
+    16777216			     8.177 ms
+    33554432			    16.149 ms
+
+    [kernel] Eigen Vector Computation (v1)
+
+    65536			     0.124 ms
+    131072			     0.134 ms
+    262144			     0.167 ms
+    524288			     0.262 ms
+    1048576			     0.382 ms
+    2097152			     0.828 ms
+    4194304			     1.878 ms
+    8388608			     4.164 ms
+    16777216			     8.156 ms
+    33554432			    16.293 ms
+                </div>
+                <p class="blogText">
+                    Benchmarking on GPU, I see similar trend that both variants are performing almost same. I believe this is due to either
+                    I'm using <i>group_broadcast</i> improperly or it's not working as expected.
+                </p>
+                <div class="microlight">
+    running on Intel(R) Iris(R) Xe MAX Graphics [0x4905]
+
+    [kernel] Eigen Vector Computation (v0)
+
+    65536			     0.096 ms
+    131072			     0.107 ms
+    262144			     0.109 ms
+    524288			     0.153 ms
+    1048576			     0.295 ms
+    2097152			     0.437 ms
+    4194304			     0.902 ms
+    8388608			     1.754 ms
+    16777216			     3.447 ms
+    33554432			     6.827 ms
+
+    [kernel] Eigen Vector Computation (v1)
+
+    65536			       0.1 ms
+    131072			      0.11 ms
+    262144			     0.112 ms
+    524288			      0.18 ms
+    1048576			     0.301 ms
+    2097152			     0.496 ms
+    4194304			     0.885 ms
+    8388608			     1.733 ms
+    16777216			     3.497 ms
+    33554432			     6.904 ms
+                </div>
            </article>
         </div>
     </div>
