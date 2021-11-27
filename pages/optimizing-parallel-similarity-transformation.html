@@ -719,6 +719,122 @@
         4096 x 4096			     2.412 ms                                   25.806 ms
         8192 x 8192			     9.962 ms                                   103.048 ms
                 </div>
+                <p class="blogText">
+                    Final kernel in pipeline checks row-sum vector and decides whether we should go to next iteration or not. When iterative method converges
+                    to result, all values in row-sum vector should be very close and absolute difference between a pair of values should be lesser than some predefined
+                    <i>epsilon</i> value. Let us take an example vector to demonstrate how I can write one parallel kernel for same.
+                </p>
+                <div class="microlight">
+    EPS = 1e-3
+    vec = [a, b, c, d]
+    
+    // stop if following evaluates to True
+    abs(vec[0] - vec[1]) < EPS && abs(vec[1] - vec[2]) < EPS && abs(vec[2] - vec[3]) < EPS && abs(vec[3] - vec[0]) < EPS
+
+    // --- 👇 is a generic rewrite of above condition check ---
+
+    N = len(vec);
+    stop = True;
+
+    for i in 0..N {
+        stop &= abs(vec[i] - vec[(i + 1) % N]) < EPS;
+    }
+
+    if(stop) // stop iteration
+    else // compute next iteration's matrix
+                </div>
+                <p class="blogText">
+                    For a vector of length N, I'll kick off N work-items where i<sup>th</sup> work-item accesses row-sum vector's i<sup>th</sup> and (i+1)<sup>th</sup> indices, 
+                    for finding absolute difference between a pair of consequtive cells. Notice for work-item with index <i>i</i>, attempting to access global memory with 
+                    index <i>(i+1)</i> should result into segmentation fault. I should be accessing index <i>i</i> and <i>(i+1) % N</i> of row-sum vector from each work-item.
+                    Implementing such a kernel is as easy as below.
+                </p>
+                <div class="microlight">
+    float EPS = 1e-3;
+
+    float *row_sum = ...; // row-sum vector of length N, in global memory
+    uint *stop = ...; // status in global memory, whether converged or not
+
+    *stop = 1U; // initialization is required
+
+    q.parallel_for(nd_range<1>{N, B}, [=] (nd_item<1> it) {
+        const size_t r = it.get_global_id(0);
+
+        bool flag = all_of(abs(*(row_sum + r) - *(row_sum + (r+1) % N)) < EPS);
+
+        // only work group leader
+        if(leader()) {
+            atomic_min(*stop, flag ? 1 : 0);
+        }
+    });
+                </div>
+                <p class="blogText">
+                    This kernel is pretty simple, except <i>all_of</i> function, which is a group algorithm function, helps in evaluation of a boolean
+                    predicate on all work-items of a work(/ sub)-group. The main problem I see with above kernel is duplicate access of global memory ( read row-sum vector ).
+                    Each cell of row-sum vector is accessed twice. For reducing global memory access, I've to resort to subgroup shuffling algorithm, so that with in a subgroup
+                    all work-items just read once from global memory, but then communicate among themselves, sharing their register cached values with other work-items in same
+                    subgroup. I use one specific subgroup function --- <i>shuffle_down</i>, which helps me in obtaining <i>((i + 1) % B)</i><sup>th</sup> work-item's value
+                    inside <i>i</i><sup>th</sup> work-item, without explicitly accessing global memory. For sake of better demonstration purpose, let me take an example.
+                    <br>
+                    <br>
+                    Say I've following vector, which I want to shuffle down, then assertion in following pseudocode block must hold.
+                </p>
+                <div class="microlight">
+    vec = [0, 1, 2, 3]
+    
+    // this is executed in data parallel context
+    float received = shuffle_down(vec[i], 1)
+
+    // then following must hold !
+    for i in 0..4 {
+        assert(received == vec[(i+1) % 4])
+    }
+                </div>
+                <p class="blogText">
+                    Pictorially it looks like below, when subgroup size is 4. If each of 4 work-items start with their initial value in 
+                    first row, after shuffle_down by 1 place, their local register content should be updated to last row. This is somewhat I want to
+                    attain. I say somewhat because, this model doesn't fully fit my requirement when vector size <i>N</i> itself is greater than subgroup
+                    size, say <i>B</i>.
+                </p>
+                <img class="imgCenterUpdt" src="../images/optimizing-parallel-similarity-transform-method-1.jpg">
+                <p class="blogText">
+                    Check following scenario, where subgroup size is 4, but vector which is being shuffled down is of length 8.
+                    As <i>shuffle_down</i> method itself wraps around at subgroup boundary, produced result will look like below.
+                    But my expected result is something where index wrapping should happen at boundary of whole vector under operation.
+                </p>
+                <img class="imgCenterUpdt" src="../images/optimizing-parallel-similarity-transform-method-2.jpg">
+                <p class="blogText">
+                    As subgroup shuffling itself is not enough to satisfy requirement for checking stopping criteria, in parallel, 
+                    I use conditional test based reading from global memory, while results into duplicate reads from global memory
+                    at subgroup boundary. Then rest of the flow is same.
+                </p>
+                <div class="microlight">
+    // check https://github.com/itzmeanjan/eigen_value/blob/1d189ac2973d69ac330785bc74335c8101ff0bee/similarity_transform.cpp#L324-L412
+    // for full implementation of stopping criteria checker kernel
+                </div>
+                <p class="blogText">
+                    I can introduce local memory here, following same rationale as I did in some of previous kernels. Instead of letting all
+                    subgroup leaders atomically accessing global memory for updating status of whether convergence criteria has been satisfied in respective
+                    subgroup, I can just let work-group leaders do that part. In this updated setup, subgroup leaders update flag in local memory, where
+                    it's decided whether convergence criteria has been reached in work-group. And when all work-items of work-group reach one barrier, 
+                    work-group leader will update work-group's result in global memory. Comparing benchmark of final variant of convergence criteria checker kernel
+                    shows much better performance on GPU.
+                </p>
+                <div class="microlight">
+    [kernel] Stop ( Convergence ) Criteria Checker
+
+    dim                                 CPU                     GPU
+    65536			     0.707 ms               0.676 ms
+    131072			      0.85 ms               0.634 ms
+    262144			     1.435 ms                0.84 ms
+    524288			     2.615 ms               1.248 ms
+    1048576			     5.072 ms               2.246 ms
+    2097152			     9.812 ms               3.964 ms
+    4194304			    19.469 ms               7.339 ms
+    8388608			    38.686 ms              13.655 ms
+    16777216			    77.394 ms              26.739 ms
+    33554432			   154.021 ms              54.011 ms
+                </div>
            </article>
         </div>
     </div>
