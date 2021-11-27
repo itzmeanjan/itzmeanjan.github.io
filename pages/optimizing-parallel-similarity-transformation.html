@@ -636,6 +636,89 @@
     16777216			     3.497 ms
     33554432			     6.904 ms
                 </div>
+                <p class="blogText">
+                    Next kernel I'll write is <span class="highlight">kernelSimilarityTransform</span>, which is an important part
+                    in compute pipeline of whole Similarity Transformation method. This kernel itself helps in computing next iteration's
+                    matrix using following technique. I've already found row sum vector of a matrix, which I'll use in this kernel.
+                    Assume I've one vector of length N, forming one diagonal matrix and its respective inverse matrix is trivial.
+                </p>
+                <div class="microlight">
+    // here N = 4
+    vec = [a, b, c, d]
+
+    d    =  diag([a, b, c, d])
+    d^-1 =  diag([1/ a, 1/ b, 1/ c, 1/ d])
+                </div>
+                <p class="blogText">
+                    Next iteration's matrix is computed as below.
+                </p>
+                <div class="microlight">
+    // M = current matrix of N x N
+    // d = diagonal matrix formed with row-sum vector
+    // d^-1 = inverse of above diagonal matrix
+
+    M = d^-1 x M x d // = matrix to be used in next iteration
+                </div>
+                <img class="imgCenterUpdt" src="../images/optimizing-parallel-similarity-transform-method-0.png">
+                <p class="blogText">
+                    This is a matrix multiplication problem, but two of three operands being diagonal matrices and two matrices being
+                    inverse of one another, I can reduce multiplication problem to a reduce variant, as I derive it in above diagram.
+                    Writing a parallel variant of this is pretty easy.
+                </p>
+                <div class="microlight">
+    // check https://github.com/itzmeanjan/eigen_value/blob/1d189ac2973d69ac330785bc74335c8101ff0bee/similarity_transform.cpp#L271-L293
+
+    float *mat = ...; // matrix of dimension N x N
+    float *vec = ...; // row sum vector of size N
+
+    float *loc_row = ...; // vector of length 1, in local memory
+    float *loc_col = ...; // vector of length B, in local memory
+
+    N = 1 << 10;
+    B = 1 << 5;
+
+    q.parallel_for(nd_range<2>{{N, N}, {1, B}}, [=] (nd_item<2> it) {
+        const size_t r = it.get_global_id(0);    
+        const size_t c = it.get_global_id(1);
+
+        // 1D unique local identifier of work-item in work-group
+        const size_t ll_id = it.get_local_linear_id(); // ∈ [0, B)
+        // 1D unique global identifier of work-item in execution space
+        const size_t gl_id = it.get_global_linear_id(); // ∈ [0, N)
+
+        // --- caching row-sum vector into local memory ---
+
+        // only work-group leader does this
+        if(leader()) {
+            loc_row[0] = *(vec + r);
+        }
+        loc_col[ll_id] = *(vec + gl_id % B);
+        
+        // wait until all work-items of work-group reach here
+        barrier();
+
+        // --- caching ends ---
+
+        *(mat + r * N + c) *= (1.f / loc_row[0]) * loc_col[ll_id];
+    });
+                </div>
+                <p class="blogText">
+                    This kernel makes use of local memory to cache diagonal matrix's ( read row-sum vector ) cells, reducing global memory access. Benchmarking this kernel on CPU, GPU
+                    compares as below. As GPUs possess explicit local memory, benefits of using local memory is clearly visible on second column in following diagram.
+                </p>
+                <div class="microlight">
+        [kernel] Next Matrix Computation
+
+            dim                                GPU                                       CPU
+        
+        128 x 128			     0.059 ms                                   0.152 ms
+        256 x 256			     0.064 ms                                   0.23 ms
+        512 x 512		             0.092 ms                                   0.504 ms
+        1024 x 1024			     0.192 ms                                   1.699 ms
+        2048 x 2048			     0.594 ms                                   6.497 ms
+        4096 x 4096			     2.412 ms                                   25.806 ms
+        8192 x 8192			     9.962 ms                                   103.048 ms
+                </div>
            </article>
         </div>
     </div>
