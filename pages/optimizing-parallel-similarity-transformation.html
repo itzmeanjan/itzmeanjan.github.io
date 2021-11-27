@@ -10,7 +10,7 @@
     </title>
     <meta prefix="og: http://ogp.me/ns#" property="og:type" content="website">
     <meta prefix="og: http://ogp.me/ns#" property="og:title" content="Optimizing Parallel Similarity Transformation">
-    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="...">
+    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="Optimization techniques of data parallel kernels targeting accelerators using SYCL/ DPC++, with in-depth demonstrations for solving multi-kernel Parallel Similarity Transformation Method, used for finding maximum eigen value of positive square matrix">
     <meta prefix="og: http://ogp.me/ns#" property="og:url" content="https://itzmeanjan.in">
     <meta prefix="og: http://ogp.me/ns#" property="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
     <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url"
@@ -20,14 +20,14 @@
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="https://itzmeanjan.in/">
     <meta property="twitter:title" content="Optimizing Parallel Similarity Transformation">
-    <meta property="twitter:description" content="...">
+    <meta property="twitter:description" content="Optimization techniques of data parallel kernels targeting accelerators using SYCL/ DPC++, with in-depth demonstrations for solving multi-kernel Parallel Similarity Transformation Method, used for finding maximum eigen value of positive square matrix">
     <meta property="twitter:image" content="https://itzmeanjan.in/images/myImage.jpg">
     <meta property="twitter:site" content="@meanjanry">
-    <meta name="description" content="...">
+    <meta name="description" content="Optimization techniques of data parallel kernels targeting accelerators using SYCL/ DPC++, with in-depth demonstrations for solving multi-kernel Parallel Similarity Transformation Method, used for finding maximum eigen value of positive square matrix">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="author" content="Anjan Roy">
     <meta name="keywords"
-        content="dpc++, dpcpp, sycl, oneapi, gpgpu, fpga, accelerator, similarity, transform, method, maximum, eigen value, eigen vector, positive, square, matrix, simt, cpp">
+        content="dpc++, dpcpp, sycl, oneapi, gpgpu, fpga, accelerator, data parallel, kernel, optimization, maximum eigen value, eigen vector, positive, square, matrix, simt, simd, subgroups, shuffling, cpp">
     <meta name="theme-color" content="darkslategrey">
     <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
     <link rel="stylesheet" type="text/css" href="../styles/index.css">
@@ -70,8 +70,8 @@
     v = (respective) eigen vector
                 </div>
                 <p class="blogText">
-                    I'll not go through algorithmic steps this time, rather I'll pick each kernel required for computing maximum eigen value
-                    of positive square matrix and figure out ways how it can be improved. Following five kernels are required for performing
+                    I'll just pick each kernel required for computing maximum eigen value
+                    of positive square matrix and figure out ways how it can be improved in step-by-step manner. Following five kernels are required for performing
                     parallel similarity transformation.
                 </p>
                 <ol>
@@ -83,7 +83,7 @@
                 </ol>
                 <p class="blogText">
                     I'll start with first one. All this kernel should do is simply compute sum of values stored in cells along each row of matrix. A<sub>N x N</sub>
-                    being a square matrix, it needs to output a N-element vector where i<sup>th</sup> cell should hold sum of i<sup>th</sup> row of matrix. I want to
+                    being a square matrix, it needs to output to a N-element vector where i<sup>th</sup> cell should hold sum of i<sup>th</sup> row of matrix. I want to
                     perform N-many parallel summations --- as simple as that. With this requirement in mind, I'll write following kernel.
                 </p>
                 <div class="microlight">
@@ -113,9 +113,9 @@
                     vector of length N, will be accessed N-many times by N-many designated work-items. This results into N<sup>2</sup> global memory access, which is expensive.
                     I'd like to reduce global memory access as much as possible. One simple way to do this in current context is to make use of reduction function
                     of SYCL DPC++, which will help me in computing sum of all elements held by all work-items of subgroup. Using this subgroup method maps
-                    well to underlying SIMD assembly function, which reduces communication cost, but does compute sum of all values held by subgroup participants. 
+                    well to underlying SIMD instructions, which reduces communication cost, but does compute sum of all values held by subgroup participants. 
                     Finally I'll use atomic write to update sum in designated row of result vector, living in global memory, helping me to reduce global memory access
-                    to N<sup>2</sup> / B, given that B is subgroup width. I'll express this with following kernel.
+                    to N<sup>2</sup> / B, given that B = subgroup width. I'll express this with following kernel.
                 </p>
                 <div class="microlight">
     // @note this is a pseudocode
@@ -144,9 +144,9 @@
                     This kernel is indeed better than previous matrix row sum kernel, where N<sup>2</sup> global memory accesses were performed. But I see
                     one more way to attempt further optimization. I want to make use of faster local memory so that subgroup leader can atomically 
                     update respective work-group's sum, stored in designated local memory.
-                    It's possible to have multiple subgroups in a work-group, that way I'm able to reduce global memory access to another factor. Now only subgroup leaders
+                    It's possible to have multiple subgroups in a work-group, that way I'm able to reduce global memory access by another factor. Now only subgroup leaders
                     are accessing local memory to update respective work-group's row sum, with their own subgroup level row sum. Finally after all work-items of
-                    some work-group are done, only work-group leader will access designated cell of global memory to atomically update respective row sum. 
+                    this work-group are done, only work-group leader will access designated cell of global memory to atomically update respective row sum. 
                     With this update kernel should only access global memory N<sup>2</sup> / B times, when B = work-group size, which should preferrably be greater than subgroup size. 
                     My final update to matrix row sum kernel looks like below.
                 </p>
@@ -163,7 +163,7 @@
         if(leader()) {
             // initialised by work-group leader
             //
-            // if not done, it might prove costly 
+            // if not done, it might prove to be costly 
             *local_memory = 0.f;
         }
 
@@ -237,8 +237,8 @@
                 </div>
                 <p class="blogText">
                     I see for random square matrix of dimension N x N, second variant of row summation kernel performs best. I expected third variant to
-                    perform at least as same as second one, though it seems second one is ~2x faster compared to last kernel. I compiled these kernels Ahead of Time,
-                    so that runtime kernel compilation time can be saved and launch will be faster. As I've access to GPU, I've also ran it there and following are benchmark
+                    perform at least as same as second one, if not better, though it seems second one is ~2x faster compared to last kernel. I compiled these kernels Ahead of Time,
+                    so that runtime kernel compilation time can be saved and launch on accelerator will be faster. As I've access to GPU, I've also ran it there and following are benchmark
                     results I obtained.
                 </p>
                 <div class="microlight">
@@ -289,6 +289,8 @@
                     maximum value of vector, I'll have to initialize result memory location with 0. I'll write following kernel, depicting my naive attempt.
                 </p>
                 <div class="microlight">
+    // kernelMaxInVector_v0
+    //
     // check https://github.com/itzmeanjan/eigen_value/blob/cbbe178cc36bfe3b3e4a7e9d38d311145a9ff742/benchmarks/benchmark_similarity_transform.cpp#L164-L175
 
     float *vec = ...; // source vector of length N
@@ -318,12 +320,14 @@
                     for finding maximum value among all work-items of certain subgroup. This results in better mapping to underlying SIMD instructions.
                     Finally only subgroup leader will attempt to compare subgroup's maximum value with result in global memory location, which naturally
                     results into reduced access of global memory. In previous kernel, all work-items would have to compare their holding
-                    with target in global memory, which must result into N-many global memory accesses. But with this improvement, global memory access should
+                    with target in global memory, which results into N-many global memory accesses. But with this improvement, global memory access should
                     be reduced to N / B, when N = vector size, B = subgroup size.
                     <br>
-                    Following is my attempt in writing this improved variant of kernel.
+                    Following is my attempt in writing this improved variant of <i>kernelMaxInVector</i>.
                 </p>
                 <div class="microlight">
+    // kernelMaxInVector_v1
+    //
     // check https://github.com/itzmeanjan/eigen_value/blob/cbbe178cc36bfe3b3e4a7e9d38d311145a9ff742/benchmarks/benchmark_similarity_transform.cpp#L208-L226
 
     q.parallel_for(nd_range<1>{N, B}, [=] (nd_item<1> it) {
@@ -348,18 +352,20 @@
                 </div>
                 <p class="blogText">
                     As I understand, second variant of max in vector kernel should perform better than first variant, but I've another idea
-                    which I'd like to implement and benchmark. In quest of finding a way to reduce global memory access as much as possible,
-                    I bring in idea of local memory, where all subgroups of certain work-group will help in storing maximum value of work-group
-                    itself. And finally when all work-items of that work-group are done, only work-group leader will attempt to access
+                    which I'd like to implement and benchmark. In quest of finding a way in reducing global memory access as much as possible,
+                    I bring in idea of using local memory, where all subgroups of certain work-group help in computing maximum value of work-group
+                    itself. And finally when all work-items of that work-group are done ( read reaches a synchronization point ), only work-group leader will attempt to access
                     global memory and perform atomic comparison to decide whether updation to result can be performed or not. This kernel
                     should reduce global memory access to N / B, when N = vector size, B = work-group size. Note, this technique will only
                     prove fruitful if work-group size is larger than subgroup size, specifally I'll set work-group such that it's evenly
                     divisible by subgroup size, which I'll specify using attribute understandable by <span class="highlight">dpcpp</span> compiler.
                     <br>
                     <br>
-                    Following is the attribute required for fixing subgroup size for some kernel.
+                    Following is the attribute required for setting subgroup size for some kernel.
                 </p>
                 <div class="microlight">
+    // just an example of hardcoding subgroup size in kernel definition
+    //
     // check https://github.com/itzmeanjan/eigen_value/blob/cbbe178cc36bfe3b3e4a7e9d38d311145a9ff742/similarity_transform.cpp#L161
 
     q.parallel_for(nd_range<1>{N, B}, [=] (nd_item<1> it) [[intel::reqd_sub_group_size(32)]] { 
@@ -370,6 +376,8 @@
                     My final attempt in improving vector max value finder kernel is as below.
                 </p>
                 <div class="microlight">
+    // kernelMaxInVector_v2
+    //
     // check https://github.com/itzmeanjan/eigen_value/blob/cbbe178cc36bfe3b3e4a7e9d38d311145a9ff742/similarity_transform.cpp#L159-L203
 
     float *local_memory = ...; // local-data-share of size 1
@@ -382,6 +390,9 @@
             //
             // otherwise result might be wrong
             // if we rely on default initialised value
+            //
+            // notice I can safely initialise with 0.f
+            // because I'm working with positive matrix
             *local_memory = 0.f;
         }
 
@@ -468,7 +479,7 @@
                     <br>
                     <br>
                     In below table, I present you with benchmark results I obtain after running same kernels on GPU. As GPU is less capable
-                    in executing atomic operations, compared to CPU, I see first variant performing  worst on GPU. In second variant, subgroup's
+                    in executing atomic operations, compared to CPU, I see first variant performing  much worse on GPU. In second variant, subgroup's
                     work-items find maximum value using SYCL DPC++ reduction function, which is performing lot better as I expected. In this case,
                     contention should also be lower, as only subgroup leaders are supposed to be atomically accessing global memory. The final
                     variant, where I introduced local memory, so that I can reduce scope of global memory access by another factor, letting only
@@ -522,6 +533,8 @@
                     where each element of result vector is computed using following formula.
                 </p>
                 <div class=microlight>
+    // sequential way of computing eigen vector
+
     max_val = max(src_vec);
 
     for i in 0..n {
@@ -533,11 +546,13 @@
                     computing result eigen vector from row sum vector and max value in row sum vector.
                 </p>
                 <div class="microlight">
+    // kernelComputeEigenVector_v0
+    //
     // check https://github.com/itzmeanjan/eigen_value/blob/cbbe178cc36bfe3b3e4a7e9d38d311145a9ff742/benchmarks/benchmark_similarity_transform.cpp#L289-L294
     
-    float *row_sum_vec = ...; // row summations of matrix of dimension N x N
-    float *max_val = ...; // max value in above row sum vector
-    float *res_vec = ...; // result vector of size N
+    float *row_sum_vec = ...;   // row summations of matrix of dimension N x N, so length is N
+    float *max_val = ...;       // max value in above row sum vector
+    float *res_vec = ...;       // result vector of size N
     
     N = 1 << 10;
     B = 1 << 5;
@@ -559,6 +574,8 @@
                     this kernel is as simple as adding <i>group_broadcast</i> method when reading from memory location held behind <i>max_val</i>.
                 </p>
                 <div class="microlight">
+    // kernelComputeEigenVector_v1
+    //
     // check https://github.com/itzmeanjan/eigen_value/blob/1d189ac2973d69ac330785bc74335c8101ff0bee/similarity_transform.cpp#L222-L236
 
     q.parallel_for(nd_range<1>{N, B}, [=] (nd_item<1> it) {
@@ -646,26 +663,28 @@
     // here N = 4
     vec = [a, b, c, d]
 
-    d    =  diag([a, b, c, d])
-    d^-1 =  diag([1/ a, 1/ b, 1/ c, 1/ d])
+    d    =  diag([a, b, c, d])              // diagonal matrix
+    d^-1 =  diag([1/ a, 1/ b, 1/ c, 1/ d])  // inverse of diagonal matrix
                 </div>
                 <p class="blogText">
                     Next iteration's matrix is computed as below.
                 </p>
                 <div class="microlight">
-    // M = current matrix of N x N
-    // d = diagonal matrix formed with row-sum vector
-    // d^-1 = inverse of above diagonal matrix
+    // M    =   current matrix of size N x N
+    // d    =   diagonal matrix formed with row-sum vector
+    // d^-1 =   inverse of above diagonal matrix
 
     M = d^-1 x M x d // = matrix to be used in next iteration
                 </div>
                 <img class="imgCenterUpdt" src="../images/optimizing-parallel-similarity-transform-method-0.png">
                 <p class="blogText">
                     This is a matrix multiplication problem, but two of three operands being diagonal matrices and two matrices being
-                    inverse of one another, I can reduce multiplication problem to a reduce variant, as I derive it in above diagram.
-                    Writing a parallel variant of this is pretty easy.
+                    inverse of one another, I can reduce matrix multiplication problem to a reduced variant, as I derive it in above diagram.
+                    Writing a parallel implementation of this is pretty easy.
                 </p>
                 <div class="microlight">
+    // kernelSimilarityTransform or call it kernelComputeNextMatrix
+    //
     // check https://github.com/itzmeanjan/eigen_value/blob/1d189ac2973d69ac330785bc74335c8101ff0bee/similarity_transform.cpp#L271-L293
 
     float *mat = ...; // matrix of dimension N x N
@@ -675,7 +694,7 @@
     float *loc_col = ...; // vector of length B, in local memory
 
     N = 1 << 10;
-    B = 1 << 5;
+    B = 1 << 5; // = work-group size
 
     q.parallel_for(nd_range<2>{{N, N}, {1, B}}, [=] (nd_item<2> it) {
         const size_t r = it.get_global_id(0);    
@@ -684,7 +703,7 @@
         // 1D unique local identifier of work-item in work-group
         const size_t ll_id = it.get_local_linear_id(); // ∈ [0, B)
         // 1D unique global identifier of work-item in execution space
-        const size_t gl_id = it.get_global_linear_id(); // ∈ [0, N)
+        const size_t gl_id = it.get_global_linear_id(); // ∈ [0, N*N)
 
         // --- caching row-sum vector into local memory ---
 
@@ -720,9 +739,9 @@
         8192 x 8192			     9.962 ms                                   103.048 ms
                 </div>
                 <p class="blogText">
-                    Final kernel in pipeline checks row-sum vector and decides whether we should go to next iteration or not. When iterative method converges
-                    to result, all values in row-sum vector should be very close and absolute difference between a pair of values should be lesser than some predefined
-                    <i>epsilon</i> value. Let us take an example vector to demonstrate how I can write one parallel kernel for same.
+                    Final kernel in pipeline i.e. <span class="highlight">kernelStopCriteria</span>, examines row-sum vector and decides whether we should go to next iteration or not. When iterative method converges
+                    to result, all values in row-sum vector should be very close and absolute difference between a pair of consequtive values should be lesser than some predefined
+                    <i>epsilon</i> value --- error in floating point computation that I'm okay to live with. Let us take an example vector to demonstrate how I can write one parallel kernel for same.
                 </p>
                 <div class="microlight">
     EPS = 1e-3
@@ -745,22 +764,30 @@
                 </div>
                 <p class="blogText">
                     For a vector of length N, I'll kick off N work-items where i<sup>th</sup> work-item accesses row-sum vector's i<sup>th</sup> and (i+1)<sup>th</sup> indices, 
-                    for finding absolute difference between a pair of consequtive cells. Notice for work-item with index <i>i</i>, attempting to access global memory with 
-                    index <i>(i+1)</i> should result into segmentation fault. I should be accessing index <i>i</i> and <i>(i+1) % N</i> of row-sum vector from each work-item.
+                    for finding absolute difference between a pair of consequtive cells. Notice for work-item with index <i>N-1</i>, attempting to access global memory with 
+                    index <i>(i+1) = N</i> should result into segmentation fault. I should be accessing index <i>i</i> and <i>(i+1) % N</i> of row-sum vector from each work-item.
                     Implementing such a kernel is as easy as below.
                 </p>
                 <div class="microlight">
+    // kernelStopCriteria_v0
+
     float EPS = 1e-3;
 
     float *row_sum = ...; // row-sum vector of length N, in global memory
     uint *stop = ...; // status in global memory, whether converged or not
 
-    *stop = 1U; // initialization is required
+    *stop = 1U;  // initialization is required
 
     q.parallel_for(nd_range<1>{N, B}, [=] (nd_item<1> it) {
-        const size_t r = it.get_global_id(0);
+        const size_t cur = it.get_global_id(0);
+        const size_t nxt = (cur + 1) % N;
 
-        bool flag = all_of(abs(*(row_sum + r) - *(row_sum + (r+1) % N)) < EPS);
+        float cur_v = *(row_sum + cur);
+        float nxt_v = *(row_sum + nxt);
+
+        float diff = abs(cur_v - nxt_v);
+
+        bool flag = all_of(diff < EPS);
 
         // only work group leader
         if(leader()) {
@@ -769,9 +796,9 @@
     });
                 </div>
                 <p class="blogText">
-                    This kernel is pretty simple, except <i>all_of</i> function, which is a group algorithm function, helps in evaluation of a boolean
-                    predicate on all work-items of a work(/ sub)-group. The main problem I see with above kernel is duplicate access of global memory ( read row-sum vector ).
-                    Each cell of row-sum vector is accessed twice. For reducing global memory access, I've to resort to subgroup shuffling algorithm, so that with in a subgroup
+                    This kernel is pretty simple, except <i>all_of</i> function, which is a SYCL group algorithm function, helps in evaluation of a boolean
+                    predicate across all work-items of a work(/ sub)-group. The main problem I see with above kernel is duplicate access of global memory ( i.e. row-sum vector ).
+                    Each cell of row-sum vector is accessed twice. For reducing global memory access, I've to resort to subgroup shuffling algorithm, so that within a subgroup
                     all work-items just read once from global memory, but then communicate among themselves, sharing their register cached values with other work-items in same
                     subgroup. I use one specific subgroup function --- <i>shuffle_down</i>, which helps me in obtaining <i>((i + 1) % B)</i><sup>th</sup> work-item's value
                     inside <i>i</i><sup>th</sup> work-item, without explicitly accessing global memory. For sake of better demonstration purpose, let me take an example.
@@ -786,13 +813,13 @@
     float received = shuffle_down(vec[i], 1)
 
     // then following must hold !
-    for i in 0..4 {
+    [[parallel]] for i in 0..4 {
         assert(received == vec[(i+1) % 4])
     }
                 </div>
                 <p class="blogText">
                     Pictorially it looks like below, when subgroup size is 4. If each of 4 work-items start with their initial value in 
-                    first row, after shuffle_down by 1 place, their local register content should be updated to last row. This is somewhat I want to
+                    first row, after shuffle_down by 1 place, their local register content should be updated to last row. This is somewhat similar to what I want to
                     attain. I say somewhat because, this model doesn't fully fit my requirement when vector size <i>N</i> itself is greater than subgroup
                     size, say <i>B</i>.
                 </p>
@@ -805,7 +832,7 @@
                 <img class="imgCenterUpdt" src="../images/optimizing-parallel-similarity-transform-method-2.jpg">
                 <p class="blogText">
                     As subgroup shuffling itself is not enough to satisfy requirement for checking stopping criteria, in parallel, 
-                    I use conditional test based reading from global memory, while results into duplicate reads from global memory
+                    I use conditional check based reading from global memory, though this results into duplicate reads from global memory
                     at subgroup boundary. Then rest of the flow is same.
                 </p>
                 <div class="microlight">
@@ -816,7 +843,7 @@
                     I can introduce local memory here, following same rationale as I did in some of previous kernels. Instead of letting all
                     subgroup leaders atomically accessing global memory for updating status of whether convergence criteria has been satisfied in respective
                     subgroup, I can just let work-group leaders do that part. In this updated setup, subgroup leaders update flag in local memory, where
-                    it's decided whether convergence criteria has been reached in work-group. And when all work-items of work-group reach one barrier, 
+                    it's decided whether convergence criteria has been reached in work-group. And when all work-items of work-group reach one barrier ( synchronization point ), 
                     work-group leader will update work-group's result in global memory. Comparing benchmark of final variant of convergence criteria checker kernel
                     shows much better performance on GPU.
                 </p>
@@ -843,9 +870,10 @@
                 <img class="imgCenter" src="../images/optimizing-parallel-similarity-transform-method-3.jpg">
                 <p class="blogText">
                     Now I'd like to present final benchmark of whole compute pipeline of Parallel Similarity Transformation, 
-                    depicting performance on both CPU, GPU. I run benchmark suite with N x N hilbert matrix, which finds maximum
+                    depicting performance on both CPU, GPU. I run benchmark suite with N x N hilbert matrix, finding maximum
                     eigen value and respective eigen vector. Last column in following table shows how many iterations were required
-                    before converging to maximum eigen value.
+                    before converging to maximum eigen value. For matrices of large dimension performance on GPU is better, because all component kernels
+                    perform better on GPU, making whole compute pipeline faster.
                 </p>
                 <div class="microlight">
     running on Intel(R) Xeon(R) CPU E5-2686 v4 @ 2.30GHz
@@ -873,17 +901,17 @@
     8192 x 8192                           2373 ms                       17 round(s)
                 </div>
                 <p class="blogText">
-                    I keep parallel similarity transform method's implementation <a class="blogLink" target="_blank" href="https://github.com/itzmeanjan/eigen_value/tree/baeaae61f9f56b692cb3070062553286b4a91932">here</a>
+                    I keep parallel similarity transform method's full implementation <a class="blogLink" target="_blank" href="https://github.com/itzmeanjan/eigen_value/tree/baeaae61f9f56b692cb3070062553286b4a91932">here</a>
                     for future reference. In this post, I attempted to show how I'd go about writing parallel kernels and eventually optimize them. Major points I try to focus
                     during optimization phase.
                 </p>
                 <ul>
                     <li>Can global memory access be reduced ?</li>
                     <li>Is it possible to use subgroup functions ?</li>
-                    <li>Is it beneficial to go with local memory cached/ blocked variant ?</li>
+                    <li>Is it possible to write local memory cached/ blocked variant ?</li>
                 </ul>
                 <p class="blogText">
-                    If you find out some mistake/ possible (still undiscovered) way to improve some kernel, consider dropping me a line with that.
+                    If you find out some mistake/ possible (yet undiscovered) way to improve some kernel, consider dropping me a line with that.
                     <br>
                     <br>
                     Have a great time !
