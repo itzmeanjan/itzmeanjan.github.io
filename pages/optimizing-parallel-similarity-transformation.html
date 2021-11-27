@@ -835,6 +835,59 @@
     16777216			    77.394 ms              26.739 ms
     33554432			   154.021 ms              54.011 ms
                 </div>
+                <p class="blogText">
+                    Empowered with all these (optimized) kernels, it's time to present whole compute pipeline with inter-kernel dependency.
+                    I use SYCL buffers for representing/ passing around data, which helps SYCL runtime to figure out computational dependency
+                    graph in terms of DAG.
+                </p>
+                <img class="imgCenter" src="../images/optimizing-parallel-similarity-transform-method-3.jpg">
+                <p class="blogText">
+                    Now I'd like to present final benchmark of whole compute pipeline of Parallel Similarity Transformation, 
+                    depicting performance on both CPU, GPU. I run benchmark suite with N x N hilbert matrix, which finds maximum
+                    eigen value and respective eigen vector. Last column in following table shows how many iterations were required
+                    before converging to maximum eigen value.
+                </p>
+                <div class="microlight">
+    running on Intel(R) Xeon(R) CPU E5-2686 v4 @ 2.30GHz
+    Parallel Similarity Transform for finding max eigen value (with vector)
+    
+    128  x  128			        11 ms			     9 round(s)
+    256  x  256			         6 ms			    10 round(s)
+    512  x  512			        17 ms			    12 round(s)
+    1024 x 1024			        54 ms			    13 round(s)
+    2048 x 2048			       213 ms			    14 round(s)
+    4096 x 4096			       911 ms			    15 round(s)
+    8192 x 8192			      4052 ms			    17 round(s)
+
+    // --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
+
+    running on Intel(R) Iris(R) Xe MAX Graphics [0x4905]
+    Parallel Similarity Transform for finding max eigen value (with vector)
+
+    128  x  128                             13 ms                        9 round(s)
+    256  x  256                              9 ms                       10 round(s)
+    512  x  512                             14 ms                       12 round(s)
+    1024 x 1024                             35 ms                       13 round(s)
+    2048 x 2048                            130 ms                       14 round(s)
+    4096 x 4096                            535 ms                       15 round(s)
+    8192 x 8192                           2373 ms                       17 round(s)
+                </div>
+                <p class="blogText">
+                    I keep parallel similarity transform method's implementation <a class="blogLink" target="_blank" href="https://github.com/itzmeanjan/eigen_value/tree/baeaae61f9f56b692cb3070062553286b4a91932">here</a>
+                    for future reference. In this post, I attempted to show how I'd go about writing parallel kernels and eventually optimize them. Major points I try to focus
+                    during optimization phase.
+                </p>
+                <ul>
+                    <li>Can global memory access be reduced ?</li>
+                    <li>Is it possible to use subgroup functions ?</li>
+                    <li>Is it beneficial to go with local memory cached/ blocked variant ?</li>
+                </ul>
+                <p class="blogText">
+                    If you find out some mistake/ possible (still undiscovered) way to improve some kernel, consider dropping me a line with that.
+                    <br>
+                    <br>
+                    Have a great time !
+                </p>
            </article>
         </div>
     </div>
