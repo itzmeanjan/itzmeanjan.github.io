@@ -79,10 +79,10 @@
                     With this, I can say following Merkle Tree construction technique can be generalised to other cryptographic hash functions
                     offering acceptable security and collision resistance, where two hash digests of respective hash function can be supplied as input and it produces
                     another hash digest as output. For this work I'm going to use aforementioned prime field <span class="highlight">F(2<sup>64</sup> - 2<sup>32</sup> + 1)</span>, so each 
-                    element of prime field can be represented in native 64-bit unsigned integer i.e. <i>uint64_t</i>. Output of Rescue Prime
-                    Hash function i.e. digest is of width 4 field elements. With 4 field elements in Rescue Prime digest, output of <span class="highlight">merge</span>
-                    function should be 256-bit. Input to <span class="highlight">merge</span> function should be 512-bit in total,
-                    as I'm going to interpret that input as two Rescue Prime digests ( each of 256-bit ) placed next to each other.
+                    element of prime field can be represented in native 64-bit unsigned integer i.e. <i>uint64_t</i>. 
+                    Input to Rescue Prime hash's <span class="highlight">merge</span> function is 512-bit which is interpreted as 8 prime field elements 
+                    or more specifically two Rescue Prime hash digests placed next to each other, each of width 256-bit ( read 4 prime field elements ).
+                    Output of Rescue Prime hash function i.e. digest is of width 4 field elements, which takes 256-bit to represent.
                 </p>
                 <div class="microlight">
     input  = [0, 1, 2, 3, 4, 5, 6, 7] = Two Rescue Prime Digests
@@ -109,7 +109,7 @@
                 <p class="blogText">
                     In following explanation, I design one function which takes N-many Rescue Prime Digests,
                     which are interpreted as leaves of Merkle Tree and as output that function produces all intermediate
-                    nodes of Merkle tree. These intermediate nodes are nothing but Rescue Prime digests of two children nodes. I consider perfectly 
+                    nodes of Merkle tree. These intermediate nodes are nothing but Rescue Prime digests of two immediate children nodes. I consider perfectly 
                     balanced binary Merkle Tree i.e. each non-leaf node has exactly two children and all leaves are living at same depth. Naturally N can only be power of 2.
                     That means with N-many leaves provided, I should construct all intermediate nodes of a Merkle Tree with log<sub>2</sub>N levels or in other words Merkle tree of height (log<sub>2</sub>N + 1).
                     So there should be (N - 1)-many intermediate nodes to compute of Merkle Tree with total (2N - 1) nodes. Let's take an example for better understanding.
@@ -117,24 +117,31 @@
                 <img class="imgCenter" src="../images/opencl-accelerated-merkle-tree-construction-0.jpg">
                 <p class="blogText">
                     In above diagram, I've a binary Merkle Tree with 8 leaves. Each consequtive pair of leaves
-                    are merged together for obtaining deepest level of intermediate nodes, who are living just above leaves.
+                    are merged ( read hashed ) together for obtaining deepest level of intermediate nodes i.e. intermediates living just above leaves.
                     Similarly those intermediate nodes are paired together for hashing and obtained digests will live on intermediate node
                     layer just above it. This procedure continues until we reach root node. If interested you can dig deep into Merkle Tree construction,
-                    while starting <a class="blogLink" target="_blank" href="https://en.wikipedia.org/wiki/Merkle_tree">here</a>.
-                    Notice how tree nodes are numbered. Assume that as input following array is provided, which are considered as leaves of Merkle Tree.
+                    a starting point can be <a class="blogLink" target="_blank" href="https://en.wikipedia.org/wiki/Merkle_tree">this</a>.
+                    <br>
+                    <br>
+                    Notice how tree nodes are numbered, which are nothing but indices of intermediate and leaf nodes in a 1D container array.
+                    Here I'm assuming both input digests ( read tree leaves ) and output intermediate node digests are kept in same array.
+                    Now assume that as input following array is provided, which are considered as leaves of Merkle Tree.
                     Output should have (N - 1)-many intermediate node digests.
                 </p>
                 <div class="microlight">
     leaves = [a, b, c, d, e, f, g, h]
 
     n = len(leaves)
-    assert (n & (n - 1)) == 0 # power of 2 check
+    assert (n & (n - 1)) == 0 # ensure that it's power of 2
                 </div>
                 <p class="blogText">
-                    Output should be placed in an one dimensional array of length N such 1<sup>st</sup> element ( i.e. at index zero ) is empty,
+                    Output should be placed in an one dimensional array of length N such that 1<sup>st</sup> element ( i.e. at index zero ) is empty
+                    ( which is why there's no node tagged with index 0 in above diagram ),
                     2<sup>nd</sup> element is obtained by hashing elements at index 2 and 3 ( in ordered fashion ). Similarly element at index 2 of output array
                     is computed by hashing elements at index 4 and 5. This means element at index <i>i</i> of output array is computed by hashing elements
                     at index <i>(2 * i)</i> and <i>(2 * i + 1)</i>, generally speaking. This also means, I've to start filling output array backwards.
+                    <br>
+                    <br>
                     First I'll pair consequtive elements in input array of length N and compute Rescue Prime Hash ( read <span class="highlight">merge(digest_0, digest_1)</span> function )
                     for each pair. This should give me (N >> 1)-many intermediate nodes, who live just above leaf nodes.
                 </p>
@@ -143,7 +150,7 @@
     N = len(leaves)
 
     intermediates = [merge(a, b), merge(c, d), merge(e, f), merge(g, h)] # computed during this round
-                  = [i, j, k, l]
+                  = [i, j, k, l] # aliased
 
     n = len(intermediates)
     assert n == N >> 1
@@ -153,21 +160,81 @@
            = [0, _, _, _, i, j, k, l]
                 </div>
                 <p class="blogText">
-                    In next step of computation I'll calculate Rescue Prime hashes on intermediate nodes computed during previous round. I'll pair consequtive intermediate nodes
-                    and compute Rescue Prime merge function on them for getting (N >> 2)-many new intermediate nodes.
+                    In next round of computation I'll calculate Rescue Prime hashes on intermediate nodes computed during previous round. I'll pair consequtive intermediate nodes
+                    and compute Rescue Prime merge function on them for getting (N >> 2)-many new intermediate nodes. After completion of this round, I've
+                    ((N >> 1) + (N >> 2)) -many intermediate node digests.
                 </p>
                 <div class="microlight">
     intermediates = [i, j, k, l]
+    # N already initialised above
 
-    intermediates_new = [merge(i, j), merge(k, l)]
-                      = [m, n]
+    intermediates_new = [merge(i, j), merge(k, l)] # computed during this round
+                      = [m, n] # aliased
 
     n = len(intermediates_new)
     assert n == N >> 2
 
     output = [0, _, intermediates_new ..., i, j, k, l]
+           = [0, _, merge(i, j), merge(k, l), i, j, k, l] # _ => not yet computed
            = [0, _, m, n, i, j, k, l] # _ => not yet computed
                 </div>
+                <p class="blogText">
+                    Notice only 2<sup>nd</sup> element of output array is non-computed still, which is root of Merkle tree we're computing. 
+                    Root of tree is nothing but digest of two immediate subtrees. It can be computed as below. This way I've computed
+                    ((N >> 1) + (N >> 2) + (N >> 3)) -many intermediate nodes of Merkle Tree, in log<sub>2</sub>N rounds.
+                </p>
+                <div class="microlight">
+    intermediates_new = [m, n]
+
+    root = merge(m, n) # root digest computed during this round
+         = o
+
+    output = [0, root, m, n, i, j, k, l]
+           = [0, merge(m, n), m, n, i, j, k, l]
+           = [0, o, m, n, i, j, k, l] # all intermediate nodes computed !
+                </div>
+                <p class="blogText">
+                    When N is large, say 2<sup>24</sup>, it's beneficial to compute each round of Merkle Tree construction in parallel.
+                    There'll be 24 rounds and during each round given that all intermediate nodes of previous round are already computed
+                    and available for read-only access, it's easy to just pair consequtive intermediate nodes computed during previous round
+                    and apply Rescue Prime <span class="highlight">merge</span> function on them, which produces intermediate nodes to be used
+                    during next round.
+                    <br>
+                    <br>
+                    For N-many leaves provided as input to one OpenCL kernel, in log<sub>2</sub>N rounds
+                    total (N - 1) -many intermediate nodes to be computed. Each of these rounds can safely run in-parallel
+                    but round k is data dependent on round (k - 1). Intermediate nodes computed during round k are used as input during
+                    dispatch of round (k + 1). That means OpenCL event based dispatched kernel dependency management is required so that compute 
+                    dependency graph can be inferred by OpenCL runtime and no data race happens. 
+                    <br>
+                    <br>
+                    In OpenCL, I'll pass input array of length N as an OpenCL buffer ( read cl_mem )
+                    to kernel, which computes intermediate nodes of Merkle Tree. Output array which is also passed as an OpenCL buffer, 
+                    is also of length N, where first element will be kept empty and it'll never be touched ( read accessed ) by any dispatched kernels.
+                    Though output buffer is of length N, all (N - 1) -many intermediate nodes can't be computed in a single
+                    dispatch. Total log<sub>2</sub>N -many dispatches will be required.
+                    <br>
+                    <br>
+                    During first dispatch only (N >> 1) -many intermediate nodes to be computed, which are living just above leaf nodes. 
+                    This time input buffer of length N is accessed in read-only mode and last (N >> 1)-many places of output buffer 
+                    is accessed in write-only mode. This is the only kernel dispatch round when input buffer is used, in all upcoming kernel
+                    dispatch rounds, non-overlapping regions of output buffer will be used for both input and output purposes.                     
+                    <br>
+                    <br>
+                    Note, size of output buffer region used for input is always twice the size of subbuffer used 
+                    for writing intermediate nodes computed during that round. It can be trivially figured out due to the fact
+                    that each call to merge function merges two chidren nodes into single parent node.
+                    <br>
+                    <br>
+                    I'll use OpenCL subbuffers for accessing only subsection of output
+                    buffer required during certain kernel dispatch round. For one kernel dispatch round, other than first one, output buffer will be splitted into
+                    two non-overlapping ( though living next to each other ) subbuffers, where one is input ( accessed with read-only flag ) and another one is output ( accessed with write-only flag ) for that round.
+                    In next kernel dispatch round, previous round's write-only subbuffer region is accessed in read-only mode
+                    and appropriate region of output buffer is accessed in write-only mode for placing computed intermediate nodes.
+                    <br>
+                    <br>
+                    Let me take a diagrammatic example for better demonstration purposes.
+                </p>
            </article>
         </div>
     </div>
