@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<!--
+  Author: Anjan Roy<hello@itzmeanjan.in>
+-->
+<html>
+
+<head>
+    <title>
+        OpenCL Accelerated Merkle Tree Construction
+    </title>
+    <meta prefix="og: http://ogp.me/ns#" property="og:type" content="website">
+    <meta prefix="og: http://ogp.me/ns#" property="og:title" content="OpenCL Accelerated Merkle Tree Construction">
+    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="---">
+    <meta prefix="og: http://ogp.me/ns#" property="og:url" content="https://itzmeanjan.in">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url"
+        content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:width" content="950">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:height" content="735">
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://itzmeanjan.in/">
+    <meta property="twitter:title" content="OpenCL Accelerated Merkle Tree Construction">
+    <meta property="twitter:description" content="---">
+    <meta property="twitter:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta property="twitter:site" content="@meanjanry">
+    <meta name="description" content="---">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="author" content="Anjan Roy">
+    <meta name="keywords" content="">
+    <meta name="theme-color" content="darkslategrey">
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" type="text/css" href="../styles/index.css">
+    <script src="../styles/code.js"></script>
+</head>
+
+<body>
+    <div id="parentDiv">
+        <div id="navBar">
+            <nav>
+                <a class="navLink" href="/"><big>H</big>ome</a> |
+                <a class="navLink" href="https://github.com/itzmeanjan" target="_blank"><big>P</big>rojects</a> |
+                <a class="navLink" href="/pages/blog.html"><big>B</big>log</a> |
+                <a class="navLink" href="/pages/contact.html"><big>C</big>ontact</a>
+            </nav>
+        </div>
+        <div class="childDiv">
+            <article>
+                <h1 class="blogHeader">
+                    OpenCL Accelerated Merkle Tree Construction
+                </h1>
+                <h3>Created : December 19, 2021</h3>
+            </article>
+        </div>
+        <div class="childDiv">
+            <article>
+                <p class="blogText">
+                    For last few weeks I've been spending time on accelerating Zk-STARK friendly Rescue Prime Hash Function so that
+                    large number of hash computations can be offloaded into accelerators i.e. OpenCL backed CPU, GPGPU etc. As current implementation
+                    of Rescue Prime Hash function doesn't lend itself well for data parallel acceleration, I've majorly concentrated in running multiple
+                    instances of Rescue Prime Hash function on independent and non-overlapping input. I can simply say, given N-many independent inputs
+                    Rescue Prime Hash is computed N-many times, producing N-many digests, in-parallel. Though with this individual computation of Rescue Prime Hash 
+                    doesn't end up being faster, but total throughput definitely improves. During this process of accelerating Rescue Prime Hash function,
+                    I also explored possibility of vectorizing Rescue Permutation steps using both 
+                    <span class="highlight">OpenCL vector intrinsics and nightly Rust's portable-simd feature</span>. But today I'm not going to be talking
+                    about Rescue Prime Hash function and its implementation itself, instead one application of that --- <i>Merkle Tree Construction using Rescue Prime Hash function</i>.
+                    Some other day I'll take up Rescue Prime Hash function; for now if interested you should be looking into following references. Note, all following
+                    implementations I'm linking are using <span class="highlight">F(2<sup>64</sup> - 2<sup>32</sup> + 1)</span> as prime field to operate on.
+                </p>
+                <ul>
+                    <li><a class="blogLink" href="https://eprint.iacr.org/2020/1143.pdf" target="_blank">Rescue Prime Specification</a></li>
+                    <li><a class="blogLink" href="https://github.com/novifinancial/winterfell/blob/4eeb4670387f3682fa0841e09cdcbe1d43302bf3/crypto/src/hash/rescue/rp64_256/mod.rs" target="_blank">Rescue Prime Implementation, I found useful</a></li>
+                    <li><a class="blogLink" href="https://github.com/itzmeanjan/ff-gpu/blob/9c57cb13e4b2d96a084da96d558fe3d4707bfcb7/rescue_prime.cpp" target="_blank">SYCL/ DPC++ Rescue Prime Implementation, I wrote</a></li>
+                    <li><a class="blogLink" href="https://github.com/itzmeanjan/vectorized-rescue-prime/tree/77e371ef2fb11ba7d7369005a60a0888393729f0" target="_blank">OpenCL vectorized Rescue Prime Implementation, I wrote</a></li>
+                    <li><a class="blogLink" href="https://github.com/itzmeanjan/simd-rescue-prime/tree/1c1dce5e61ad3a2834ff966138bdda0a81516ca7" target="_blank">Portable SIMD powered Rescue Prime Implementation, I wrote</a></li>
+                </ul>
+                <p class="blogText">
+                    I'd like to clarify that for this work I'm assuming I've access to OpenCL accelerated Rescue Prime Hash function <span class="highlight">merge(digest_0, digest_1)</span>,
+                    which takes two Rescue Prime digests and produces single Rescue Prime digest. For reference you should check out <a class="blogLink" href="https://github.com/itzmeanjan/vectorized-rescue-prime/blob/614500dd1f271e4f8badf1305c8077e2532eb510/kernel.cl#L424-L474" target="_blank">this OpenCL kernel</a>, which exactly does that.
+                    With this, I can say following Merkle Tree construction technique can be generalised to other cryptographic hash functions
+                    offering acceptable security and collision resistance, where two hash digests of respective hash function can be supplied as input and it produces
+                    another hash digest as output. For this work I'm going to use aforementioned prime field <span class="highlight">F(2<sup>64</sup> - 2<sup>32</sup> + 1)</span>, so each 
+                    element of prime field can be represented in native 64-bit unsigned integer i.e. <i>uint64_t</i>. Output of Rescue Prime
+                    Hash function i.e. digest is of width 4. With 4 field elements in Rescue Prime digest, output of <span class="highlight">merge</span>
+                    function should be 256-bit. Input to <span class="highlight">merge</span> function should be 512-bit in total,
+                    as I'm going to interpret that input as two Rescue Prime digests ( each of 256-bit ) placed next to each other.
+                </p>
+                <div class="microlight">
+    input  = [0, 1, 2, 3, 4, 5, 6, 7] = Two Rescue Prime Digests
+    output = [a, b, c, d]             = Rescue Prime Digest
+    
+    # --- Interpreted as ---
+ 
+    output = merge(input) = merge(input[:4], input[4:])
+
+    - input[:4] = first Rescue Prime Digest
+    - input[4:] = second Rescue Prime Digest
+
+    #           ---
+    
+    assert sizeof(input[0]) == 8 // in bytes
+    assert sizeof(output[0]) == 8 // in bytes
+    
+    assert sizeof(input) == 64 // in bytes
+    assert sizeof(output) == 32 // in bytes
+                </div>
+           </article>
+        </div>
+    </div>
+    <div id="footerDiv">
+        <footer>
+            <p id="footerText">
+                &copy <a href="https://github.com/itzmeanjan/itzmeanjan.github.io" id="footerLink"
+                    target="_blank"><big>A</big>njan Roy</a> ( <big>M</big>IT Licensed )
+            </p>
+        </footer>
+    </div>
+</body>
+
+</html>
