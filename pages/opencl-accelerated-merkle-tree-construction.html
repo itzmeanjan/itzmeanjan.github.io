@@ -110,11 +110,64 @@
                     In following explanation, I design one function which takes N-many Rescue Prime Digests,
                     which are interpreted as leaves of Merkle Tree and as output that function produces all intermediate
                     nodes of Merkle tree. These intermediate nodes are nothing but Rescue Prime digests of two children nodes. I consider perfectly 
-                    balanced binary Merkle Tree i.e. each non-leaf node has exactly two children and all leaves are living at same depth. I also fix that N can only be power of 2.
-                    That means with N-many leaves provided, I should construct all intermediate nodes of a Merkle Tree with log<sub>2</sub>N levels or in other words Merkle tree of height (log<sub>2</sub>N + 1). 
+                    balanced binary Merkle Tree i.e. each non-leaf node has exactly two children and all leaves are living at same depth. Naturally N can only be power of 2.
+                    That means with N-many leaves provided, I should construct all intermediate nodes of a Merkle Tree with log<sub>2</sub>N levels or in other words Merkle tree of height (log<sub>2</sub>N + 1).
                     So there should be (N - 1)-many intermediate nodes to compute of Merkle Tree with total (2N - 1) nodes. Let's take an example for better understanding.
                 </p>
                 <img class="imgCenter" src="../images/opencl-accelerated-merkle-tree-construction-0.jpg">
+                <p class="blogText">
+                    In above diagram, I've a binary Merkle Tree with 8 leaves. Each consequtive pair of leaves
+                    are merged together for obtaining deepest level of intermediate nodes, who are living just above leaves.
+                    Similarly those intermediate nodes are paired together for hashing and obtained digests will live on intermediate node
+                    layer just above it. This procedure continues until we reach root node. If interested you can dig deep into Merkle Tree construction,
+                    while starting <a class="blogLink" target="_blank" href="https://en.wikipedia.org/wiki/Merkle_tree">here</a>.
+                    Notice how tree nodes are numbered. Assume that as input following array is provided, which are considered as leaves of Merkle Tree.
+                    Output should have (N - 1)-many intermediate node digests.
+                </p>
+                <div class="microlight">
+    leaves = [a, b, c, d, e, f, g, h]
+
+    n = len(leaves)
+    assert (n & (n - 1)) == 0 # power of 2 check
+                </div>
+                <p class="blogText">
+                    Output should be placed in an one dimensional array of length N such 1<sup>st</sup> element ( i.e. at index zero ) is empty,
+                    2<sup>nd</sup> element is obtained by hashing elements at index 2 and 3 ( in ordered fashion ). Similarly element at index 2 of output array
+                    is computed by hashing elements at index 4 and 5. This means element at index <i>i</i> of output array is computed by hashing elements
+                    at index <i>(2 * i)</i> and <i>(2 * i + 1)</i>, generally speaking. This also means, I've to start filling output array backwards.
+                    First I'll pair consequtive elements in input array of length N and compute Rescue Prime Hash ( read <span class="highlight">merge(digest_0, digest_1)</span> function )
+                    for each pair. This should give me (N >> 1)-many intermediate nodes, who live just above leaf nodes.
+                </p>
+                <div class="microlight">
+    leaves = [a, b, c, d, e, f, g, h] # input
+    N = len(leaves)
+
+    intermediates = [merge(a, b), merge(c, d), merge(e, f), merge(g, h)] # computed during this round
+                  = [i, j, k, l]
+
+    n = len(intermediates)
+    assert n == N >> 1
+
+    output = [0, _, _, _, intermediates ...] # ... => spread operator
+           = [0, _, _, _, merge(a, b), merge(c, d), merge(e, f), merge(g, h)] # _ => not yet computed
+           = [0, _, _, _, i, j, k, l]
+                </div>
+                <p class="blogText">
+                    In next step of computation I'll calculate Rescue Prime hashes on intermediate nodes computed during previous round. I'll pair consequtive intermediate nodes
+                    and compute Rescue Prime merge function on them for getting (N >> 2)-many new intermediate nodes.
+                </p>
+                <div class="microlight">
+    intermediates = [i, j, k, l]
+
+    intermediates_new = [merge(i, j), merge(k, l)]
+                      = [m, n]
+
+    n = len(intermediates_new)
+    assert n == N >> 2
+
+    output = [0, _, intermediates_new ..., i, j, k, l]
+           = [0, _, m, n, i, j, k, l] # _ => not yet computed
+                </div>
            </article>
         </div>
     </div>
