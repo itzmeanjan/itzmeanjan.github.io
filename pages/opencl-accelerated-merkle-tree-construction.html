@@ -235,6 +235,47 @@
                     <br>
                     Let me take a diagrammatic example for better demonstration purposes.
                 </p>
+                <p class="blogText">
+                    I allocate two OpenCL buffers on target compute device, one for storing input digests, representing leaves of tree
+                    and another one for storing all computed intermediate digests of Merkle Tree. These two buffers are supplied to Merkle Tree construction kernel.
+                    There will be other inputs required which are hash function specific and I'm skipping them now. To be more specific in Rescue Prime hash function
+                    it needs to have read-only access to MDS matrix, Round Key constants, to be applied on hash state during Rescue Permutation rounds.
+                    <br>
+                    <br>
+                    I'm going to demonstrate construction of Merkle Tree with 32 leaves, so there'll be 5 rounds i.e. 5 kernel dispatches will be required. And these 5 dispatched kernels
+                    are to be executed in-order due to inherent data dependency in hierarchical structure of binary Merkle Tree.
+                </p>
+                <img class="imgCenter" src="../images/opencl-accelerated-merkle-tree-construction-1.jpg">
+                <p class="blogText">
+                    In very first round of kernel dispatch, original input buffer is used as input ( read-only mode ) and marked half of output buffer is taken as subbuffer ( write-only mode )
+                    and used for writing output of that round, which will be input for next round.
+                </p>
+                <img class="imgCenter" src="../images/opencl-accelerated-merkle-tree-construction-2.jpg">
+                <p class="blogText">
+                    In second round of kernel dispatch, original output buffer of length N ( = 32, here ) is splitted into two non-overlapping regions i.e. subbuffers. Previous round's
+                    output subbuffer region is accessed in read-only mode this time and marked portion of output buffer is accessed as write-only subbuffer where this round's computed digests 
+                    ( read intermediate nodes ) are written, which are going to be accessed in read-only mode during next kernel dispatch round.
+                </p>
+                <img class="imgCenter" src="../images/opencl-accelerated-merkle-tree-construction-3.jpg">
+                <p class="blogText">
+                    In third round, 4 intermediate nodes are computed by reading from subbuffer which represents 8 intermediate nodes ( computed during last round ), living just below this round's computed intermediate nodes.
+                </p>
+                <img class="imgCenter" src="../images/opencl-accelerated-merkle-tree-construction-4.jpg">
+                <p class="blogText">
+                    In this round, 3<sup>rd</sup> round's output subbuffer region is accessed in read-only mode for computing 2 intermediate nodes,
+                    which are root nodes of immediate subtrees of Merkle Root. Note, Merkle Root is yet to be computed and placed at index 1 of output buffer,
+                    which is why it's shown as empty in following diagram.
+                </p>
+                <img class="imgCenter" src="../images/opencl-accelerated-merkle-tree-construction-5.jpg">
+                <p class="blogText">
+                    And finally in round 5 of kernel dispatch, root of Merkle Tree is computed by accessing two intermediate nodes, 
+                    computed during round 4, which are Merkle Root's immediate subtree roots.
+                </p>
+                <img class="imgCenter" src="../images/opencl-accelerated-merkle-tree-construction-6.jpg">
+                <p class="blogText">
+                    With this our OpenCL kernel has computed all intermediate nodes ( 31 in number ) of Merkle Tree with 32 leaves, in 5 consequtive rounds, where
+                    each round safely executed in parallel.
+                </p>
            </article>
         </div>
     </div>
