@@ -10,7 +10,7 @@
     </title>
     <meta prefix="og: http://ogp.me/ns#" property="og:type" content="website">
     <meta prefix="og: http://ogp.me/ns#" property="og:title" content="OpenCL Accelerated Merkle Tree Construction">
-    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="---">
+    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="Parallelizing large Merkle Tree construction on accelerator platforms like OpenCL backed CPU and GPGPU, while using SIMD powered Rescue Prime Hash function implementation">
     <meta prefix="og: http://ogp.me/ns#" property="og:url" content="https://itzmeanjan.in">
     <meta prefix="og: http://ogp.me/ns#" property="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
     <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url"
@@ -20,13 +20,13 @@
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="https://itzmeanjan.in/">
     <meta property="twitter:title" content="OpenCL Accelerated Merkle Tree Construction">
-    <meta property="twitter:description" content="---">
+    <meta property="twitter:description" content="Parallelizing large Merkle Tree construction on accelerator platforms like OpenCL backed CPU and GPGPU, while using SIMD powered Rescue Prime Hash function implementation">
     <meta property="twitter:image" content="https://itzmeanjan.in/images/myImage.jpg">
     <meta property="twitter:site" content="@meanjanry">
-    <meta name="description" content="---">
+    <meta name="description" content="Parallelizing large Merkle Tree construction on accelerator platforms like OpenCL backed CPU and GPGPU, while using SIMD powered Rescue Prime Hash function implementation">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="author" content="Anjan Roy">
-    <meta name="keywords" content="">
+    <meta name="keywords" content="opencl, parallel, merkle tree, construction, simd, rescue prime hash, cryptographic hash, zk-stark friendly hash, accelerator, c, opencl c, cpu, gpgpu, benchmark">
     <meta name="theme-color" content="darkslategrey">
     <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
     <link rel="stylesheet" type="text/css" href="../styles/index.css">
@@ -131,13 +131,13 @@
                 <div class="microlight">
     leaves = [a, b, c, d, e, f, g, h]
 
-    n = len(leaves)
-    assert (n & (n - 1)) == 0 # ensure that it's power of 2
+    N = len(leaves)
+    assert (N & (N - 1)) == 0 # ensure that it's power of 2
                 </div>
                 <p class="blogText">
                     Output should be placed in an one dimensional array of length N such that 1<sup>st</sup> element ( i.e. at index zero ) is empty
                     ( which is why there's no node tagged with index 0 in above diagram ),
-                    2<sup>nd</sup> element is obtained by hashing elements at index 2 and 3 ( in ordered fashion ). Similarly element at index 2 of output array
+                    2<sup>nd</sup> element ( Merkle root at index 1 ) is obtained by hashing elements at index 2 and 3 ( in ordered fashion ). Similarly element at index 2 of output array
                     is computed by hashing elements at index 4 and 5. This means element at index <i>i</i> of output array is computed by hashing elements
                     at index <i>(2 * i)</i> and <i>(2 * i + 1)</i>, generally speaking. This also means, I've to start filling output array backwards.
                     <br>
@@ -282,7 +282,7 @@
                     256-bit in width or in other words 4 contiguous prime field elements, where each element can be represented using <i>u64</i>.
                     Total of 32 * 256 -bit = 1024 bytes of memory is allocated for each of input and output buffer. Now remember, I had to
                     split original output buffer into non-overlapping subbuffer regions for read-only and write-only access during several kernel dispatch
-                    rounds, which is fine as long as subbuffer starting memory address is properly aligned with
+                    rounds, which is fine as long as subbuffer's origin ( in terms of bytes ) is properly aligned with
                     OpenCL device's base address alignment requirement. For more info you should look at Khronos OpenCL man page 
                     <a class="blogLink" href="http://man.opencl.org/clCreateSubBuffer.html" target="_blank">here</a> and search for error code 
                     <tt>CL_MISALIGNED_SUB_BUFFER_OFFSET</tt>.
@@ -312,7 +312,7 @@
                 <p class="blogText">
                     This means I can't create a subbuffer from whole output buffer when origin of subbuffer
                     is not aligned to 512 bytes. To be more specific, I can't create one subbuffer which originates
-                    at some index that can't be evenly divided by 512. Let's now go back to previous demonstration, where
+                    at some byte index that can't be evenly divided by 512. Let's now go back to previous demonstration, where
                     I constructed a Merkle Tree from 32 leaves, and explore deeply to ensure that all kernel dispatches will
                     execute as envisioned.
                 </p>
@@ -337,7 +337,7 @@
                     this round's input subbuffer halves in size; details below.
                     <br>
                     <br>
-                    And here it all breaks. Looks like I can't create subbuffer region in second round itself, because
+                    And here it all breaks ! Looks like I can't create subbuffer region in second round, because
                     output subbuffer of second round is not properly aligned with Nvidia Tesla V100 base memory address alignment
                     requirement ( because 256 % 512 != 0 )
                 </p>
@@ -373,6 +373,32 @@
                     I wrote for sequentially computing tip of Merkle Tree.
                 </p>
                 <img class="imgCenter" src="../images/opencl-accelerated-merkle-tree-construction-7.jpg">
+                <p class="blogText">
+                    Finally let's talk numbers.
+                </p>
+                <p class="blogText">
+                    My vectorized OpenCL Rescue Prime Hash implementation empowers Merkle Tree construction, when run on data center grade Nvidia Tesla V100 GPGPU,
+                    I see following numbers. For sake of reproducibility of claimed benchmark, I provide all necessary implementations
+                    <a class="blogLink" target="_blank" href="https://github.com/itzmeanjan/vectorized-rescue-prime/tree/77e371e">here</a>. Major portion
+                    of code I wrote for parallelizing Merkle Tree construction is orchestration of several kernel dispatch rounds on host; if interested you should check 
+                    <a class="blogLink" href="https://github.com/itzmeanjan/vectorized-rescue-prime/blob/77e371ef2fb11ba7d7369005a60a0888393729f0/rescue_prime.c#L153-L718" target="_blank">here</a>.
+                </p>
+                <div class="microlight">
+    # check https://github.com/itzmeanjan/vectorized-rescue-prime/tree/77e371e#nvidia-tesla-v100-gpu-with-opencl
+
+    Rescue Prime based Merkle Tree Construction Benchmark
+
+       merklize		   1048576 leaves		              130.50 ms
+       merklize		   2097152 leaves		              235.47 ms
+       merklize		   4194304 leaves		              445.62 ms
+       merklize		   8388608 leaves		              864.30 ms
+                </div>
+                <p class="blogText">
+                    In coming days, I'd like to explain implementation details of SIMD powered Rescue Prime Hash function.
+                    <br>
+                    <br>
+                    Have a great time !
+                </p>
            </article>
         </div>
     </div>
