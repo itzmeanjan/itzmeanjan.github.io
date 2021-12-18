@@ -276,6 +276,103 @@
                     With this our OpenCL kernel has computed all intermediate nodes ( 31 in number ) of Merkle Tree with 32 leaves, in 5 consequtive rounds, where
                     each round safely executed in parallel.
                 </p>
+                <p class="blogText">
+                    This is time to clarify how much memory does it actually consume to store 32 abstractly 
+                    represented cells in input/ output buffer. Each cell is abstract representation of one Rescue Prime digest which is
+                    256-bit in width or in other words 4 contiguous prime field elements, where each element can be represented using <i>u64</i>.
+                    Total of 32 * 256 -bit = 1024 bytes of memory is allocated for each of input and output buffer. Now remember, I had to
+                    split original output buffer into non-overlapping subbuffer regions for read-only and write-only access during several kernel dispatch
+                    rounds, which is fine as long as subbuffer starting memory address is properly aligned with
+                    OpenCL device's base address alignment requirement. For more info you should look at Khronos OpenCL man page 
+                    <a class="blogLink" href="http://man.opencl.org/clCreateSubBuffer.html" target="_blank">here</a> and search for error code 
+                    <tt>CL_MISALIGNED_SUB_BUFFER_OFFSET</tt>.
+                    <br>
+                    <br>
+                    For querying what is OpenCL device memory base address alignment requirement, I use 
+                    <a class="blogLink" href="https://github.com/itzmeanjan/vectorized-rescue-prime/blob/614500dd1f271e4f8badf1305c8077e2532eb510/utils.c#L129-L146" target="_blank">this function</a>.
+                    If you've <i>clinfo</i> tool installed, that can also be used for checking all available device base address alignment requirements like below.
+                </p>
+                <div class="microlight">
+    $ clinfo | grep -i 'alignment'
+
+    Minimum alignment for any data type             128 bytes
+    Alignment of base address                       4096 bits (512 bytes)
+    Preferred alignment for atomics                 
+    Minimum alignment for any data type             128 bytes
+    Alignment of base address                       1024 bits (128 bytes)
+                </div>
+                <p class="blogText">
+                    We're interested in <i>Alignment of base address</i> field, but there're two of them because two devices are available
+                    in my system. As I'm planning to run this kernel on Nvidia Tesla V100 GPGPU, which is enlisted first when <i>clinfo</i>
+                    is run, I'll just consider following from above output.
+                </p>
+                <div class="microlight">
+    Alignment of base address                       4096 bits (512 bytes)
+                </div>
+                <p class="blogText">
+                    This means I can't create a subbuffer from whole output buffer when origin of subbuffer
+                    is not aligned to 512 bytes. To be more specific, I can't create one subbuffer which originates
+                    at some index that can't be evenly divided by 512. Let's now go back to previous demonstration, where
+                    I constructed a Merkle Tree from 32 leaves, and explore deeply to ensure that all kernel dispatches will
+                    execute as envisioned.
+                </p>
+                <p class="blogText">
+                    In round 1, whole input buffer is used in read-only mode and half of output buffer is used for writing computed
+                    intermediate nodes.
+                </p>
+                <div class="microlight">
+    input: ✅
+        subbuffer creation not required
+    
+    // region defined in terms of bytes
+    //
+    // look for CL_BUFFER_CREATE_TYPE_REGION in http://man.opencl.org/clCreateSubBuffer.html
+    // for details regarding function signature and argument type
+    output: ✅
+        origin: 512
+        size:   512
+                </div>
+                <p class="blogText">
+                    In second round, previous round's output subbuffer is used as input subbuffer and
+                    this round's input subbuffer halves in size; details below.
+                    <br>
+                    <br>
+                    And here it all breaks. Looks like I can't create subbuffer region in second round itself, because
+                    output subbuffer of second round is not properly aligned with Nvidia Tesla V100 base memory address alignment
+                    requirement ( because 256 % 512 != 0 )
+                </p>
+                <div class="microlight">
+    input: ✅
+        origin: 512
+        size:   512
+
+    output: ❌
+        origin: 256
+        size:   256
+
+    # output and input subbuffers are contiguous in memory but non-overlapping
+    #
+    # note, first output subbuffer lives, then input subbuffer lives, which is due
+    # to hierarchical binary Merkle tree structure
+                </div>
+                <p class="blogText">
+                    That means, as I was planning to dispatch kernel 5 times with different non-overlapping subbuffer regions,
+                    to be used as input/ output for that round, I can't do that. And as an alternative I've to compute some intermediate
+                    nodes sequentially. I showed I have to stop after round 1 kernel dispatch in above case and there're still 15
+                    more intermediate nodes to compute. I write one kernel where only one OpenCL work-item computes all remaining 
+                    intermediate nodes at tip of Merkle Tree by iteratively going through them in order. In order to avoid device-to-host data transfer
+                    when whole Merkle Tree is not yet constructed, I have to use sequential implementation of kernel.
+                    <br>
+                    <br>
+                    An optimization experiment --- one can attempt to do data transfer to host and compute remaining intermediate nodes in parallel ( as I primarily proposed ) 
+                    on host itself where memory base address alignment issues are absent because pointer arithmetics can be comfortably used
+                    for accessing subregions of whole array, allocated on host for holding all intermediate nodes ( either computed/ to be computed ).
+                    <br>
+                    <br>
+                    This is <a class="blogLink" href="https://github.com/itzmeanjan/vectorized-rescue-prime/blob/614500dd1f271e4f8badf1305c8077e2532eb510/kernel.cl#L476-L507" target="_blank">the kernel</a>
+                    I wrote for sequentially computing tip of Merkle Tree.
+                </p>
+                <img class="imgCenter" src="../images/opencl-accelerated-merkle-tree-construction-7.jpg">
            </article>
         </div>
     </div>
