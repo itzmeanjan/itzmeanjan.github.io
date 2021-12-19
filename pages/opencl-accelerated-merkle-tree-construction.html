@@ -78,7 +78,8 @@
                     which takes two Rescue Prime digests and produces single Rescue Prime digest. For reference you should check out <a class="blogLink" href="https://github.com/itzmeanjan/vectorized-rescue-prime/blob/614500dd1f271e4f8badf1305c8077e2532eb510/kernel.cl#L424-L474" target="_blank">this OpenCL kernel</a>, which exactly does that.
                     With this, I can say following Merkle Tree construction technique can be generalised to other cryptographic hash functions
                     offering acceptable security and collision resistance, where two hash digests of respective hash function can be supplied as input and it produces
-                    another hash digest as output. For this work I'm going to use aforementioned prime field <span class="highlight">F(2<sup>64</sup> - 2<sup>32</sup> + 1)</span>, so each 
+                    another hash digest as output. Say for example in Blake3, two hash digests can be flattened into a byte array which is supplied to Blake3 hasher for producing digest.
+                    For this work I'm going to use aforementioned prime field <span class="highlight">F(2<sup>64</sup> - 2<sup>32</sup> + 1)</span>, so each 
                     element of prime field can be represented in native 64-bit unsigned integer i.e. <i>uint64_t</i>. 
                     Input to Rescue Prime hash's <span class="highlight">merge</span> function is 512-bit which is interpreted as 8 prime field elements 
                     or more specifically two Rescue Prime hash digests placed next to each other, each of width 256-bit ( read 4 prime field elements ).
@@ -139,7 +140,11 @@
                     ( which is why there's no node tagged with index 0 in above diagram ),
                     2<sup>nd</sup> element ( Merkle root at index 1 ) is obtained by hashing elements at index 2 and 3 ( in ordered fashion ). Similarly element at index 2 of output array
                     is computed by hashing elements at index 4 and 5. This means element at index <i>i</i> of output array is computed by hashing elements
-                    at index <i>(2 * i)</i> and <i>(2 * i + 1)</i>, generally speaking. This also means, I've to start filling output array backwards.
+                    at index <i>(2 * i)</i> and <i>(2 * i + 1)</i>, generally speaking. This is perfectly applicable only when
+                    all nodes of Merkle Tree ( including input leaves ) are placed in same contiguous memory allocation.
+                    And this is applicable, with small change, when input ( Merkle Tree leaves ) and output are placed in
+                    different arrays.
+                    As I'll go with later, I've to start filling output array backwards.
                     <br>
                     <br>
                     First I'll pair consequtive elements in input array of length N and compute Rescue Prime Hash ( read <span class="highlight">merge(digest_0, digest_1)</span> function )
@@ -317,6 +322,7 @@
                     execute as envisioned.
                 </p>
                 <p class="blogText">
+                    Original input/ output buffer are having origin at byte index 0 and size of 1024 bytes.
                     In round 1, whole input buffer is used in read-only mode and half of output buffer is used for writing computed
                     intermediate nodes.
                 </p>
@@ -353,7 +359,7 @@
     # output and input subbuffers are contiguous in memory but non-overlapping
     #
     # note, first output subbuffer lives, then input subbuffer lives, which is due
-    # to hierarchical binary Merkle tree structure
+    # to hierarchical structure of binary Merkle tree
                 </div>
                 <p class="blogText">
                     That means, as I was planning to dispatch kernel 5 times with different non-overlapping subbuffer regions,
@@ -361,7 +367,9 @@
                     nodes sequentially. I showed I have to stop after round 1 kernel dispatch in above case and there're still 15
                     more intermediate nodes to compute. I write one kernel where only one OpenCL work-item computes all remaining 
                     intermediate nodes at tip of Merkle Tree by iteratively going through them in order. In order to avoid device-to-host data transfer
-                    when whole Merkle Tree is not yet constructed, I have to use sequential implementation of kernel.
+                    when whole Merkle Tree is not yet constructed, I have to use sequential implementation of kernel. For different OpenCL devices,
+                    different memory alignment requirement may exist, so portable host-side orchestrator code can't hard-code how many of intermediate nodes
+                    at tip of Merkle Tree to be computed sequentially. I suggest you take a look at my implementation of that, which I'm going to link at end.
                     <br>
                     <br>
                     An optimization experiment --- one can attempt to do data transfer to host and compute remaining intermediate nodes in parallel ( as I primarily proposed ) 
