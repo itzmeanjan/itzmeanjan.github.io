@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<!--
+  Author: Anjan Roy<hello@itzmeanjan.in>
+-->
+<html>
+
+<head>
+    <title>
+        Evaluation of Merklization Design and Performance in SYCL
+    </title>
+    <meta prefix="og: http://ogp.me/ns#" property="og:type" content="website">
+    <meta prefix="og: http://ogp.me/ns#" property="og:title" content="Evaluation of Merklization Design and Performance in SYCL">
+    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="---">
+    <meta prefix="og: http://ogp.me/ns#" property="og:url" content="https://itzmeanjan.in">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url"
+        content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:width" content="950">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:height" content="735">
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://itzmeanjan.in/">
+    <meta property="twitter:title" content="Evaluation of Merklization Design and Performance in SYCL">
+    <meta property="twitter:description" content="---">
+    <meta property="twitter:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta property="twitter:site" content="@meanjanry">
+    <meta name="description" content="---">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="author" content="Anjan Roy">
+    <meta name="keywords" content="---">
+    <meta name="theme-color" content="darkslategrey">
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" type="text/css" href="../styles/index.css">
+    <script src="../styles/code.js"></script>
+</head>
+
+<body>
+    <div id="parentDiv">
+        <div id="navBar">
+            <nav>
+                <a class="navLink" href="/"><big>H</big>ome</a> |
+                <a class="navLink" href="https://github.com/itzmeanjan" target="_blank"><big>P</big>rojects</a> |
+                <a class="navLink" href="/pages/blog.html"><big>B</big>log</a> |
+                <a class="navLink" href="/pages/contact.html"><big>C</big>ontact</a>
+            </nav>
+        </div>
+        <div class="childDiv">
+            <article>
+                <h1 class="blogHeader">
+                    Evaluation of Merklization Design and Performance in SYCL
+                </h1>
+                <h3>Created : December 31, 2021</h3>
+            </article>
+        </div>
+        <div class="childDiv">
+            <article>
+                <p class="blogText">
+                    Around a fortnight back I wrote about OpenCL accelerated Merkle Tree construction technique, while using
+                    Rescue Prime Hash as underlying collision resistant, cryptographic hash function for obtaining immediate parent node from two children
+                    nodes ( either leaves/ intermediates ). You can find that post <a class="blogLink" href="./opencl-accelerated-merkle-tree-construction.html" target="_blank">here</a>.
+                    <br>
+                    <br>
+                    During last two weeks, I've made some improvements in Rescue Prime Hash implementation and also ported it to SYCL. If you happen to
+                    be specifically interested in those changes/ improvements, I suggest you take a look at following pull requests.
+                </p>
+                <ul>
+                    <li><a class="blogLink" href="https://github.com/itzmeanjan/ff-gpu/pull/13" target="_blank">Porting vectorized OpenCL Rescue Prime to SYCL</a></li>
+                    <li><a class="blogLink" href="https://github.com/itzmeanjan/ff-gpu/pull/16" target="_blank">Optimizing SYCL Rescue Prime with reduced vector lanes</a></li>
+                </ul>
+                <p class="blogText">
+                    Along with that I also explored a different way of Merklization, where given problem statement is same as before i.e.
+                    when N -many leaf nodes of some Binary Merkle Tree are provided with (N - 1) -many intermediate nodes to be computed. 
+                    In this new way of Merklization, I change which work-items are tasked to compute which intermediate nodes and how many
+                    kernel dispatch rounds are required for computing all intermediate nodes. But, as usual, that itself comes with its benefits and drawbacks.
+                    Today in this post, I plan to study design and performance of two Merklization techniques, that I've devised, while
+                    using SYCL for implementation.
+                    <br>
+                    <br>
+                    Same as last post, I'm not going to be explaining how I improved Rescue Prime implementation in SYCL, but I note that
+                    a huge portion of Merklization performance boost comes from optimized implementation of Rescue Prime in SYCL. 
+                    I'll do a deep study of that in coming weeks, as promised before.
+                </p>
+                <p class="blogText">
+                    Let me begin with simple one, which henceforth I'll call <b>merklization approach 1</b>. Here <span class="highlight">merklize</span>
+                    function is provided with N -many leaf nodes, where N = 2<sup>i</sup> ∀ i ∈ {1, 2, ...}. (N - 1) -many intermediate nodes
+                    are computed by dispatching compute kernel log<sub>2</sub>N times. Say for example, if I start with N = 32, all intermediates are
+                    computed in 5 rounds, as shown below.
+                </p>
+                <div class="microlight">
+    N = 32
+    
+    leaves        = [1; N] # 32 leaf nodes
+    intermediates = [0; N] # empty intermediate node allocation
+
+    ## Dispatch 1:
+    intermediates[16..32] = merklize(leaves) # pairs total of 32 nodes into 16 intermediates
+
+    ## Dispatch 2:
+    intermediates[8..16] = merklize(intermediates[16..32]) # pairs total of 16 nodes into 8 intermediates
+
+    ## Dispatch 3:
+    intermediates[4..8] = merklize(intermediates[8..16]) # pairs total of 8 nodes into 4 intermediates
+
+    ## Dispatch 4:
+    intermediates[2..4] = merklize(intermediates[4..8]) # pairs total of 4 nodes into 2 intermediates
+
+    ## Dispatch 5:
+    intermediates[1..2] = merklize(intermediates[2..4]) # pairs 2 subtrees into root node
+
+    Total intermediate nodes computed = 16 + 8 + 4 + 2 + 1 = 31 ✅
+                </div>
+                <p class="blogText">
+                    You should also notice, there are 5 rounds and each of them are data dependent on previous dispatch round.
+                    But good news is that each of these rounds are easily parallelizable, due to absence of any intra-round 
+                    data dependency. For some specific dispatch round if input to <i>merklize</i> has N intermediate/ leaf nodes,
+                    each pair of consecutive nodes are read by respective work-items ( N >> 1 in total ) which are merged into single Rescue Prime digest
+                    and stored in proper memory allocation. There is scope of global memory access coalescing, as non-strided, contiguous
+                    memory addresses are accessed by each work-item. Let us take help of a diagram to better appreciate the scope
+                    of parallelism.
+                </p>
+                <img class="imgCenter" src="../images/evaluate-merklization-design-performance-in-sycl-0.jpg">
+                <p class="blogText">
+                    In above diagram, N ( = 16 ) -many leaf nodes are used for depicting execution flow. It requires 4 kernel
+                    dispatch rounds to compute all intermediates and each of them are data dependent on previous round. Each dispatch
+                    round shows how many work-items are required to parallelly compute all computable intermediate nodes; which work-item
+                    accesses which pair of consequtive nodes ( either leaves/ intermediates; leaves applicable only during round 0 ). Note,
+                    very first memory location ( resevered for some Rescue Prime digest ) is never accessed by any of dispatched kernels, because
+                    (N - 1) -many intermediate nodes are stored in memory allocation able to store N -many intermediate nodes, where N is power of 2.
+                </p>
+            </article>
+        </div>
+    </div>
+    <div id="footerDiv">
+        <footer>
+            <p id="footerText">
+                &copy <a href="https://github.com/itzmeanjan/itzmeanjan.github.io" id="footerLink"
+                    target="_blank"><big>A</big>njan Roy</a> ( <big>M</big>IT Licensed )
+            </p>
+        </footer>
+    </div>
+</body>
+
+</html>
