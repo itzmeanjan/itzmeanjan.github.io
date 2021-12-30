@@ -291,10 +291,17 @@
     work-group: 3 | active local work-item indices = {0, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _}
                 </div>
                 <p class="blogText">
-                    Another reason behind stopping iteration is that I can't synchronize across work-groups, which will be required
+                    Actual reason behind stopping iteration is that I can't synchronize across work-groups, which will be required
                     in next iteration, if we've to proceed. If I decide to go with <tt>iter = 5</tt>, I need to compute 2 intermediate
                     nodes from (total) 4 intermediate nodes computed during last iteration. But those 4 input intermediate nodes are computed
-                    by 4 different work-items who are part of 4 different work-groups ( see above depiction ). Question is when to start executing iteration with <tt>iter = 5</tt> ?
+                    by 4 different work-items who are part of 4 different work-groups ( see above depiction ).
+                    <br>
+                    <br>
+                    <b>Question</b> is <i>when to start executing iteration with <tt>iter = 5</tt> ?</i>
+                    <br>
+                    <b>Answer</b> is <i>when all 64 work-items ( across 4 work-groups ) agree that they've completed previous iteration & data written to global memory during that is safely available for consumption.</i>
+                    <br>
+                    <br>
                     As it's not possible to synchronize across work-groups, I can't safely start executing next iteration i.e. <tt>iter = 5</tt>.
                     There's a high chance that I'll end up reading intermediate node data when it's still in undefined state.
                     <br>
@@ -311,6 +318,78 @@
 
     total 2 active work-items, living in different work-groups, requiring cross work-group synchronization ❌
                 </div>
+                <p class="blogText">
+                    As that is not possible, I'll have to dispatch another ( final ) round of kernel, for computing remaining intermediate nodes.
+                    Before I get to that I'd like to check how many intermediate nodes are already computed among 255 target intermediate nodes.
+                    Following table shows I've to still compute 3 intermediate nodes, which are root of Merkle Tree and their two immediate children.
+                </p>
+                <div class="microlight">
+    round | step | iter | computed intermediates
+    --------------------------------------------
+        1       1     NA            128
+
+        2       1     NA            64
+        
+        2       2      1            32
+        2       2      2            16
+        2       2      3            8
+        2       2      4            4
+
+    Total intermediate nodes computed till now = ( 128 + 64 + 32 + 16 + 8 + 4 ) = 252 📝
+                </div>
+                <p class="blogText">
+                    In final kernel dispatch round, I'll dispatch 2 work-items ( in single work-group ), who will compute 2 intermediate nodes in step one
+                    from previous round's 4 computed intermediate nodes. After step one, these two work-items are synchronized so that in step two
+                    previous step's global memory changes ( i.e. write ops ) are ensured to be visible in correct state. In step two, first loop initiation/ termination
+                    condition is checked i.e. <tt>assert 1 < 2</tt> and only even indexed work-item is activated to execute loop body, which computes
+                    root of Merkle Tree. With that all intermediate nodes are computed for Binary Merkle Tree with N = 256 leaf nodes.
+                </p>
+                <div class="microlight">
+    # step one; round three
+
+    work-group: 0 | active local work-item indices = {0, 1}
+                </div>
+                <div class="microlight">
+    # iter one; step two; round three
+
+    work-group: 0 | active local work-item indices = {0, _} # root of Merkle Tree computed
+                </div>
+                <p class="blogText">
+                    Few points to note here, if we increase work-group size for kernel dispatches in <b>approach 2</b>, it seems it's beneficial
+                    because as per our formula lesser kernel dispatch rounds will be required. But <b>approach 2</b> also requires us to perform
+                    work-group level synchronization, that means when work-group size is doubled up, double -many work-items will be required to be
+                    synchronizing so that safely next iteration can be executed, while consuming previous iteration's global memory
+                    writes ( intermediate nodes computed during last iteration/ step ). And I also note synchronization is costly. Another point to note,
+                    after every round of work-group synchronization half of previous round's active work-items ( in a work-group ) are deactivated that means
+                    most of work-items are not doing any useful work, which is just waste of computation ability of highly parallel GPU architecture.
+                    <br>
+                    <br>
+                    If you happen to be interested in inspecting <b>approach 2</b> in detail, I suggest you take a look at
+                    <a class="blogLink" href="https://github.com/itzmeanjan/ff-gpu/blob/8e480571b15d747ee5747f1853781317b4e5c9ae/merkle_tree.cpp#L104-L225" target="_blank">this</a>
+                    SYCL implementation.
+                </p>
+                <p class="blogText">
+                    Now it's time to benchmark both of these implementations to actually see what do they bring on table. I used Nvidia Tesla V100 for that purpose, while
+                    compiling single source SYCL program with SYCL/ DPC++ ( experimental CUDA backend ).
+                </p>
+                <div class="microlight">
+    # see https://github.com/itzmeanjan/ff-gpu/blob/8e480571b15d747ee5747f1853781317b4e5c9ae/benchmarks/cuda_merkle_tree.md
+
+    Merklize using Rescue Prime on F(2**64 - 2**32 + 1) elements on `Tesla V100-SXM2-16GB`
+
+     leaves		        approach 1                  approach 2
+    ------------------------------------------------------------------
+    1048576		        63.0723 ms                  136.805 ms
+    2097152		        116.168 ms                  238.906 ms
+    4194304		        221.621 ms                  445.335 ms
+    8388608		        431.217 ms                  873.742 ms
+                </div>
+                <p class="blogText">
+                    As speculated, <b>approach 1</b> is ~2x faster compared to <b>approach 2</b>. Though <b>approach 2</b> has lesser kernel
+                    dispatch rounds but costly work-group level synchronization, mostly inactive work-items etc. are reasons behind
+                    lower performance. While in <b>approach 1</b>, there may be log<sub>2</sub>N -many dispatch rounds, but during each dispatch
+                    every work-item dispatched does some useful work, hence compute ability of GPU is better utilized.
+                </p>
             </article>
         </div>
     </div>
