@@ -177,6 +177,140 @@
     else:
         R = log2(N >> (2 + log2(B))) + 1
                 </div>
+                <p class="blogText">
+                    Let me now explain <b>approach 2</b>, while attempting to foresee what kind of benefit it may bring to Merklization.
+                </p>
+                <p class="blogText">
+                    Say N = 16 and work-group size I'm willing to work with is 2. Then during first round, 8 work-items will be dispatched, each
+                    computing single Rescue Prime merge and total 8 intermediate nodes will be produced, who lives just above leaf nodes. Following above formula,
+                    I need to dispatch kernel 3 times for constructing whole Merkle Tree. First round looks like below.
+                </p>
+                <img class="imgCenter" src="../images/evaluate-merklization-design-performance-in-sycl-1.jpg">
+                <p class="blogText">
+                    During next round, which is dependent on first one, 4 work-items will be dispatched. As first step, each of these 4 work-items will be
+                    computing one Rescue Prime merge, producing 4 intermediate nodes. These four work-items are globally numbered as <tt>{group: 0 => {0, 1, 2, 3}}</tt>,
+                    but remember I decided to work with work-group size of 2, so local indexing of 4 work-items will be <tt>{group: 0 => {0, 1}, group: 1 => {0, 1}}</tt>.
+                    After first step in round 2, all work-items present in each of work-groups are synchronized, so that it's ensured that
+                    next step can be proceeded into safely, without getting into trouble of data race. After all work-items ( = 2, in number ) in work-group
+                    reach <span class="highlight"><tt>sycl::group_barrier(...)</tt></span>, only even indexed work-items are chosen for computing next level of
+                    intermediate nodes, which ensures odd indexed work-items are disabled and doesn't cause any data race. After all even indexed work-items
+                    have computed upper level of intermediate nodes, all work-items in a work-group are synchronized again just to ensure that
+                    this iteration step's data will be available ( i.e. visible to next set of active work-items ) for use in next iteration.
+                    Now question is when to stop this iterative process ?
+                    <br>
+                    <br>
+                    I use <span class="highlight"><tt>(1 << (iter - 1)) < B</tt></span> as iteration control condition, where <tt>iter = 1</tt> at start and then <tt>iter++</tt>
+                    after each iteration completes.
+                    <br>
+                    <br>
+                    Going back to our example, where work-group size B = 2, <tt>iter = 1</tt> should be only iteration, as after <tt>iter++</tt>
+                    stopping criteria is reached ( <tt>2 < 2 == !true</tt> ). Looking at following diagram also asserts so, only root of tree is left to
+                    be computed, which will be done in last kernel dispatch round.
+                </p>
+                <img class="imgCenter" src="../images/evaluate-merklization-design-performance-in-sycl-2.jpg">
+                <p class="blogText">
+                    In third and last kernel dispatch round, only 1 work-item is launched for computing root of Merkle Tree and no more iterations
+                    are required, because there is nothing else left for computation. Once again going back to <b>approach 2</b>, I'll demonstrate with N = 256 and B = 16
+                    so that you can appreciate the need for work-group sychronization.
+                    <br>
+                    <br>
+                    Formula says, 3 kernel dispatch rounds should be enough to compute all intermediate nodes of Binary Merkle Tree with 256 leaf nodes.
+                    In first round, 128 work-items are dispatched for computing 128 intermediate nodes, living just above 256 leaf nodes.
+                    In second kernel dispatch round, 64 work-items are dispatched for first computing 64 intermediate nodes from 128 intermediate nodes, computed
+                    during last round of dispatch. Remember B = 16 is our work-group size, so 16 work-items per work-group are synchronized
+                    before they decide to execute next step. As per loop control condition <tt>(1 << (iter - 1)) < B</tt>,
+                    it's safe to execute loop with <tt>iter = 1</tt>. That means, 8 even indexed work-items among 16 work-items in each of 4 work-groups
+                    will be activated to compute 8 intermediate nodes, producing total of <tt>8 x 4 = 32</tt> intermediate nodes from 64 intermediate nodes
+                    which were computed during previous step by 4 work-groups. Let us expand into <q><i>8 even indexed work-items to be activated</i></q>.
+                    <br>
+                    <br>
+                    It means among following 16 work-items ( per work-group; making total of 64 -many dispatched ), who all participated in first step of second round,
+                    only even indexed 8 work-items will participate in second step i.e. iteration with <tt>iter = 1</tt>.
+                </p>
+                <div class="microlight">
+    # step one; round two
+
+    work-group: 0 | active local work-item indices = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
+    work-group: 1 | active local work-item indices = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
+    work-group: 2 | active local work-item indices = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
+    work-group: 3 | active local work-item indices = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
+                </div>
+                <p class="blogText">
+                    Following 32 work-items will be active, computing 32 intermediate nodes from 64 intermediate nodes, computed during first step of second dispatch round.
+                    This is exactly the reason behind work-group synchronization after first step ( in second kernel dispatch round ), so it's ensured that all 16 work-items
+                    in work-group have computed the intermediate node it was responsible for. And only after that 8 selected work-items ( in a work-group )
+                    can safely use previously computed 16 intermediate nodes.
+                </p>
+                <div class="microlight">
+    # iter 1; step two; round two
+
+    work-group: 0 | active local work-item indices = {0, _, 2, _, 4, _, 6, _, 8, _, 10, _, 12, _, 14, _}
+    work-group: 1 | active local work-item indices = {0, _, 2, _, 4, _, 6, _, 8, _, 10, _, 12, _, 14, _}
+    work-group: 2 | active local work-item indices = {0, _, 2, _, 4, _, 6, _, 8, _, 10, _, 12, _, 14, _}
+    work-group: 3 | active local work-item indices = {0, _, 2, _, 4, _, 6, _, 8, _, 10, _, 12, _, 14, _}
+                </div>
+                <p class="blogText">
+                    After iteration with <tt>iter = 1</tt>, all 16 work-items in work-group to be synchronized, so that necessary intermediate nodes are visible
+                    to all work-items, who will be activated during next iteration i.e. <tt>iter = 2</tt>. Before we can go and execute iteration with <tt>iter = 2</tt>,
+                    we must check loop termination condition. As <tt>assert 2 < 16</tt>, execution can proceed. This time, 4 even indexed work-items ( per work-group )
+                    among last iteration's 8 active work-items, will be activated for computing total of <tt>4 x 4 = 16</tt> intermediate nodes, as shown below.
+                    Once they reach end of loop, 16 work-items ( per work-group ) are synchronized, so that path of entering next round is paved well, by ensuring memory visibility.
+                </p>
+                <div class="microlight">
+    # iter 2; step two; round two
+
+    work-group: 0 | active local work-item indices = {0, _, _, _, 4, _, _, _, 8, _, _, _, 12, _, _, _}
+    work-group: 1 | active local work-item indices = {0, _, _, _, 4, _, _, _, 8, _, _, _, 12, _, _, _}
+    work-group: 2 | active local work-item indices = {0, _, _, _, 4, _, _, _, 8, _, _, _, 12, _, _, _}
+    work-group: 3 | active local work-item indices = {0, _, _, _, 4, _, _, _, 8, _, _, _, 12, _, _, _}
+                </div>
+                <p class="blogText">
+                    Iteration <tt>iter = 3</tt> can be executed, as loop termination condition doesn't yet satisfy ( i.e. assert 4 < 16 ). In this iteration,
+                    2 even indexed work-items among last iteration's 4 active work-items ( per work-group ) will be activated for computing total <tt>2 x 4  = 8</tt>
+                    intermediate nodes, shown below. After completion of this iteration, all work-items in work-group will be synchronized, as usual.
+                </p>
+                <div class="microlight">
+    # iter 3; step two; round two
+
+    work-group: 0 | active local work-item indices = {0, _, _, _, _, _, _, _, 8, _, _, _, _, _, _, _}
+    work-group: 1 | active local work-item indices = {0, _, _, _, _, _, _, _, 8, _, _, _, _, _, _, _}
+    work-group: 2 | active local work-item indices = {0, _, _, _, _, _, _, _, 8, _, _, _, _, _, _, _}
+    work-group: 3 | active local work-item indices = {0, _, _, _, _, _, _, _, 8, _, _, _, _, _, _, _}
+                </div>
+                <p class="blogText">
+                    Last iteration of second round i.e. <tt>iter = 4</tt>, will activate 1 ( and only one ) even-indexed work-item among 2 active work-items from last iteration ( per work-group )
+                    and produce total of 4 intermediate nodes, which looks like below. Note this is last iteration because after that with <tt>iter = 5</tt>
+                    loop termination condition ( i.e. <tt>(1 << (iter - 1)) < 16</tt> ) is triggerred.
+                </p>
+                <div class="microlight">
+    # iter 4; step two; round two
+
+    work-group: 0 | active local work-item indices = {0, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _}
+    work-group: 1 | active local work-item indices = {0, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _}
+    work-group: 2 | active local work-item indices = {0, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _}
+    work-group: 3 | active local work-item indices = {0, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _}
+                </div>
+                <p class="blogText">
+                    Another reason behind stopping iteration is that I can't synchronize across work-groups, which will be required
+                    in next iteration, if we've to proceed. If I decide to go with <tt>iter = 5</tt>, I need to compute 2 intermediate
+                    nodes from (total) 4 intermediate nodes computed during last iteration. But those 4 input intermediate nodes are computed
+                    by 4 different work-items who are part of 4 different work-groups ( see above depiction ). Question is when to start executing iteration with <tt>iter = 5</tt> ?
+                    As it's not possible to synchronize across work-groups, I can't safely start executing next iteration i.e. <tt>iter = 5</tt>.
+                    There's a high chance that I'll end up reading intermediate node data when it's still in undefined state.
+                    <br>
+                    <br>
+                    If I had a mechanism to synchronize across work-groups, following depicts which work-items will be active during iteration <tt>iter = 5</tt>.
+                </p>
+                <div class="microlight">
+    # imagine `iter 5; step two; round two` is in execution
+
+    work-group: 0 | active local work-item indices = {0, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _}
+    work-group: 1 | active local work-item indices = {_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _}
+    work-group: 2 | active local work-item indices = {0, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _}
+    work-group: 3 | active local work-item indices = {_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _}
+
+    total 2 active work-items, living in different work-groups, requiring cross work-group synchronization ❌
+                </div>
             </article>
         </div>
     </div>
