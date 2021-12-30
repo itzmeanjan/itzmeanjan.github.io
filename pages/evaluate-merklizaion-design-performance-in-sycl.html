@@ -121,11 +121,62 @@
                 <p class="blogText">
                     In above diagram, N ( = 16 ) -many leaf nodes are used for depicting execution flow. It requires 4 kernel
                     dispatch rounds to compute all intermediates and each of them are data dependent on previous round. Each dispatch
-                    round shows how many work-items are required to parallelly compute all computable intermediate nodes; which work-item
-                    accesses which pair of consequtive nodes ( either leaves/ intermediates; leaves applicable only during round 0 ). Note,
-                    very first memory location ( resevered for some Rescue Prime digest ) is never accessed by any of dispatched kernels, because
-                    (N - 1) -many intermediate nodes are stored in memory allocation able to store N -many intermediate nodes, where N is power of 2.
+                    round shows how many work-items are required to parallelly compute all computable intermediate nodes, by invoking Rescue <span class="highlight">merge</span> function;
+                    which work-item accesses which pair of consequtive nodes ( either leaves/ intermediates; leaves applicable only during round 0 ).
+                    Note, very first memory location ( resevered for some Rescue Prime digest ) is never accessed by any of dispatched kernels, because
+                    (N - 1) -many intermediate nodes are stored in memory allocated for storing total of N -many intermediate nodes, where N is power of 2.
                 </p>
+                <p class="blogText">
+                    Implementing this in SYCL is pretty easy, using USM allocation allows me to perform pointer arithmetics, which is much more
+                    familiar compared to SYCL buffer/ sub-buffer/ accessor. I suggest you take a look
+                    <a class="blogLink" href="https://github.com/itzmeanjan/ff-gpu/blob/8e480571b15d747ee5747f1853781317b4e5c9ae/merkle_tree.cpp#L3-L102" target="_blank">here</a>
+                    for exploring exact implementation details of <b>approach 1</b>.
+                </p>
+                <p class="blogText">
+                    Notice when N is relatively large, say = 2<sup>24</sup>, total 24 kernel dispatch rounds will be required to compute all intermediate
+                    nodes. Dispatching kernel requires host-device interaction, which is not cheap. Also OpenCL/ SYCL doesn't yet
+                    allow recording commands into a buffer and then replaying same when required to be executed as I can do in Vulkan Compute; with that during actual kernel execution,
+                    host-device interaction can be reduced and more work will be ready for offloading, while suffering less from host latencies due to say context switching.
+                    Well, OpenCL has <a class="blogLink" href="https://www.khronos.org/registry/OpenCL/specs/3.0-unified/html/OpenCL_Ext.html#cl_khr_command_buffer" target="_blank">this extension</a>
+                    just to experiment with that idea, but today I'm working with SYCL. Motivated by this reason, I decided to devise a way
+                    so that kernel dispatch round count can be reduced while Merklizing.
+                    <br>
+                    <br>
+                    I'm going to refer to this new Merklization technique as <b>approach 2</b>. Say we've N = 2<sup>24</sup> -many leaf nodes and we're using work-group
+                    size B = 2<sup>8</sup>, then number of required kernel dispatch rounds for constructing Merkle Tree using <b>approach 2</b> will be
+                    <tt>log<sub>2</sub>(N >> (2 + log<sub>2</sub>B)) + 1</tt>, which turns out to be 15, much lesser than 24, which would be required using <b>approach 1</b>.
+                    Also note, it doesn't matter what is work-group size, required #-of kernel dispatch rounds will always be log<sub>2</sub>N using <b>approach 1</b>.
+                    But using <b>approach 2</b>, work-group size can influence total #-of required kernel dispatch rounds to compute whole Merkle Tree.
+                    If I increase work-group size B to say 2<sup>9</sup>, then following aforementioned formula, I'll be required to dispatch kernel 14 times.
+                    But as per my experience, increasing work-group size to that large value benefits less, which we'll explore soon.
+                    Say, finally I decide to live with work-group size B = 2<sup>6</sup>, I'll be required to perform 17 rounds of kernel dispatch, which is still lesser than
+                    24 rounds, required in <b>approach 1</b>.
+                    <br>
+                    <br>
+                    I've come up with following formula for computing required #-of kernel dispatch rounds using <b>approach 2</b>.
+                    You should notice, an appended <tt>+ 1</tt>, in each of these cases, that's coming from <a class="blogLink" href="https://github.com/itzmeanjan/ff-gpu/blob/8e480571b15d747ee5747f1853781317b4e5c9ae/merkle_tree.cpp#L122-L135" target="_blank">here</a>
+                    --- the very first round of kernel dispatch reads all N -many leaves from input buffer and writes (N >> 1) -many intermediate nodes
+                    ( living just above leaf nodes ) in designated location of output buffer. After that remaining intermediate nodes are computed
+                    in one/ many rounds. Note, each of these kernel dispatch rounds are data dependent on previous one, which is due to
+                    inherent hierarchical structure of Merkle Tree.
+                </p>
+                <div class="microlight">
+    # see https://github.com/itzmeanjan/ff-gpu/blob/8e480571b15d747ee5747f1853781317b4e5c9ae/merkle_tree.cpp#L137-L147
+    #
+    # `+ 1` at end of each case comes due to first kernel dispatch
+    # https://github.com/itzmeanjan/ff-gpu/blob/8e480571b15d747ee5747f1853781317b4e5c9ae/merkle_tree.cpp#L122-L135
+
+    N = leaf count
+    B = work-group size
+    R = number of kernel dispatch rounds
+
+    if N >> 2 == B:
+        R = 1 + 1
+    elif N >> 3 == B
+        R = (log2(N >> (2 + log2(B))) + 1) + 1
+    else:
+        R = log2(N >> (2 + log2(B))) + 1
+                </div>
             </article>
         </div>
     </div>
