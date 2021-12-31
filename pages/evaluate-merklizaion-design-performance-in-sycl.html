@@ -10,7 +10,7 @@
     </title>
     <meta prefix="og: http://ogp.me/ns#" property="og:type" content="website">
     <meta prefix="og: http://ogp.me/ns#" property="og:title" content="Evaluation of Merklization Design and Performance in SYCL">
-    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="Deep dive into design of Parallel Binary Merkle Tree construction using SYCL/ DPC++, while evaluating design and performance on Nvidia Tesla V100 GPU; also compares performance with equivalent OpenCL implementation">
+    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="Deep dive into design of Parallel Binary Merkle Tree construction using SYCL/ DPC++, while evaluating performance on Nvidia Tesla V100 GPU; also compares performance with equivalent OpenCL implementation">
     <meta prefix="og: http://ogp.me/ns#" property="og:url" content="https://itzmeanjan.in">
     <meta prefix="og: http://ogp.me/ns#" property="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
     <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url"
@@ -20,13 +20,13 @@
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="https://itzmeanjan.in/">
     <meta property="twitter:title" content="Evaluation of Merklization Design and Performance in SYCL">
-    <meta property="twitter:description" content="Deep dive into design of Parallel Binary Merkle Tree construction using SYCL/ DPC++, while evaluating design and performance on Nvidia Tesla V100 GPU; also compares performance with equivalent OpenCL implementation">
+    <meta property="twitter:description" content="Deep dive into design of Parallel Binary Merkle Tree construction using SYCL/ DPC++, while evaluating performance on Nvidia Tesla V100 GPU; also compares performance with equivalent OpenCL implementation">
     <meta property="twitter:image" content="https://itzmeanjan.in/images/myImage.jpg">
     <meta property="twitter:site" content="@meanjanry">
-    <meta name="description" content="Deep dive into design of Parallel Binary Merkle Tree construction using SYCL/ DPC++, while evaluating design and performance on Nvidia Tesla V100 GPU; also compares performance with equivalent OpenCL implementation">
+    <meta name="description" content="Deep dive into design of Parallel Binary Merkle Tree construction using SYCL/ DPC++, while evaluating performance on Nvidia Tesla V100 GPU; also compares performance with equivalent OpenCL implementation">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="author" content="Anjan Roy">
-    <meta name="keywords" content="Deep dive into design of Parallel Binary Merkle Tree construction using SYCL/ DPC++, while evaluating design and performance on Nvidia Tesla V100 GPU; also compares performance with equivalent OpenCL implementation">
+    <meta name="keywords" content="parallel, merkle tree, design, performance, cpu, gpu, sycl, dpcpp, dpc++, rescue prime hash, zk-stark friendly hash, simd, vector width, nvidia, tesla, v100, opencl, accelerator, benchmark">
     <meta name="theme-color" content="darkslategrey">
     <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
     <link rel="stylesheet" type="text/css" href="../styles/index.css">
@@ -80,7 +80,7 @@
                     I'll do a deep study of that in coming weeks, as promised before.
                 </p>
                 <p class="blogText">
-                    Let me begin with simple one, which henceforth I'll call Merklization <b>approach 1</b>. Here <span class="highlight">merklize</span>
+                    Let me begin with the simple one, which henceforth I'll call Merklization <b>approach 1</b>. Here <span class="highlight">merklize</span>
                     function is provided with N -many leaf nodes, where N = 2<sup>i</sup> ∀ i ∈ {1, 2, ...}. (N - 1) -many intermediate nodes
                     are computed by dispatching compute kernel log<sub>2</sub>N times. Say for example, if I start with N = 32, all intermediates are
                     computed in 5 rounds, as shown below.
@@ -92,19 +92,19 @@
     intermediates = [0; N] # empty intermediate node allocation
 
     ## Dispatch 1:
-    intermediates[16..32] = merklize(leaves) # pairs total of 32 nodes into 16 intermediates
+    intermediates[16..32] = merklize(leaves)                # pairs & merges total of 32 leaf nodes into 16 intermediates
 
     ## Dispatch 2:
-    intermediates[8..16] = merklize(intermediates[16..32]) # pairs total of 16 nodes into 8 intermediates
+    intermediates[8..16] = merklize(intermediates[16..32])  # pairs & merges total of 16 nodes into 8 intermediates
 
     ## Dispatch 3:
-    intermediates[4..8] = merklize(intermediates[8..16]) # pairs total of 8 nodes into 4 intermediates
+    intermediates[4..8] = merklize(intermediates[8..16])    # pairs & merges total of 8 nodes into 4 intermediates
 
     ## Dispatch 4:
-    intermediates[2..4] = merklize(intermediates[4..8]) # pairs total of 4 nodes into 2 intermediates
+    intermediates[2..4] = merklize(intermediates[4..8])     # pairs & merges total of 4 nodes into 2 intermediates
 
     ## Dispatch 5:
-    intermediates[1..2] = merklize(intermediates[2..4]) # pairs 2 subtrees into root node
+    intermediates[1..2] = merklize(intermediates[2..4])     # pairs & merges 2 top most subtrees into root node
 
     Total intermediate nodes computed = 16 + 8 + 4 + 2 + 1 = 31 ✅
                 </div>
@@ -124,11 +124,17 @@
                     round shows how many work-items are required to parallelly compute all computable intermediate nodes, by invoking Rescue <span class="highlight">merge</span> function;
                     which work-item accesses which pair of consequtive nodes ( either leaves/ intermediates; leaves applicable only during round 0 ).
                     Note, very first memory location ( resevered for some Rescue Prime digest ) is never accessed by any of dispatched kernels, because
-                    (N - 1) -many intermediate nodes are stored in memory allocated for storing total of N -many intermediate nodes, where N is power of 2.
+                    (N - 1) -many intermediate nodes are stored in memory allocated for storing total of N -many intermediate nodes, where N is power of 2 i.e. 
+                    ( <span class="highlight"><tt>N & (N - 1) == 0</tt></span> ).
                 </p>
                 <p class="blogText">
                     Implementing this in SYCL is pretty easy, using USM allocation allows me to perform pointer arithmetics, which is much more
-                    familiar compared to SYCL buffer/ sub-buffer/ accessor. I suggest you take a look
+                    familiar compared to SYCL buffer/ sub-buffer/ accessor. If you've gone through my last
+                    <a class="blogLink" href="./opencl-accelerated-merkle-tree-construction.html" target="_blank">post</a>, where I walked you through equivalent implementation
+                    using OpenCL, you should notice as SYCL 2020 USM based memory allocation is being used no such issue of <b>device memory base address alignment</b> is encountered here.
+                    I suspect, if I had to implement SYCL variant using SYCL buffer/ sub-buffer/ accessor abstraction ( which is useful due to its automatic dependency chain inference ability )
+                    I could have stumbled upon alignment issues while sub-buffering. Also SYCL being single source programming model, it's much easier to program compared to raw OpenCL --- less
+                    verbosity is encountered. I suggest you take a look
                     <a class="blogLink" href="https://github.com/itzmeanjan/ff-gpu/blob/8e480571b15d747ee5747f1853781317b4e5c9ae/merkle_tree.cpp#L3-L102" target="_blank">here</a>
                     for exploring exact implementation details of <b>approach 1</b>.
                 </p>
@@ -138,7 +144,7 @@
                     allow recording commands into a buffer and then replaying same when required to be executed as I can do in Vulkan Compute; with that during actual kernel execution,
                     host-device interaction can be reduced and more work will be ready for offloading, while suffering less from host latencies due to say context switching.
                     Well, OpenCL has <a class="blogLink" href="https://www.khronos.org/registry/OpenCL/specs/3.0-unified/html/OpenCL_Ext.html#cl_khr_command_buffer" target="_blank">this extension</a>
-                    just to experiment with that idea, but today I'm working with SYCL. Motivated by this reason, I decided to devise a way
+                    just to experiment with that idea, but today I'm working with SYCL, where I've not yet discovered anything similar. Motivated by this reason, I decided to devise a way
                     so that kernel dispatch round count can be reduced while Merklizing.
                     <br>
                     <br>
@@ -357,8 +363,8 @@
                 <p class="blogText">
                     Few points to note here, if we increase work-group size for kernel dispatches in <b>approach 2</b>, it seems to be beneficial
                     because as per our formula lesser kernel dispatch rounds will be required. But <b>approach 2</b> also requires us to perform
-                    work-group level synchronization, that means when work-group size is doubled up, double -many work-items will be required to be
-                    synchronizing so that safely next iteration can be executed, while consuming previous iteration's global memory
+                    work-group level synchronization, that means when work-group size is doubled up, double -many work-items will be required to
+                    synchronize so that safely next iteration can be executed, while consuming previous iteration's global memory
                     writes ( intermediate nodes computed during last iteration/ step ). And I also note synchronization is costly. Another point to note,
                     after every round of work-group synchronization half of previous round's active work-items ( in a work-group ) are deactivated that means
                     most of work-items are not doing any useful work, which is just waste of computation ability of highly parallel GPU architecture.
@@ -371,7 +377,7 @@
                 <p class="blogText">
                     Now it's time to benchmark both of these implementations to actually see what do they bring on table. I used Nvidia Tesla V100 for that purpose, while
                     compiling single source SYCL program with SYCL/ DPC++ ( experimental CUDA backend ). I'm also placing last column
-                    which holds results obtained by benchmarking equivalent OpenCL implementation of <b>approach 1</b>, which I already presented
+                    which shows results obtained by benchmarking equivalent OpenCL implementation of <b>approach 1</b>, which I already presented
                     at end of <a class="blogLink" href="./opencl-accelerated-merkle-tree-construction.html">this</a> post.
                 </p>
                 <div class="microlight">
@@ -388,14 +394,15 @@
                 </div>
                 <p class="blogText">
                     As speculated, <b>approach 1</b> is ~2x faster compared to <b>approach 2</b>. Though <b>approach 2</b> has lesser kernel
-                    dispatch rounds but costly work-group level synchronization, mostly inactive work-items etc. are reasons behind
-                    lower performance. While in <b>approach 1</b>, there may be log<sub>2</sub>N -many dispatch rounds, but during each dispatch
+                    dispatch rounds but costly work-group level synchronization, mostly ( which keeps increasing after every step/ iteration ) 
+                    inactive work-items etc. are reasons behind lower performance. 
+                    While in <b>approach 1</b>, there may be log<sub>2</sub>N -many dispatch rounds, but during each dispatch
                     every work-item does some useful work, hence compute ability of GPU is better utilized, resulting into better performance.
-                    Equivalent OpenCL implementation of Merklization doesn't perform as good as SYCL variant. Note, SYCL with CUDA backend uses
-                    PTX as IR, but OpenCL on Nvidia GPU uses SPIR as <b>I</b>ntermediate <b>R</b>epresentation language. Also I'd like to note,
+                    Equivalent OpenCL implementation of Merklization <b>approach 1</b> doesn't perform as good as SYCL variant. Note, SYCL with CUDA backend uses
+                    PTX as IR, but OpenCL on Nvidia GPU uses SPIR as <b>I</b>ntermediate <b>R</b>epresentation language. I'd like to also note,
                     OpenCL implementation is powered by Rescue Prime <span class="highlight">merge(...)</span> function where hash state is represented
-                    using vector with 16 lanes of 64 -bit width i.e. <span class="highlight"><tt>ulong16</tt></span>. But in SYCL implementation Rescue hash state is represented
-                    using an array of 3 vectors each with 4 lanes of 64 -bit width i.e. <span class="highlight"><tt>sycl::ulong4[3]</tt></span>.
+                    using vector with 16 lanes ( each of 64 -bit width ) i.e. <span class="highlight"><tt>ulong16</tt></span>. But in SYCL implementation Rescue hash state is represented
+                    using an array of 3 vectors each 4 lanes wide ( each vector lane is of 64 -bit width ) i.e. <span class="highlight"><tt>sycl::ulong4[3]</tt></span>.
                     That means, in OpenCL implementation, last 4 lanes are used for padding purpose, because Rescue Prime hash state is
                     12 field elements ( 64 -bit each ) wide, wasting both compute and memory capability of accelerator; though it's much easier to program and more readable.
                     I implemented Rescue Prime hash with hash state represented using both <span class="highlight"><tt>sycl::ulong16</tt></span> and
