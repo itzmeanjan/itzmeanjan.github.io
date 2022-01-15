@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<!--
+  Author: Anjan Roy<hello@itzmeanjan.in>
+-->
+<html>
+
+<head>
+    <title>
+        BLAKE3 on GPGPU
+    </title>
+    <meta prefix="og: http://ogp.me/ns#" property="og:type" content="website">
+    <meta prefix="og: http://ogp.me/ns#" property="og:title" content="BLAKE3 on GPGPU">
+    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="---">
+    <meta prefix="og: http://ogp.me/ns#" property="og:url" content="https://itzmeanjan.in">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url"
+        content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:width" content="950">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:height" content="735">
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://itzmeanjan.in/">
+    <meta property="twitter:title" content="BLAKE3 on GPGPU">
+    <meta property="twitter:description" content="---">
+    <meta property="twitter:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta property="twitter:site" content="@meanjanry">
+    <meta name="description" content="---">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="author" content="Anjan Roy">
+    <meta name="keywords" content="---">
+    <meta name="theme-color" content="darkslategrey">
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" type="text/css" href="../styles/index.css">
+    <script src="../styles/code.js"></script>
+</head>
+
+<body>
+    <div id="parentDiv">
+        <div id="navBar">
+            <nav>
+                <a class="navLink" href="/"><big>H</big>ome</a> |
+                <a class="navLink" href="https://github.com/itzmeanjan" target="_blank"><big>P</big>rojects</a> |
+                <a class="navLink" href="/pages/blog.html"><big>B</big>log</a> |
+                <a class="navLink" href="/pages/contact.html"><big>C</big>ontact</a>
+            </nav>
+        </div>
+        <div class="childDiv">
+            <article>
+                <h1 class="blogHeader">
+                    BLAKE3 on GPGPU
+                </h1>
+                <h3>Created : January 15, 2022</h3>
+            </article>
+        </div>
+        <div class="childDiv">
+            <article>
+              <p class="blogText">
+                Last week I implemented multiple variants of highly parallelizable cryptographic hash function BLAKE3
+                using SYCL and today I'd like to present my collective understanding, which I gained while implementing/ benchmarking
+                BLAKE3, targeting heterogeneous accelerator platform(s). BLAKE3 cryptographic hash function easily lends itself well
+                to data parallel execution environments like SYCL/ OpenCL. Speaking from high level design point of view, it consists of 
+                following two steps.
+              </p>
+              <ol>
+                <li>Splitting the whole input byte array into N -many equilength ( 1024 bytes ) chunks, each of which can be independently compressed in parallel</li>
+                <li>Finally it requires constructing one Binary Merkle Tree with N -many leaf nodes, produced in last step as result of chunk compression</li>
+              </ol>
+              <p class="blogText">
+                The root of tree ( first 32 bytes ) is desired cryptographic hash of input byte array. Both of these steps are good candidates for data parallelism. Note, step-1 produces
+                N -many leaf nodes of Binary Merkle Tree, which are used for finding root of Merkle Tree in step-2 i.e. step-2 is data dependent on step-1. 
+                <br>
+                <br>
+                In this document, I'll be working with input byte array of length M -bytes such that <span class="highlight"><tt>M = N * 1024, where N = 2<sup>i</sup>, i = {1, 2, 3 ...}</tt></span>. That means
+                after execution of step-1 of BLAKE3, I should have power of 2 -many leaf nodes ( = N ), which will be used for computing root of fully balanced Binary Merkle Tree.
+                This will simplify both explanation & implementation. I'll walk you through following two techniques of implementing BLAKE3.
+              </p>
+              <ol>
+                <li>Each SYCL work-item compressing single chunk independently</li>
+                <li>Each SYCL work-item compressing P = {2, 4, 8, 16} chunks parallelly</li>
+              </ol>
+              <p class="blogText">
+                  Let me start with first approach which is simpler.
+                  <br>
+                  <br>
+                  Let us assume, I've 8KB input which I take as byte array ( say <span class="highlight">const sycl::uchar *</span> ) and split it into 8 equal sized chunks.
+                  Now each of these 1024 -bytes wide chunks can be compressed in parallel. For doing so, I'll dispatch 8 work-items, with work-group size W ( <= 8 ).
+                  Once all these 8 work-items complete their execution, each of them output 64 -bytes chaining value, from which first 32 -bytes to be taken
+                  as output chaining value of that chunk. These output chaining values are used as leaf nodes of Binary Merkle Tree, which I'm about to construct.
+                  In final step of computation, I construct a Binary Merkle Tree from 8 output chaining values, while combining each pair of consequtive chaining values
+                  in each level of tree. As Binary Merkle Tree is a hierarchical structure, I need to dispatch multiple rounds of kernels. To be more specific, in first dispatch
+                  round, I'll dispatch 4 work-items, who will read ( total ) 4 consequtive pairs of output chaining values and interpret pair of chaining values as left and
+                  right child of ( to be formed ) parent node. Computing parent node involves compressing a pair of chaining values, where each chaining value is of 32 -bytes,
+                  making total of 64 -bytes input to compress function. After completion of this dispatch round, we should have 4 parent nodes, who live just above leaf nodes.
+                  In next dispatch round, I've to ask for 2 work-items, each will compress two consequtive chaining values ( which are computed during last round )
+                  and produce total 2 parent nodes, who live just below root of the tree. In final round, it suffices to dispatch just a single task which takes
+                  64 -bytes input ( read two chaining values, which are two immediate children of root of tree, computed during last round ) and produces 32 -bytes
+                  output chaining value which is root of Merkle Tree. This root is our desired BLAKE3 hash.
+                  <br>
+                  <br>
+                  A pictorial demonstration might be helpful at this moment.
+              </p>
+              <img class="imgCenter" src="../images/blake3_on_gpgpu_0.jpg">
+            </article>
+        </div>
+    </div>
+    <div id="footerDiv">
+        <footer>
+            <p id="footerText">
+                &copy <a href="https://github.com/itzmeanjan/itzmeanjan.github.io" id="footerLink"
+                    target="_blank"><big>A</big>njan Roy</a> ( <big>M</big>IT Licensed )
+            </p>
+        </footer>
+    </div>
+</body>
+
+</html>
