@@ -275,6 +275,51 @@
     state[3] = state[3].yzwx()
               </div>
               <img class="imgCenter" src="../images/blake3_on_gpgpu_3.jpg">
+              <p class="blogText">
+                  During compression of 64 -bytes message input, after application of each round of mixing, sixteen message words ( 16 x 4 = 64 -bytes total message ) are permuted in following manner
+                  and permuted output is used as input message words during next round.
+              </p>
+              <div class="microlight">
+    # see https://github.com/BLAKE3-team/BLAKE3/blob/da4c792/reference_impl/reference_impl.rs#L40
+    
+    const size_t MSG_PERMUTATION[16] = {2, 6, 3, 10, 7, 0, 4, 13,
+                                    1, 11, 12, 5, 9, 14, 15, 8}
+
+    # see https://github.com/itzmeanjan/blake3/blob/e7019ed/include/blake3.hpp#L1623-L1635
+
+    def permute(sycl::uint msg[16]):
+        # temporary memory allocation to help permute
+        sycl::uint perm[16] = [0] * 16
+        
+        # permute
+        for i in range(16):
+            perm[i] = msg[MSG_PERMUTATION[i]]
+
+        # copy back
+        for i in range(16):
+            msg[i] = perm[i]
+              </div>
+              <p class="blogText">
+                  Now let us go back to chunk compression, where we had 1024 -bytes input ( as <tt>sycl::uchar *</tt> ); each <tt>compress( ... )</tt> function invocation
+                  takes 64 contiguous bytes to mix with 4x4 hash state matrix, that means we've to iterate 16 times for processing whole chunk. Each of these 64 -bytes
+                  are called blocks, 16 of them make a chunk. For first block in a chunk, a predefined input chaining value is used, but all subsequent 15 blocks use
+                  previous blocks output chaining value as its input chaining value. Note, BLAKE3 hash state is 64 -bytes, input chaining value is 32 -bytes, so remaining 32 -bytes
+                  of hash state ( i.e. last two rows of 4x4 hash state matrix ) comes from other parameters passed to <tt>compress( ... )</tt>. After applying <tt>compress( ... )</tt>
+                  first 32 -bytes of hash state is taken as output chaining value, to be used as input chaining value of next block in same chunk. Below is a pictorial demonstration for ease of
+                  understanding.
+              </p>
+              <div class="microlight">
+    # definition of compress( ... ) function: https://github.com/itzmeanjan/blake3/blob/e7019ed/include/blake3.hpp#L1728-L1780
+              </div>
+              <img class="imgCenter" src="../images/blake3_on_gpgpu_4.jpg">
+              <p class="blogText">
+                  Last block of some chunk produces 32 -bytes output chaining value, which is considered to be leaf node of Binary Merkle Tree. After all chunks are compressed & we've
+                  N -many output chaining values, interpreted as leaf nodes of Binary Merkle Tree. Usual parallel Binary Merkle Tree construction algorithmic can be applied. Note, for
+                  merging two consequtive chaining values ( at leaf level ) into single parent chaining value, <tt>compress( ... )</tt> function is invoked with a predefined constant input
+                  chaining value, along with two consequtive chaining values being interpreted as 64 -bytes input message. Some input flags change to denote that it's a parent node, being compressed.
+                  Also another point to note, when computing root chaining value ( read target digest of input byte array ), two immediate child nodes just below root are compressed
+                  into single chaining value, while passing some flags to denote this is root node being computed.
+              </p>
             </article>
         </div>
     </div>
