@@ -342,6 +342,73 @@
     also see how two immediate children nodes of root of BLAKE3 merkle tree are merged into root ( chaining value )
     # https://github.com/itzmeanjan/blake3/blob/e7019ed/include/blake3.hpp#L1805-L1812
               </div>
+              <p class="blogText">
+                  It's good time to give second approach a go, where each SYCL work-item compresses more than one chunk.
+                  <br>
+                  <br>
+                  Remember in first approach of parallel BLAKE3, I used a 4x4 matrix of 64 -bytes for representing hash state, when compressing each block of total 1024 -bytes wide chunk.
+                  But this time, hash state is represented using a 16 x N matrix, where N = {2, 4, 8, 16} and i<sup>th</sup> row of state matrix holds N -many different chunk's hash state
+                  value at index <b>i</b>; so N -many different chunk's hash states are represented using N -many columns of 16 x N shared state matrix. That means, with N = 4, sixteen 128 -bit
+                  vectors will be used for representing whole hash state of 4 chunks. Programmatically I'd like to represent it using following syntax.
+              </p>
+              <div class="microlight">
+    # representing N = 4, chunk's hash state
+    # each column, represents hash state of i^th chunk, where i ∈ [0, N)
+    #
+    # s_i_j = j^th chunk's hash state at index i, when each chunk's hash state looks like
+    # sycl::uint s_j[16] = { s_0, s_1, s_2, s_3, s_4, s_5, s_6, s_7, s_8, s_9, s_10, s_11, s_12, s_13, s_14, s_15 }
+
+    sycl::uint4 state[16] = {
+        sycl::uint4{ s_0_0, s_0_1, s_0_2, s_0_3 },
+        sycl::uint4{ s_1_0, s_1_1, s_1_2, s_1_3 },
+        sycl::uint4{ s_2_0, s_2_1, s_2_2, s_2_3 },
+        sycl::uint4{ s_3_0, s_3_1, s_3_2, s_3_3 },
+        sycl::uint4{ s_4_0, s_4_1, s_4_2, s_4_3 },
+        sycl::uint4{ s_5_0, s_5_1, s_5_2, s_5_3 },
+        sycl::uint4{ s_6_0, s_6_1, s_6_2, s_6_3 },
+        sycl::uint4{ s_7_0, s_7_1, s_7_2, s_7_3 },
+        sycl::uint4{ s_8_0, s_8_1, s_8_2, s_8_3 },
+        sycl::uint4{ s_9_0, s_9_1, s_9_2, s_9_3 },
+        sycl::uint4{ s_10_0, s_10_1, s_10_2, s_10_3 },
+        sycl::uint4{ s_11_0, s_11_1, s_11_2, s_11_3 },
+        sycl::uint4{ s_12_0, s_12_1, s_12_2, s_12_3 },
+        sycl::uint4{ s_13_0, s_13_1, s_13_2, s_13_3 },
+        sycl::uint4{ s_14_0, s_14_1, s_14_2, s_14_3 },
+        sycl::uint4{ s_15_0, s_15_1, s_15_2, s_15_3 },
+    };
+              </div>
+              <img class="imgCenter" src="../images/blake3_on_gpgpu_5.jpg">
+              <p class="blogText">
+                  With N ( = 4 ) chunks being compressed together, each SYCL work-item mixes total 4096 -bytes of input message into hash state, 
+                  each 1024 -bytes chunk splitted in 16 blocks, each of width 64 -bytes. There'll be sixteen rounds required for compressing 4096 -bytes. 
+                  In each round, i<sup>th</sup> block of all N chunks are compressed together. Note color coding used in following demonstration, where
+                  I attempt to show you how message words ( 32 -bit wide ) of each block are chosen to construct 128 -bit vectors ( using <tt>sycl::uint4</tt> )
+                  which are using during column-wise and diagonal mixing. I'd also like you to note that, there's no diagonalisation and undiagonalisation steps
+                  required in this SIMD style mixing, because each chunk's hash state is actually a 16 word vector, which is a column of 16 x N state matrix.
+                  After first block is processed, which consumes 64 -bytes message from each of four chunks ( i.e. first block of each chunk ), output chaining value
+                  of four chunks are prepared by taking 8 x N state matrix, where lower 8 x N portion of matrix ( read last 8 rows ) is dropped. This should produce
+                  32 -bytes output chaining value for each chunk, which will be used as input chaining values for those respective chunks when processing block<sub>i+1</sub>
+                  from all N ( = 4 ) chunks.
+                  <br>
+                  <br>
+                  After all sixteen blocks from all chunks are compressed into hash state, 16 x N state matrix is truncated to 8 x N matrix ( by dropping last 8 rows ), 
+                  which holds N -many output chaining values of N -many chunks. These N -many output chaining values are considered as N -many leaf nodes of BLAKE3 Merkle Tree,
+                  which will be constructed once all work-items complete compressing N -many chunks each.
+                  <br>
+                  <br>
+                  Binary Merklization algorithm doesn't anyhow change in second approach.
+              </p>
+              <img class="imgCenter" src="../images/blake3_on_gpgpu_6.jpg">
+              <p class="blogText">
+                  Note, when N = 2, sixteen 64 -bit wide SIMD registers are used for representing hash state of two chunks, which are compressed in parallel. Similarly, for N = {4, 8, 16}
+                  sixteen {128, 256, 512} -bit registers ( respectively ) will be used for representing hash state of N chunks. On modern CPUs which supports <tt>avx512*</tt> instructions
+                  512 -bit vectors can help boosting second SIMD approach.
+                  <br>
+                  <br>
+                  For understanding opportunities of using SIMD for parallelizing BLAKE3 on relatively large input byte arrays, I suggest you take a look at BLAKE3
+                  <a class="blogLink" href="https://github.com/BLAKE3-team/BLAKE3-specs/blob/ac78a71/blake3.pdf" target="_blank">specification</a>'s
+                  section 5.3.
+              </p>
             </article>
         </div>
     </div>
