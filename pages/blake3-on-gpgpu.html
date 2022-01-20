@@ -885,6 +885,27 @@
                 With these benchmark results in mind, I'll say, approach_1 of BLAKE3, where each SYCL work-item compresses single chunk performs much better ( almost always ) compared
                 to approach_2, where it's possible to compress 2/ 4/ 8/ 16 chunks in parallel, by each SYCL work-item.
             </p>
+            <p class="blogText">
+                For sake of reproducibility and future reference, I keep blake3's SYCL implementation <a class="blogLink" href="https://github.com/itzmeanjan/blake3/tree/724085b2f3d14aa7e9403f756312ccb2890c299d" target="_blank">here</a>.
+                I've presented benchmark results on only three accelerators, but you can find more of them for different input sizes <a class="blogLink" href="https://github.com/itzmeanjan/blake3/tree/724085b2f3d14aa7e9403f756312ccb2890c299d#benchmark" target="_blank">here</a>.
+                You may be interested in BLAKE3 implementation approach_{1, 2}, which you can find in this <a class="blogLink" href="https://github.com/itzmeanjan/blake3/blob/724085b2f3d14aa7e9403f756312ccb2890c299d/include/blake3.hpp" target="_blank">file</a>.
+                <br>
+                <br>
+                Note, this implementation might only be helpful when hashing large input sizes, but <i>does it really benefit using this implementation when host -> device data transfer
+                cost is much higher compared to kernel execution time ?</i> is an important question. If you happen to be interested in using BLAKE3 for constructing Merkle Tree, you may
+                check out my other <a class="blogLink" href="https://github.com/itzmeanjan/merklize-blake3/tree/f14f03945a0664ae59ac5c0fdea61623c58949bd" target="_blank">project</a>. Binary
+                Merklization using BLAKE3 is much easier as it requires me to hash only 64 -bytes input and produce 32 -bytes digest, which an intermediate node of Merkle Tree. This kind of
+                hashing is called 2-to-1 hashing, where two BLAKE3 digests are concatenated & hashed. You may notice, 2-to-1 hashing is simpler ( and cheaper ) because I need to compress
+                only one chunk, which has only one block in itself. So that chunk is root node of BLAKE3's internal Merkle Tree. I need to just make a single call to <tt>compress( ... )</tt>
+                function with proper flags to denote that this is the only node in BLAKE3's internal Merkle Tree --- and this is compute cheap ! So for generating all intermediate nodes of Binary Merkle Tree
+                when N -many ( read N is power of 2 ) leaf nodes are provided ( read each leaf node is a BLAKE3 digest ), using BLAKE3 hash, above linked implementation can come handy. Benchmark details 
+                of Binary Merklization implementation using BLAKE3 for different input sizes on different accelerator platforms can be found <a class="blogLink" href="https://github.com/itzmeanjan/merklize-blake3/tree/f14f03945a0664ae59ac5c0fdea61623c58949bd#benchmarks" target="_blank">here</a>.
+                While we're at it, it can be interesting to take a look at ( and compare ) Binary Merklization <a class="blogLink" href="https://github.com/itzmeanjan/vectorized-rescue-prime/tree/77e371ef2fb11ba7d7369005a60a0888393729f0#benchmark" target="_blank">implementation</a> 
+                using Rescue Prime hash, I wrote few weeks ago. It's clearly visible how performant BLAKE3 is compared to Rescue Prime, when Binary Merklization benchmarks are compared !
+            </p>
+            <p class="blogText">
+                Have a great time !
+            </p>
             </article>
         </div>
     </div>
