@@ -62,10 +62,10 @@
               </p>
               <ol>
                 <li>Splitting the whole input byte array into N -many equilength ( 1024 bytes ) chunks, each of which can be independently compressed in parallel</li>
-                <li>Finally it requires constructing one Binary Merkle Tree with N -many leaf nodes, produced in last step as result of chunk compression</li>
+                <li>Finally it requires constructing one Binary Merkle Tree with N -many leaf nodes, produced in previous step as result of chunk compression</li>
               </ol>
               <p class="blogText">
-                The root of tree ( first 32 bytes ) is desired cryptographic hash of input byte array. Both of these steps are good candidates for data parallelism. Note, step-1 produces
+                The root of tree ( 32 -bytes wide ) is desired cryptographic hash of input byte array. Both of these steps are good candidates for data parallelism. Note, step-1 produces
                 N -many leaf nodes of Binary Merkle Tree, which are used for finding root of Merkle Tree in step-2 i.e. step-2 is data dependent on step-1. 
                 <br>
                 <br>
@@ -83,8 +83,8 @@
                   <br>
                   Let us assume, I've 8KB input which I take as byte array ( say <span class="highlight"><tt>const sycl::uchar *</tt></span> ) and split it into 8 equal sized chunks.
                   Now each of these 1024 -bytes wide chunks can be compressed in parallel. For doing so, I'll dispatch 8 work-items, with work-group size W ( <tt><= 8 && 8 % W == 0</tt> ),
-                  where each work-item executes <span class=highlight><tt>compress( ... )</tt></span> function, consuming 1024 -bytes message, into hash state.
-                  Once all these 8 work-items complete their execution, each of them output 64 -bytes chaining value ( which is actually BLAKE3 hash state matrix ), 
+                  where each work-item executes <span class=highlight><tt>compress( ... )</tt></span> function, consuming 1024 -bytes input message into hash state.
+                  Once all these 8 work-items complete their execution, each of them output 64 -bytes chaining value ( which is actually BLAKE3 hash state matrix of that chunk ), 
                   from which first 32 -bytes to be taken
                   as output chaining value of that chunk. These output chaining values are used as leaf nodes of Binary Merkle Tree, which I'm about to construct.
                   <br>
@@ -129,7 +129,7 @@
               </div>
               <p class="blogText">
                 In final round, it suffices to dispatch just a single task which takes
-                64 -bytes input ( read two chaining values, which are two immediate children of root of tree, computed during last round ) and produces 32 -bytes
+                64 -bytes input ( read two chaining values, which are two immediate children of root of tree; these were computed during last round --- thus data dependency ) and produces 32 -bytes
                 output chaining value which is root of Merkle Tree. This root is our desired BLAKE3 hash. Also note, before root of tree can be computed, flag denoting
                 that output of <tt>compress( ... )</tt> function invocation is root chaining value of BLAKE3 Merkle Tree, need to be set.
                 <br>
@@ -139,7 +139,7 @@
               <img class="imgCenter" src="../images/blake3_on_gpgpu_0.jpg">
               <p class="blogText">
                   Empowered with this high level knowledge of algorithmic construction of BLAKE3, it's good time to dive into often mentioned <span class="highlight"><tt>compress( ... )</tt></span>
-                  function. Simply speaking compression starts with 32 -bytes input chaining value and 64 -bytes input message words, it consumes whole message into BLAKE3 hash state
+                  function. Simply speaking compression starts with 32 -bytes input chaining value and 64 -bytes input message, it consumes whole message into BLAKE3 hash state
                   ( in multiple rounds, while also employing message permutation, using predefined indexing tricks )
                   and produces output of 64 -bytes, which is nothing but hash state after consuming whole input message inside it. First 32 -bytes of output is taken as chaining value
                   which is either used as input to next stage of computation or as final root chaining value i.e. BLAKE3 digest. Let's emphasize on BLAKE3 hash state.
@@ -154,6 +154,30 @@
     # see https://github.com/BLAKE3-team/BLAKE3/blob/da4c792/reference_impl/reference_impl.rs#L42-L52 👇
     
     # rrot( v, n ) => `v` is rotated right by n -bit places
+    #
+    # 1. If v is a scalar, it's bitwise rotated rightwards by n -bits
+    #
+    # 2. When v is vector, each lane of vector ( 32 -bit word ) is 
+    # rotated n -bits rightwards
+
+    # Note: Find `rotate` function in table 
+    # https://www.khronos.org/registry/SYCL/specs/sycl-2020/html/sycl-2020.html#_integer_functions
+    # which takes either a scalar/ vector and rotates each element leftwards by n -bits
+    # but for blake3 I need to rotate hash state words rightwards, so I make use of them as
+    #
+    # n = # -of bit places to rotate rightwards
+    # v = input vector, each lane of it will be rotated
+    #
+    # sycl::rotate(v, 32 - n) => rotated each lane by n -bits rightwards
+    #
+    # If I've to rotate each lane by 7 -bits rightwards, I'll
+    # invoke sycl::rotate(_, 25)
+    #
+    # This works because each word of blake3 is 32 -bits wide !
+    #
+    # See how I've used it 
+    # https://github.com/itzmeanjan/blake3/blob/1c58f6a/include/blake3.hpp#L1570-L1573
+
 
     def g(sycl::uint state[16], size_t a, size_t b, size_t c, size_t d, sycl::uint mx, sycl::uint my):
         state[a] = state[a] + state[b] + mx
@@ -181,10 +205,10 @@
         g(state, 3, 4, 9, 14, msg[14], msg[15])
               </div>
               <p class="blogText">
-                  Note indices passed as argument to <tt>g( ... )</tt> function from <tt>blake3_round( ... )</tt>, which clearly shows in first four function invocations, it's column-wise mixing
-                  eight message words with hash state. And last four <tt>g( ... )</tt> function invocations are diagonally mixing remaining eight message words with hash state. It's possible to
+                  Note indices passed as argument to <tt>g( ... )</tt> function from <tt>blake3_round( ... )</tt>, which clearly shows in first four <tt>g( ... )</tt> function invocations, it's column-wise mixing
+                  first eight message words with hash state. And last four <tt>g( ... )</tt> function invocations are diagonally mixing remaining eight message words with hash state. It's possible to
                   reduce four vertical mixing invocations into single function call, where all four columns are mixed parallelly, 
-                  if I represent hash state as an array of 4 vectors ( SYCL intrinsic ), where each vector is of type <tt>sycl::uint4</tt>, as shown below. With this new representation of hash state,
+                  if I represent hash state as an array of 4 vectors ( SYCL <a class="blogLink" href="https://www.khronos.org/registry/SYCL/specs/sycl-2020/html/sycl-2020.html#sec:vector.type" target="_blank">intrinsic</a> ), where each vector is of type <tt>sycl::uint4</tt>, as shown below. With this new representation of hash state,
                   diagonal mixing also enjoys boost, where all four diagonals of hash state matrix can be mixed parallelly.
               </p>
               <div class="microlight">
@@ -202,6 +226,9 @@
               <div class="microlight">
     # see section 5.3 of BLAKE3 specification https://github.com/BLAKE3-team/BLAKE3-specs/blob/ac78a71/blake3.pdf
     # simd style mixing
+    #
+    # see full SYCL implementation of blake3_round( ... )
+    # https://github.com/itzmeanjan/blake3/blob/1c58f6a/include/blake3.hpp#L1558-L1610
 
     def blake3_round(sycl::uint4 state[4], sycl::uint msg[16]):
         sycl::uint4 mx = { msg[0], msg[2], msg[4], msg[6] }
@@ -230,10 +257,11 @@
         # ... to be written ...
               </div>
               <p class="blogText">
-                  But this 4x4 matrix based hash state form comes with its own requirement, where it needs to be diagonalised such that each diagonal of 4x4 matrix is now in same column, before
+                  But keeping hash state as 4x4 matrix comes with its own requirement, where it needs to be diagonalised such that each diagonal of 4x4 matrix is now in same column, before
                   diagonal mixing can be applied. After diagonal mixing, hash state needs to get back to its original form, which calls for undoing the diagonalisation previously performed.
-                  Diagonalisation involves rotating lanes of 4 vectors leftwards by row index of respective vector i.e. {0, 1, 2, 3} in 4x4 state matrix. Note, vector lane rotation doesn't rotate
-                  each lane content ( <tt>sycl::uint</tt> ), instead it rotates whole vector by N places. I make use of vector swizzle operators provided by SYCL vector intrinsic API for rotating vector.
+                  Diagonalisation involves rotating each of four vectors leftwards by row index of respective vector i.e. {0, 1, 2, 3} in 4x4 state matrix. Note, vector lane rotation doesn't rotate
+                  each lane content ( <tt>sycl::uint</tt> ), instead it rotates whole vector by N ( < 4, because each row has 4 lanes ) places.
+                  I make use of vector swizzle operators provided by SYCL vector intrinsic <a class="blogLink" href="https://www.khronos.org/registry/SYCL/specs/sycl-2020/html/sycl-2020.html#_swizzles" target="_blank">API</a> for rotating vector.
                   <br>
                   <br>
                   A pictorial depiction looks like below.
@@ -253,7 +281,9 @@
               </div>
               <p class="blogText">
                   Following code snippet can perform diagonal mixing on four 128 -bit vectors i.e. <tt>sycl::uint4[4]</tt>. This will consume last 8 message words of total 64 -bytes
-                  input message into hash state.
+                  input message into hash state. Note, other than which message words are consumed, diagonal mixing is just same as column-wise mixing, because
+                  we've arranged columns to be so. This means, in implementation both of these mixings can be replaced using preprocessor directives or other compile-time
+                  code generation means.
               </p>
               <div class="microlight">
     def blake3_round(sycl::uint4 state[4], sycl::uint msg[16]):        
@@ -275,7 +305,7 @@
         state[1] = rrot(state[1] ^ state[2], 7)
               </div>
               <p class="blogText">
-                  After diagonal mixing diagonalisation will be undone, rotating vector lanes rightwards by row index of respective vector i.e. {0, 1, 2, 3} in 4x4 state matrix. Following code snippet should bring back
+                  After diagonal mixing diagonalisation will be undone, rotating 4x4 state matrix vectors rightwards by row index of respective vector i.e. {0, 1, 2, 3} in 4x4 state matrix. Following code snippet should bring back
                   hash state is desired form, preparing it for next round.
               </p>
               <div class="microlight">
@@ -324,22 +354,30 @@
                   understanding.
               </p>
               <div class="microlight">
-    # definition of compress( ... ) function: https://github.com/itzmeanjan/blake3/blob/e7019ed/include/blake3.hpp#L1728-L1780
+    # definition of compress( ... ) function
+    # https://github.com/itzmeanjan/blake3/blob/e7019ed/include/blake3.hpp#L1728-L1780
+    
+    # predefined constant input chaining values I mentioned above
+    # https://github.com/itzmeanjan/blake3/blob/1c58f6a/include/blake3_consts.hpp#L8-L9
+    
+    # these are flags used in blake3
+    # https://github.com/itzmeanjan/blake3/blob/1c58f6a/include/blake3_consts.hpp#L16-L20
               </div>
               <img class="imgCenter" src="../images/blake3_on_gpgpu_4.jpg">
               <p class="blogText">
-                  Last block of some chunk produces 32 -bytes output chaining value, which is considered to be leaf node of Binary Merkle Tree. After all chunks are compressed & we've
+                  Last block of each chunk produces 32 -bytes output chaining value, which is considered to be leaf node of Binary Merkle Tree. After all chunks are compressed & we've
                   N -many output chaining values, interpreted as leaf nodes of Binary Merkle Tree. Usual parallel Binary Merkle Tree construction algorithm can be applied. Note, for
                   merging two consecutive chaining values ( at leaf level ) into single parent chaining value, <tt>compress( ... )</tt> function is invoked with a predefined constant input
                   chaining value, along with two consecutive chaining values being interpreted as 64 -bytes input message. Some input flags are passed to denote that its output chaining value will be a parent node.
-                  And when computing root chaining value ( read target digest of input byte array ), two immediate child nodes just below root are compressed
+                  While computing root chaining value ( read target digest of input byte array ), two immediate child nodes just below root are compressed
                   into single chaining value, while passing some flags to denote this is root node being computed.
               </p>
               <div class="microlight">
     see how two child nodes are merged into single parent ( chaining value ) 
     # https://github.com/itzmeanjan/blake3/blob/e7019ed/include/blake3.hpp#L1782-L1803
     
-    also see how two immediate children nodes of root of BLAKE3 merkle tree are merged into root ( chaining value )
+    also see how two immediate children nodes of root of BLAKE3 merkle tree
+    are merged into root ( chaining value )
     # https://github.com/itzmeanjan/blake3/blob/e7019ed/include/blake3.hpp#L1805-L1812
               </div>
               <p class="blogText">
@@ -348,7 +386,7 @@
                   <br>
                   Remember in first approach of parallel BLAKE3, I used a 4x4 matrix of 64 -bytes for representing hash state, when compressing each block of total 1024 -bytes wide chunk.
                   But this time, hash state is represented using a 16 x N matrix, where N = {2, 4, 8, 16} and i<sup>th</sup> row of state matrix holds N -many different chunk's hash state
-                  value at index <b>i</b>; so N -many different chunk's hash states are represented using N -many columns of 16 x N shared state matrix. That means, with N = 4, sixteen 128 -bit
+                  word at index <b>i</b>; so N -many different chunk's hash states are represented in N -many columns of 16 x N shared state matrix. That means, with N = 4, sixteen 128 -bit
                   vectors will be used for representing whole hash state of 4 chunks. Programmatically I'd like to represent it using following syntax.
               </p>
               <div class="microlight">
@@ -356,7 +394,7 @@
     # each column, represents hash state of i^th chunk, where i ∈ [0, N)
     #
     # s_i_j = j^th chunk's hash state at index i, when each chunk's hash state looks like
-    # sycl::uint s_j[16] = { s_0, s_1, s_2, s_3, s_4, s_5, s_6, s_7, s_8, s_9, s_10, s_11, s_12, s_13, s_14, s_15 }
+    # sycl::uint s_i[16] = { s_0, s_1, s_2, s_3, s_4, s_5, s_6, s_7, s_8, s_9, s_10, s_11, s_12, s_13, s_14, s_15 }
 
     sycl::uint4 state[16] = {
         sycl::uint4{ s_0_0, s_0_1, s_0_2, s_0_3 },
@@ -382,7 +420,7 @@
                   With N ( = 4 ) chunks being compressed together, each SYCL work-item mixes total 4096 -bytes of input message into hash state, 
                   each 1024 -bytes chunk splitted in 16 blocks, each of width 64 -bytes. There'll be sixteen rounds required for compressing 4096 -bytes. 
                   In each round, i<sup>th</sup> block of all N chunks are compressed together. Note color coding used in following demonstration, where
-                  I attempt to show you how message words ( 32 -bit wide ) of each block are chosen to construct 128 -bit vectors ( using <tt>sycl::uint4</tt> )
+                  I attempt to show you how message words ( 32 -bit wide ) from each block are chosen to construct 128 -bit vectors ( using <tt>sycl::uint4</tt> )
                   which are using during column-wise and diagonal mixing. I'd also like you to note that, there's no diagonalisation and undiagonalisation steps
                   required in this SIMD style mixing, because each chunk's hash state is actually a 16 word vector, which is a column of 16 x N state matrix.
                   After first block is processed, which consumes 64 -bytes message from each of four chunks ( i.e. first block of each chunk ), output chaining value
@@ -401,8 +439,8 @@
               <img class="imgCenter" src="../images/blake3_on_gpgpu_6.jpg">
               <p class="blogText">
                   Note, when N = 2, sixteen 64 -bit wide SIMD registers are used for representing hash state of two chunks, which are compressed in parallel. Similarly, for N = {4, 8, 16}
-                  sixteen {128, 256, 512} -bit registers ( respectively ) will be used for representing hash state of N chunks. On modern CPUs which supports <tt>avx512*</tt> instructions
-                  512 -bit vectors can help boosting second SIMD approach.
+                  sixteen {128, 256, 512} -bit registers ( respectively ) will be used for representing hash state of N chunks. On modern CPUs which support <tt>avx512*</tt> instructions
+                  512 -bit vectors can help boosting this style of leveraging arbitrary many SIMD lanes.
                   <br>
                   <br>
                   For understanding opportunities of using SIMD for parallelizing BLAKE3 on relatively large input byte arrays, I suggest you take a look at BLAKE3
@@ -411,9 +449,9 @@
               </p>
               <p class="blogText">
                   As you've now better understanding of aforementioned two approaches for computing BLAKE3 hash, I'd like to present you with benchmark results. In following tables, you'll
-                  see I'm taking random input of N -bytes; transferring whole input to accelerator's accompanying memory; invoking BLAKE3 hash function with on-device data pointer; waiting for
+                  see I'm taking random input of N -bytes; transferring whole input to accelerator's accompanying memory; invoking BLAKE3 kernel with on-device data pointer; waiting for
                   all computation steps to complete and finally transferring 32 -bytes digest ( which is output chaining value of root node of Binary Merkle Tree in BLAKE3 hash ) to preallocated
-                  memory on host.
+                  memory on host. Note, all these numbers represent mean value obtained after executing same kernel with same input size/ arguments K ( = 8 ) -many times.
               </p>
               <table class="centeredTable">
                   <tr>
@@ -553,18 +591,18 @@
                   on Intel CPU execution time for 64 MB, 128 MB and 256 MB input sizes are pretty close to each other.
                   <br>
                   <br>
-                  As output size is constant ( read 32 -bytes ), device to host data transfer cost is not much of interest. But input data size is variable,
-                  host to device data transfer cost tells us is it worth transferring large byte array to accelerator and then computing BLAKE3 hash ?
+                  As output size is constant ( read 32 -bytes ), device to host data transfer cost is not much of concern. But input data size is variable,
+                  host to device input data transfer cost can help us in answering <i>is it worth transferring large byte array to accelerator for computing BLAKE3 hash ?</i>
                   <br>
                   <br>
                   Comparing between multiple accelerators ( with same input size ), it shows as input data size increases host to device data transfer cost
                   increases quickly for GPU ( even surpasses input data transfer cost on CPU for same size ), which makes sense because those accelerators
                   are connected to host over PCIe bus. When comparing input data transfer cost of Nvidia's GPU and Intel's CPU, I see until 512 MB input size,
                   cost was lesser for GPU, but at 512 MB input size both of them take around same time. For both GPUs from two different vendors, I see
-                  their host to device data transfer cost increases linearly as input size is increased, because both of them are connected to host CPU using PCIe,
+                  their host to device data transfer cost increases linearly as input size is doubled, because both of them are connected to host CPU using PCIe,
                   which doesn't have high bandwidth. Due to these relatively high input data transfer costs, it may not always benefit using this accelerated
-                  BLAKE3 implementation, where explicitly data needs to be transferred to accelerator's local memory, and it may end up defeating whole purpose
-                  of speeding up. Just to make it more evident, notice for 1 GB input size on Nvidia Telsa V100 GPU, input transfer is ~8x costlier than actual
+                  BLAKE3 implementation, where explicitly data needs to be transferred to accelerator's local DRAM, and it may end up defeating whole purpose
+                  of speeding up. Just to make it more evident, notice in above table, for 1 GB input size on Nvidia Telsa V100 GPU, input transfer is ~8x costlier than actual
                   computation of BLAKE3 hash.
                   <br>
                   <br>
@@ -859,18 +897,18 @@
                 </tr>
             </table>
             <p class="blogText">
-                In above table, host <-> device data transfer cost is not something I'm interested in, but instead I want you to notice how changing SIMD lane count from 2 to 16 ( everytime doubling ),
+                In above table, host <-> device data transfer cost is not something I'm interested in, but instead I want you to notice how changing SIMD lane count from 2 to 16 ( by doubling ),
                 affects kernel execution time on some accelerator with some specific input size. For example, let us zoom into row where input size is 256 MB; on Tesla V100 GPU
                 as number of SIMD lanes used are doubled ( i.e. # -of chunks being compressed together by each SYCL work-item is doubled ), kernel execution time is doubled.
                 Now notice, how kernel execution performs on Intel Iris Xe Max GPU, for input size 256 MB, using both approach_{1, 2} ( with SIMD lanes {2, 4, 8, 16} ). See with
                 approach_1, kernel execution takes ~19 ms, but when 2 chunks are compressed together ( using approach_2 ), resources are better utilized, results in improved kernel
-                execution time of ~12 ms. But kernel execution becomes ~9x costlier as soon 4 chunks are compressed together, because now each work-item compresses 4 chunks in parallel,
-                while representing hash state using sixteen 128 -bit wide vectors. Thus each work-item ends up using too much resources ( read register files for keeping hash state ), which
+                execution time of ~12 ms. But kernel execution becomes ~9x costlier as soon as 4 chunks are compressed together, because now each work-item compresses 4 chunks in parallel,
+                while representing hash state using sixteen 128 -bit wide vectors. Thus each work-item ends up using too many resources ( read register files for keeping hash state ), which
                 results in register spilling --- portions of hash state are now placed on far distant and high latency global memory. Accessing global memory involves going through
-                multiple memory hierarchies i.e. global memory and two levels of caches etc., each of which has its own latency. After compressing 4 chunks together, as I keep increasing
+                multiple memory hierarchies i.e. global memory and two levels of caches etc., each of which adds its own latency. After compressing 4 chunks together, as I keep increasing
                 # -of chunks to compress together ( say 8/ 16 ), execution time also keeps getting doubled up. Notice, for 1024 MB input size, on Intel Iris Xe Max GPU, when 2 chunks are
                 compressed together, kernel execution time is ~47 ms, but when 4 chunks are compressed together execution time suffers heavily --- increasing ~9x ! This trend follows,
-                as kernel execution time is doubled and quadrupled when 8 and 16 chunks are compressed in parallel, respectively.
+                as kernel execution time is doubled and quadrupled ( compared to compressing two chunks together ) when 8 and 16 chunks are compressed in parallel, respectively.
                 <br>
                 <br>
                 Now let us explore whether similar kind of behaviour is visible when compressing multiple chunks together on Intel CPU. Let me begin with input size 64 MB, when only single chunk
@@ -878,7 +916,7 @@
                 SIMD_LANE_COUNT = 16. Due to presence of limited number of 512 -bit registers, not many work-items can execute at a time, which is reflected when sixteen 512 -bit registers
                 are used for representing hash state, compressing 16 chunks in parallel. When I look at input size both 256 MB & 1024 MB, I see similar pattern, where compressing 4 chunks together
                 performs better than compressing {2, 8, 16} chunks together. When 4 chunks are compressed together sixteen 128 -bit vectors are used by each SYCL work-item
-                for representing hash state. Now there're 32 of these 512 -bit register files on each core of this machine, which means on each core 8 SYCL work-items should proceed in parallel,
+                for representing hash state. Now there are 32 of these 512 -bit register files on each core of this machine, which means on each core 8 SYCL work-items should proceed in parallel,
                 without any register spilling.
             </p>
             <p class="blogText">
@@ -887,17 +925,22 @@
             </p>
             <p class="blogText">
                 For sake of reproducibility and future reference, I keep blake3's SYCL implementation <a class="blogLink" href="https://github.com/itzmeanjan/blake3/tree/724085b2f3d14aa7e9403f756312ccb2890c299d" target="_blank">here</a>.
-                I've presented benchmark results on only three accelerators, but you can find more of them for different input sizes <a class="blogLink" href="https://github.com/itzmeanjan/blake3/tree/724085b2f3d14aa7e9403f756312ccb2890c299d#benchmark" target="_blank">here</a>.
+                Here I've presented benchmark results of only three accelerators, but you can find more of them for different input sizes <a class="blogLink" href="https://github.com/itzmeanjan/blake3/tree/724085b2f3d14aa7e9403f756312ccb2890c299d#benchmark" target="_blank">here</a>.
                 You may be interested in BLAKE3 implementation approach_{1, 2}, which you can find in this <a class="blogLink" href="https://github.com/itzmeanjan/blake3/blob/724085b2f3d14aa7e9403f756312ccb2890c299d/include/blake3.hpp" target="_blank">file</a>.
                 <br>
                 <br>
-                Note, this implementation might only be helpful when hashing large input sizes, but <i>does it really benefit using this implementation when host -> device data transfer
-                cost is much higher compared to kernel execution time ?</i> is an important question. If you happen to be interested in using BLAKE3 for constructing Merkle Tree, you may
+                Note, this implementation might be helpful when hashing large input sizes, but <i>does it really benefit using this implementation when host -> device data transfer
+                cost is much higher compared to kernel execution time ?</i> is an important question.
+                <br>
+                <br>
+                If you happen to be interested in using BLAKE3 for constructing Merkle Tree, you may
                 check out my other <a class="blogLink" href="https://github.com/itzmeanjan/merklize-blake3/tree/f14f03945a0664ae59ac5c0fdea61623c58949bd" target="_blank">project</a>. Binary
-                Merklization using BLAKE3 is much easier as it requires me to hash only 64 -bytes input and produce 32 -bytes digest, which an intermediate node of Merkle Tree. This kind of
+                Merklization using BLAKE3 is much easier as it requires me to hash only 64 -bytes input and produce 32 -bytes digest, which is an intermediate node of Merkle Tree. This kind of
                 hashing is called 2-to-1 hashing, where two BLAKE3 digests are concatenated & hashed. You may notice, 2-to-1 hashing is simpler ( and cheaper ) because I need to compress
-                only one chunk, which has only one block in itself. So that chunk is root node of BLAKE3's internal Merkle Tree. I need to just make a single call to <tt>compress( ... )</tt>
-                function with proper flags to denote that this is the only node in BLAKE3's internal Merkle Tree --- and this is compute cheap ! So for generating all intermediate nodes of Binary Merkle Tree
+                only one chunk, which has only one block in itself. And that chunk is root node of BLAKE3's internal Merkle Tree, meaning BLAKE3's internal Merklization requirement is not a
+                requirement anymore. 
+                I need to just make a single call to <tt>compress( ... )</tt>
+                function with proper flags to denote that this is the only node in BLAKE3's internal Merkle Tree --- compute-wise cheap ! So for generating all intermediate nodes of Binary Merkle Tree
                 when N -many ( read N is power of 2 ) leaf nodes are provided ( read each leaf node is a BLAKE3 digest ), using BLAKE3 hash, above linked implementation can come handy. Benchmark details 
                 of Binary Merklization implementation using BLAKE3 for different input sizes on different accelerator platforms can be found <a class="blogLink" href="https://github.com/itzmeanjan/merklize-blake3/tree/f14f03945a0664ae59ac5c0fdea61623c58949bd#benchmarks" target="_blank">here</a>.
                 While we're at it, it can be interesting to take a look at ( and compare ) Binary Merklization <a class="blogLink" href="https://github.com/itzmeanjan/vectorized-rescue-prime/tree/77e371ef2fb11ba7d7369005a60a0888393729f0#benchmark" target="_blank">implementation</a> 
