@@ -409,6 +409,169 @@
                   <a class="blogLink" href="https://github.com/BLAKE3-team/BLAKE3-specs/blob/ac78a71/blake3.pdf" target="_blank">specification</a>'s
                   section 5.3.
               </p>
+              <p class="blogText">
+                  As you've now better understanding of aforementioned two approaches for computing BLAKE3 hash, I'd like to present you with benchmark results. In following tables, you'll
+                  see I'm taking random input of N -bytes; transferring whole input to accelerator's accompanying memory; invoking BLAKE3 hash function with on-device data pointer; waiting for
+                  all computation steps to complete and finally transferring 32 -bytes digest ( which is output chaining value of root node of Binary Merkle Tree in BLAKE3 hash ) to preallocated
+                  memory on host.
+              </p>
+              <table class="centeredTable">
+                  <tr>
+                      <th colspan="5">
+                          BLAKE3 Hash using <tt>approach_1</tt>
+                      </th>
+                  </tr>
+                  <tr>
+                      <th>
+                          Input Size
+                      </th>
+                      <th>
+                          Accelerator
+                      </th>
+                      <th>
+                          Kernel Execution Time
+                      </th>
+                      <th>
+                          Host -> Device Tx Time
+                      </th>
+                      <th>
+                          Host <- Device Tx Time
+                      </th>
+                  </tr>
+                  <tr>
+                      <td rowspan="4">64 MB</td>
+                  </tr>
+                  <tr>                           
+                    <td>Tesla V100-SXM2-16GB</td>
+                    <td>844.598250 us</td>
+                    <td>6.166145 ms</td>
+                    <td>6.973250 us</td>
+                  </tr>
+                  <tr>
+                    <td>Intel(R) Xeon(R) Platinum 8358 CPU @ 2.60GHz</td>
+                    <td>6.239875 ms</td>
+                    <td>9.797500 ms</td>
+                    <td>2.525625 us</td>
+                  </tr>
+                  <tr>                                                  
+                    <td>Intel(R) Iris(R) Xe MAX Graphics</td>
+                    <td>4.974242 ms</td>
+                    <td>17.749401 ms</td>
+                    <td>1.319500 us</td>
+                  </tr>
+
+                <tr>
+                    <td rowspan="4">128 MB</td>
+                </tr>
+                <tr>
+                  <td>Tesla V100-SXM2-16GB</td>
+                  <td>1.800964 ms</td>
+                  <td>12.269974 ms</td>
+                  <td>7.080000 us</td>
+                </tr>
+                <tr>
+                  <td>Intel(R) Xeon(R) Platinum 8358 CPU @ 2.60GHz</td>
+                  <td>8.187520 ms</td>
+                  <td>20.664062 ms</td>
+                  <td>1.242000 us</td>
+                </tr>
+                <tr>
+                  <td>Intel(R) Iris(R) Xe MAX Graphics</td>
+                  <td>9.812348 ms</td>
+                  <td>35.475108 ms</td>
+                  <td>1.319500 us</td>
+                </tr>
+                <tr>
+                    <td rowspan="4">256 MB</td>
+                </tr>
+                <tr>              
+                  <td>Tesla V100-SXM2-16GB</td>
+                  <td>3.267731 ms</td>
+                  <td>24.462952 ms</td>
+                  <td>6.805500 us</td>
+                </tr>
+                <tr>
+                  <td>Intel(R) Xeon(R) Platinum 8358 CPU @ 2.60GHz</td>
+                  <td>8.853032 ms</td>
+                  <td>32.455801 ms</td>
+                  <td>1.047125 us</td>
+                </tr>
+                <tr>                         
+                  <td>Intel(R) Iris(R) Xe MAX Graphics</td>
+                  <td>19.465823 ms</td>
+                  <td>70.886068 ms</td>
+                  <td>1.293500 us</td>
+                </tr>
+                <tr>
+                    <td rowspan="4">512 MB</td>
+                </tr>
+                <tr>
+                  <td>Tesla V100-SXM2-16GB</td>
+                  <td>5.998047 ms</td>
+                  <td>48.833740 ms</td>
+                  <td>6.713750 us</td>
+                </tr>
+                <tr>
+                  <td>Intel(R) Xeon(R) Platinum 8358 CPU @ 2.60GHz</td>
+                  <td>14.807205 ms</td>
+                  <td>48.242437 ms</td>
+                  <td>1.063000 us</td>
+                </tr>
+                <tr>                         
+                  <td>Intel(R) Iris(R) Xe MAX Graphics</td>
+                  <td>39.271700 ms</td>
+                  <td>141.716997 ms</td>
+                  <td>1.313000 us</td>
+                </tr>
+                <tr>
+                    <td rowspan="4">1024 MB</td>
+                </tr>
+                <tr>
+                  <td>Tesla V100-SXM2-16GB</td>
+                  <td>11.915527 ms</td>
+                  <td>97.573730 ms</td>
+                  <td>8.423000 us</td>
+                </tr>
+                <tr>
+                  <td>Intel(R) Xeon(R) Platinum 8358 CPU @ 2.60GHz</td>
+                  <td>22.864140 ms</td>
+                  <td>79.047688 ms</td>
+                  <td>1.088500 us</td>
+                </tr>
+                <tr>                         
+                  <td>Intel(R) Iris(R) Xe MAX Graphics</td>
+                  <td>77.556440 ms</td>
+                  <td>283.341799 ms</td>
+                  <td>1.534000 us</td>
+                </tr>
+              </table>
+              <p class="blogText">
+                  In above table, you should see three accelerators I targeted for benchmarking BLAKE3 SIMD <tt>approach_1</tt>, where two of them are GPUs 
+                  from two different vendors and one is 64 -core CPU from Intel. You'll notice, Nvidia's Tesla V100 GPU performs best on all input sizes.
+                  Being a 64 -core CPU, in majority of cases it performs better compared to Intel's Irix Xe Max GPU. Note, when input size is 64 MB, Intel GPU
+                  perform's little better than 64 -core CPU. But as input size increases kernel execution time on Intel GPU starts to quickly increase, though
+                  on Intel CPU execution time for 64 MB, 128 MB and 256 MB input sizes are pretty close to each other.
+                  <br>
+                  <br>
+                  As output size is constant ( read 32 -bytes ), device to host data transfer cost is not much of interest. But input data size is variable,
+                  host to device data transfer cost tells us is it worth transferring large byte array to accelerator and then computing BLAKE3 hash ?
+                  <br>
+                  <br>
+                  Comparing between multiple accelerators ( with same input size ), it shows as input data size increases host to device data transfer cost
+                  increases quickly for GPU ( even surpasses input data transfer cost on CPU for same size ), which makes sense because those accelerators
+                  are connected to host over PCIe bus. When comparing input data transfer cost of Nvidia's GPU and Intel's CPU, I see until 512 MB input size,
+                  cost was lesser for GPU, but at 512 MB input size both of them take around same time. For both GPUs from two different vendors, I see
+                  their host to device data transfer cost increases linearly as input size is increased, because both of them are connected to host CPU using PCIe,
+                  which doesn't have high bandwidth. Due to these relatively high input data transfer costs, it may not always benefit using this accelerated
+                  BLAKE3 implementation, where explicitly data needs to be transferred to accelerator's local memory, and it may end up defeating whole purpose
+                  of speeding up. Just to make it more evident, notice for 1 GB input size on Nvidia Telsa V100 GPU, input transfer is ~8x costlier than actual
+                  computation of BLAKE3 hash.
+                  <br>
+                  <br>
+                  Lastly I'd like to draw your attention to device to host data transfer cost ( transferring 32 -bytes digest back to host ), where
+                  you should notice, on Nvidia's Tesla V100 GPU it's ~(6 - 7)x more expensive to transfer 32 -bytes ( over PCIe ) to host, when compared to
+                  Intel's GPU.
+              </p>
             </article>
         </div>
     </div>
