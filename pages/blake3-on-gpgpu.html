@@ -572,6 +572,319 @@
                   you should notice, on Nvidia's Tesla V100 GPU it's ~(6 - 7)x more expensive to transfer 32 -bytes ( over PCIe ) to host, when compared to
                   Intel's GPU.
               </p>
+              <p class="blogText">
+                  In approach_2 of computing BLAKE3, I'm compressing {2, 4, 8, 16} chunks together & in following table I present kernel execution time and host <-> device data transfer
+                  cost, by timing SYCL events obtained as result of submitting respective commands on SYCL queue, which has profiling enabled.
+              </p>
+              <table class="centeredTable">
+                <tr>
+                    <th colspan="6">
+                        BLAKE3 Hash using <tt>approach_2</tt>, compressing {2, 4, 8, 16} chunks together
+                    </th>
+                </tr>
+                <tr>
+                    <th>
+                        Input Size
+                    </th>
+                    <th>
+                        Accelerator
+                    </th>
+                    <th>
+                        SIMD Width
+                    </th>
+                    <th>
+                        Kernel Execution Time
+                    </th>
+                    <th>
+                        Host -> Device Tx Time
+                    </th>
+                    <th>
+                        Host <- Device Tx Time
+                    </th>
+                </tr>
+                <tr>
+                    <td rowspan="16">64 MB</td>
+                </tr>
+                <tr>                           
+                  <td rowspan="5">Tesla V100-SXM2-16GB</td>
+                </tr>
+                <tr>
+                    <td>64 -bit</td>
+                    <td>1.016358 ms</td>
+                    <td>6.172363 ms</td>
+                    <td>7.568375 us</td>
+                </tr>
+                <tr>
+                    <td>128 -bit</td>
+                    <td>923.828375 us</td>
+                    <td>6.168457 ms</td>
+                    <td>7.323875 us</td>
+                </tr>
+                <tr>                           
+                    <td>256 -bit</td>
+                    <td>1.318848 ms</td>
+                    <td>6.168945 ms</td>
+                    <td>7.812625 us</td>
+                </tr>
+                <tr>                          
+                    <td>512 -bit</td>
+                    <td>2.055176 ms</td>
+                    <td>6.176270 ms</td>
+                    <td>10.254000 us</td>
+                </tr>
+                <tr>                           
+                    <td rowspan="5">Intel(R) Xeon(R) Platinum 8358 CPU @ 2.60GHz</td>
+                </tr>
+                <tr>
+                    <td>64 -bit</td>
+                    <td>7.193866 ms</td>
+                    <td>13.689200 ms</td>
+                    <td>4.531500 us</td>
+                </tr>
+                <tr>
+                    <td>128 -bit</td>
+                    <td>6.739462 ms</td>
+                    <td>14.008103 ms</td>
+                    <td>2.967625 us</td>
+                </tr>
+                <tr>                         
+                    <td>256 -bit</td>
+                    <td>7.261953 ms</td>
+                    <td>14.829467 ms</td>
+                    <td>2.978000 us</td>
+                </tr>
+                <tr>                         
+                    <td>512 -bit</td>
+                    <td>11.546031 ms</td>
+                    <td>13.229008 ms</td>
+                    <td>1.385125 us</td>
+                </tr>
+                <tr>                           
+                    <td rowspan="5">Intel(R) Iris(R) Xe MAX Graphics</td>
+                </tr>
+                <tr>
+                                                             
+                    <td>64 -bit</td>
+                    <td>3.106389 ms</td>
+                    <td>17.748458 ms</td>
+                    <td>1.365000 us</td>
+                </tr>
+                <tr>
+                    <td>128 -bit</td>
+                    <td>28.628951 ms</td>
+                    <td>17.749823 ms</td>
+                    <td>1.332500 us</td>
+                </tr>
+                <tr>
+                    <td>256 -bit</td>
+                    <td>56.188691 ms</td>
+                    <td>17.748861 ms</td>
+                    <td>1.326000 us</td>
+                </tr>
+                <tr>
+                    <td>512 -bit</td>
+                    <td>105.559818 ms</td>
+                    <td>17.749823 ms</td>
+                    <td>1.365000 us</td>
+                </tr>
+                <tr>
+                    <td rowspan="16">256 MB</td>
+                </tr>
+                <tr>                           
+                  <td rowspan="5">Tesla V100-SXM2-16GB</td>
+                </tr>
+                <tr>
+                                                             
+                    <td>64 -bit</td>
+                    <td>3.539550 ms</td>
+                    <td>24.455078 ms</td>
+                    <td>7.080250 us</td>
+                </tr>
+                <tr>                         
+                    <td>128 -bit</td>
+                    <td>4.190674 ms</td>
+                    <td>24.442871 ms</td>
+                    <td>7.080000 us</td>
+                </tr>
+                <tr>
+                    <td>256 -bit</td>
+                    <td>5.203370 ms</td>
+                    <td>24.459961 ms</td>
+                    <td>7.568250 us</td>
+                </tr>
+                <tr>                                                   
+                    <td>512 -bit</td>
+                    <td>13.925293 ms</td>
+                    <td>24.453369 ms</td>
+                    <td>7.568375 us</td>
+                </tr>
+                <tr>                           
+                    <td rowspan="5">Intel(R) Xeon(R) Platinum 8358 CPU @ 2.60GHz</td>
+                </tr>
+                <tr>
+                    <td>64 -bit</td>
+                    <td>10.928828 ms</td>
+                    <td>33.915237 ms</td>
+                    <td>967.625000 ns</td>
+                </tr>
+                <tr>                        
+                    <td>128 -bit</td>
+                    <td>8.854166 ms</td>
+                    <td>32.901272 ms</td>
+                    <td>976.500000 ns</td>
+                </tr>
+                <tr> 
+                    <td>256 -bit</td>
+                    <td>10.290331 ms</td>
+                    <td>33.643110 ms</td>
+                    <td>1.030125 us</td>
+                </tr>
+                <tr>                                     
+                    <td>512 -bit</td>
+                    <td>18.790299 ms</td>
+                    <td>33.722702 ms</td>
+                    <td>966.125000 ns</td>
+                </tr>
+                <tr>                           
+                    <td rowspan="5">Intel(R) Iris(R) Xe MAX Graphics</td>
+                </tr>
+                <tr>                                                     
+                    <td>64 -bit</td>
+                    <td>11.941254 ms</td>
+                    <td>70.892191 ms</td>
+                    <td>1.326000 us</td>
+                </tr>
+                <tr>                        
+                    <td>128 -bit</td>
+                    <td>110.007846 ms</td>
+                    <td>70.894857 ms</td>
+                    <td>1.339000 us</td>
+                </tr>
+                <tr>
+                                                             
+                    <td>256 -bit</td>
+                    <td>245.655891 ms</td>
+                    <td>70.883748 ms</td>
+                    <td>1.391000 us</td>
+                </tr>
+                <tr>                         
+                    <td>512 -bit</td>
+                    <td>475.246200 ms</td>
+                    <td>70.886621 ms</td>
+                    <td>1.332500 us</td>
+                </tr>
+                <tr>
+                    <td rowspan="16">1024 MB</td>
+                </tr>
+                <tr>                           
+                  <td rowspan="5">Tesla V100-SXM2-16GB</td>
+                </tr>
+                <tr>                                            
+                    <td>64 -bit</td>
+                    <td>11.715087 ms</td>
+                    <td>97.482910 ms</td>
+                    <td>9.765625 us</td>
+                </tr>
+                <tr>                                                  
+                    <td>128 -bit</td>
+                    <td>12.184326 ms</td>
+                    <td>97.552734 ms</td>
+                    <td>8.300750 us</td>
+                </tr>
+                <tr>                         
+                    <td>256 -bit</td>
+                    <td>18.732911 ms</td>
+                    <td>97.577148 ms</td>
+                    <td>7.812250 us</td>
+                </tr>
+                <tr>                                                            
+                    <td>512 -bit</td>
+                    <td>52.898436 ms</td>
+                    <td>97.524170 ms</td>
+                    <td>8.056625 us</td>
+                </tr>
+                <tr>                           
+                    <td rowspan="5">Intel(R) Xeon(R) Platinum 8358 CPU @ 2.60GHz</td>
+                </tr>
+                <tr>                       
+                    <td>64 -bit</td>
+                    <td>35.084335 ms</td>
+                    <td>76.414034 ms</td>
+                    <td>903.625000 ns</td>
+                </tr>
+                <tr>                                          
+                    <td>128 -bit</td>
+                    <td>25.805447 ms</td>
+                    <td>79.800968 ms</td>
+                    <td>1.052625 us</td>
+                </tr>
+                <tr>                          
+                    <td>256 -bit</td>
+                    <td>28.765474 ms</td>
+                    <td>80.076494 ms</td>
+                    <td>1.017875 us</td>
+                </tr>
+                <tr>                                                             
+                    <td>512 -bit</td>
+                    <td>61.698307 ms</td>
+                    <td>75.633475 ms</td>
+                    <td>1.107500 us</td>
+                </tr>
+                <tr>                           
+                    <td rowspan="5">Intel(R) Iris(R) Xe MAX Graphics</td>
+                </tr>
+                <tr>                                                                           
+                    <td>64 -bit</td>
+                    <td>47.515533 ms</td>
+                    <td>283.342299 ms</td>
+                    <td>1.319500 us</td>
+                </tr>
+                <tr>                                       
+                    <td>128 -bit</td>
+                    <td>431.324205 ms</td>
+                    <td>283.344665 ms</td>
+                    <td>1.306500 us</td>
+                </tr>
+                <tr>                                            
+                    <td>256 -bit</td>
+                    <td>938.669251 ms</td>
+                    <td>283.345946 ms</td>
+                    <td>2.164500 us</td>
+                </tr>
+                <tr>                                                
+                    <td>512 -bit</td>
+                    <td>1.843786 s</td>
+                    <td>283.342267 ms</td>
+                    <td>2.164500 us</td>
+                </tr>
+            </table>
+            <p class="blogText">
+                In above table, host <-> device data transfer cost is not something I'm interested in, but instead I want you to notice how changing SIMD lane count from 2 to 16 ( everytime doubling ),
+                affects kernel execution time on some accelerator with some specific input size. For example, let us zoom into row where input size is 256 MB; on Tesla V100 GPU
+                as number of SIMD lanes used are doubled ( i.e. # -of chunks being compressed together by each SYCL work-item is doubled ), kernel execution time is doubled.
+                Now notice, how kernel execution performs on Intel Iris Xe Max GPU, for input size 256 MB, using both approach_{1, 2} ( with SIMD lanes {2, 4, 8, 16} ). See with
+                approach_1, kernel execution takes ~19 ms, but when 2 chunks are compressed together ( using approach_2 ), resources are better utilized, results in improved kernel
+                execution time of ~12 ms. But kernel execution becomes ~9x costlier as soon 4 chunks are compressed together, because now each work-item compresses 4 chunks in parallel,
+                while representing hash state using sixteen 128 -bit wide vectors. Thus each work-item ends up using too much resources ( read register files for keeping hash state ), which
+                results in register spilling --- portions of hash state are now placed on far distant and high latency global memory. Accessing global memory involves going through
+                multiple memory hierarchies i.e. global memory and two levels of caches etc., each of which has its own latency. After compressing 4 chunks together, as I keep increasing
+                # -of chunks to compress together ( say 8/ 16 ), execution time also keeps getting doubled up. Notice, for 1024 MB input size, on Intel Iris Xe Max GPU, when 2 chunks are
+                compressed together, kernel execution time is ~47 ms, but when 4 chunks are compressed together execution time suffers heavily --- increasing ~9x ! This trend follows,
+                as kernel execution time is doubled and quadrupled when 8 and 16 chunks are compressed in parallel, respectively.
+                <br>
+                <br>
+                Now let us explore whether similar kind of behaviour is visible when compressing multiple chunks together on Intel CPU. Let me begin with input size 64 MB, when only single chunk
+                is compressed by each SYCL work-item ( read approach_1 ), kernel execution time is ~6 ms. As I increase # -of chunks being compressed together execution time stays almost same until we reach
+                SIMD_LANE_COUNT = 16. Due to presence of limited number of 512 -bit registers, not many work-items can execute at a time, which is reflected when sixteen 512 -bit registers
+                are used for representing hash state, compressing 16 chunks in parallel. When I look at input size both 256 MB & 1024 MB, I see similar pattern, where compressing 4 chunks together
+                performs better than compressing {2, 8, 16} chunks together. When 4 chunks are compressed together sixteen 128 -bit vectors are used by each SYCL work-item
+                for representing hash state. Now there're 32 of these 512 -bit register files on each core of this machine, which means on each core 8 SYCL work-items should proceed in parallel,
+                without any register spilling.
+            </p>
+            <p class="blogText">
+                With these benchmark results in mind, I'll say, approach_1 of BLAKE3, where each SYCL work-item compresses single chunk performs much better ( almost always ) compared
+                to approach_2, where it's possible to compress 2/ 4/ 8/ 16 chunks in parallel, by each SYCL work-item.
+            </p>
             </article>
         </div>
     </div>
