@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<!--
+  Author: Anjan Roy<hello@itzmeanjan.in>
+-->
+<html>
+
+<head>
+    <title>
+        SYCL accelerated SHA1 & SHA2
+    </title>
+    <meta prefix="og: http://ogp.me/ns#" property="og:type" content="website">
+    <meta prefix="og: http://ogp.me/ns#" property="og:title" content="SYCL accelerated SHA1 & SHA2">
+    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="---">
+    <meta prefix="og: http://ogp.me/ns#" property="og:url" content="https://itzmeanjan.in">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url"
+        content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:width" content="950">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:height" content="735">
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://itzmeanjan.in/">
+    <meta property="twitter:title" content="SYCL accelerated SHA1 & SHA2">
+    <meta property="twitter:description" content="---">
+    <meta property="twitter:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta property="twitter:site" content="@meanjanry">
+    <meta name="description" content="---">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="author" content="Anjan Roy">
+    <meta name="keywords" content="---">
+    <meta name="theme-color" content="darkslategrey">
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" type="text/css" href="../styles/index.css">
+    <script src="../styles/code.js"></script>
+</head>
+
+<body>
+    <div id="parentDiv">
+        <div id="navBar">
+            <nav>
+                <a class="navLink" href="/"><big>H</big>ome</a> |
+                <a class="navLink" href="https://github.com/itzmeanjan" target="_blank"><big>P</big>rojects</a> |
+                <a class="navLink" href="/pages/blog.html"><big>B</big>log</a> |
+                <a class="navLink" href="/pages/contact.html"><big>C</big>ontact</a>
+            </nav>
+        </div>
+        <div class="childDiv">
+            <article>
+                <h1 class="blogHeader">
+                    SYCL accelerated SHA1 and SHA2
+                </h1>
+                <h3>Created : February 06, 2022</h3>
+            </article>
+        </div>
+        <div class="childDiv">
+            <article>
+              <p class="blogText">
+                After implementing 2-to-1 BLAKE3 hash function using SYCL for accelerating Binary Merklization, this week I decided to work on SHA1 and SHA2
+                family of cryptographic hash functions, where I implemented their 2-to-1 variants for accelerating Binary Merklization. In 2-to-1 hash function,
+                I take two byte concatenated digests of respective hash function ( making 2N -bytes of input ) and produce one N -bytes digest. For example, when working with SHA2-256, input
+                will be 64 -bytes wide and output will be 32 -bytes. That's exactly the function required for constructing
+                all intermediate nodes of Binary Merkle Tree. Because none of SHA1 and SHA2 family of cryptographic hash functions are data parallel friendly,
+                accelerating Binary Merklization, which has a parallelizable construction, with them seemed like a sound choice. Today I plan to walk you through
+                delicate implementation details of seven hash functions present in SHA{1,2} family, while also showing benchmark results of Binary Merklization
+                with relatively large ( say >= 2<sup>25</sup> ) number of input leaf nodes, using those 2-to-1 hash functions on multiple accelerators --- powered by SYCL.
+              </p>
+              <p class="blogText">
+                If you happen to be interested in BLAKE3 based Binary Merklization, using SYCL, consider checking <a class="blogLink" href="../pages/blake3-on-gpgpu.html" target="_blank">this</a>.
+                <br>
+                Or You may want to see Binary Merklization performance using Rescue Prime Hash, see <a class="blogLink" href="../pages/evaluate-merklizaion-design-performance-in-sycl.html" target="_blank">here</a>.
+              </p>
+              <p class="blogText">
+                Let me begin by quickly talking about Binary Merklization and why it's easily parallelizable.
+                <br>
+                <br>
+                As problem statement, I've N -many leaf nodes of some Binary Tree, where <tt>N = 2<sup>i</sup> | i = {1, 2, 3 ...}</tt> and I'm required to compute all intermediate
+                nodes of Binary Merkle Tree, using some 2-to-1 cryptographic hash function. Say we choose to work with SHA2-512 variant, meaning I'll have N * 2<sup>6</sup> -bytes input
+                and I've to compute (N - 1) -many intermediate nodes, where each of them is a SHA2-512 digest ( hence 512 -bit = 64 -bytes wide ) i.e. total (N - 1) * 2<sup>6</sup> -bytes
+                output to be produced. For example, see following diagram where sixteen ( = N ) leaf nodes are input, and in first round of data parallel compute offload, eight intermediate nodes
+                are produced using 2-to-1 SHA2-256 hash function. These eight intermediate nodes are placed on respective indices of output memory allocation which can store N -many SHA2-256 digests.
+                Notice, as pairing two consecutive ( intermdiate/ leaf ) nodes and merging them to single digest is highly parallelizable structure, it's good candidate for data parallel acceleration.
+                To be more specific for computing all intermdiate nodes living just above leaf nodes, I need to dispatch eight SYCL work-items, each will compute a single merging. Once this round
+                of computation ends, four work-items can be dispatched for computing four intermdiate nodes living on immediate next level. This process of halving work-item count on each new level, 
+                continues until root of Merkle Tree is computed using <tt>q.single_task( ... )</tt>,
+                which is placed at index-1 of output allocation. Notice, though within each level of Binary Merkle Tree construction, multiple intermediates can be parallelly computed, but until one level
+                is completed by respective kernel dispatch round, it's immediate above level can't be started, due to structural data dependency. Also note, as (N - 1) -many leaf nodes are computed
+                first 32 -bytes of output allocation will be empty. Similarly if, SHA2-224 is our choice of 2-to-1 hash function, first 28 -bytes will be untouched.
+              </p>
+              <img class="imgCenterUpdt" src="../images/sycl-accelerated-sha1-and-sha2-0.png">
+              <p class="blogText">
+                Now imagine, N = 2<sup>25</sup> i.e. I've to compute (2<sup>25</sup> - 1) -many intermediate nodes of Binary Merkle Tree in log<sub>2</sub>(2<sup>25</sup>) = 25 -many
+                sequentially ordered kernel dispatch rounds --- a huge scope of using power of accelerated computing.
+                With fundamental understanding of construction of Binary Merklization in our mind, I'll start with SHA1 cryptographic hash functions. 
+                Before I begin, I'd like you to take note of <a class="blogLink" href="https://csrc.nist.gov/Projects/Hash-Functions/NIST-Policy-on-Hash-Functions" target="_blank">this</a>
+                NIST policy, where SHA1 is stated to be deprecated.
+              </p>
+            </article>
+        </div>
+    </div>
+    <div id="footerDiv">
+        <footer>
+            <p id="footerText">
+                &copy <a href="https://github.com/itzmeanjan/itzmeanjan.github.io" id="footerLink"
+                    target="_blank"><big>A</big>njan Roy</a> ( <big>M</big>IT Licensed )
+            </p>
+        </footer>
+    </div>
+</body>
+
+</html>
