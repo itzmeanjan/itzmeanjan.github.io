@@ -11,3 +11,78 @@ permalink: /pages/contact
 **Twitter** : <a href="https://twitter.com/meanjanroy" target="_blank">meanjanroy</a>
 
 **LinkedIn** : <a href="https://www.linkedin.com/in/itzmeanjan" target="_blank">itzmeanjan</a>
+
+---
+
+**SSH Public Key** :
+
+```bash
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOVUHTAdqrXRyPWmOa8Ri8vFBK1Qmw4AwVQAzPdwjJGo hello@itzmeanjan.in
+```
+
+**GPG Key Id** :
+
+```bash
+06B35D7B157875E1
+```
+
+**PGP Public Key** :
+
+<details>
+<summary>Expand</summary>
+
+```bash
+-----BEGIN PGP PUBLIC KEY BLOCK-----
+
+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
+=cEJn
+-----END PGP PUBLIC KEY BLOCK-----
+```
+</details>
+
