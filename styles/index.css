@@ -215,7 +215,7 @@ table, th, td {
     font-size: medium;
     color:greenyellow;
     background-color: black;
-    font-family: fantasy;
+    font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     border-radius: 1vw;
     padding-left: 0.5vw;
     padding-right: 0.5vw;
