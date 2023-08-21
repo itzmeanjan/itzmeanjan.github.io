@@ -4,7 +4,7 @@ title: Blog
 permalink: /pages/blog
 ---
 
-- [BLAKE3 on GPGPU](/pages/blake3-on-gpgpu.html) on January 20, 2022
+- [BLAKE3 on GPGPU](/pages/blake3-on-gpgpu) on January 20, 2022
 - [Evaluation of Merklization Design and Performance in SYCL](/pages/evaluate-merklizaion-design-performance-in-sycl.html) on December 31, 2021
 - [OpenCL Accelerated Merkle Tree Construction](/pages/opencl-accelerated-merkle-tree-construction.html) on December 19, 2021
 - [Optimizing Parallel Similarity Transformation](/pages/optimizing-parallel-similarity-transformation.html) on November 27, 2021
@@ -27,7 +27,7 @@ permalink: /pages/blog
 - [Understanding Random Linear Network Coding](/pages/understanding-rlnc.html) on July 04, 2021
 - [Adaptive Perception of Network Topology](/pages/adaptive-perception-of-network-topology.html) on June 28, 2021
 - [Perceiving P2P Network Topology](/pages/perceiving-p2p-topology.html) on June 20, 2021
-- [Speaking TCP](/pages/speaking-tcp.html) on June 13, 2021
-- [Sound of Heartbeat over TCP](/pages/sound-of-heartbeat-over-tcp.html) on June 06, 2021
-- [Designing Distributed Pub/Sub](/pages/distributed-pubsub.html) on June 01, 2021
-- [Beginning of Blogging](/pages/beginning-of-blogging.html) on May 29, 2021
+- [Speaking TCP](/pages/speaking-tcp) on June 13, 2021
+- [Sound of Heartbeat over TCP](/pages/sound-of-heartbeat-over-tcp) on June 06, 2021
+- [Designing Distributed Pub/Sub](/pages/distributed-pubsub) on June 01, 2021
+- [Beginning of Blogging](/pages/beginning-of-blogging) on May 29, 2021
