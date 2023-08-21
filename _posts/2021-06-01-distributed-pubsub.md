@@ -1,14 +1,9 @@
 ---
-layout: default
+layout: post
 title: Designing Distributed Pub/Sub
 subtitle: A possible design of Distributed Pub/Sub System
+author: Anjan Roy
 permalink: /pages/distributed-pubsub
----
-
-# Designing Distributed Pub/Sub
-
-Created : June 01, 2021
-
 ---
 
 Sometime ago I started working on `pub0sub` - _Fast, Light-weight, Ordered Pub/Sub System_ --- built on top of async I/O, leveraging power of kernel event loop.

@@ -1,14 +1,9 @@
 ---
-layout: default
+layout: post
 title: Beginning of Blogging
 subtitle: Practising daily writing for greater good
+author: Anjan Roy
 permalink: /pages/beginning-of-blogging
----
-
-# Beginning of Blogging
-
-Created : May 29, 2021
-
 ---
 
 Finally I've decided to start blogging !

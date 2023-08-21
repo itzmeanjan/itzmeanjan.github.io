@@ -1,14 +1,9 @@
 ---
-layout: default
+layout: post
 title: Speaking TCP
 subtitle: Analysing ways of speaking TCP
+author: Anjan Roy
 permalink: /pages/speaking-tcp
----
-
-# Speaking TCP
-
-Created : June 13, 2021
-
 ---
 
 For last few months I've been working at TCP level more often than I generally do. During this period I designed and implemented few systems where multiple participants talk to each other over TCP while following custom application level protocol. I learned the way most of TCP applications written in ( specifically ) Golang

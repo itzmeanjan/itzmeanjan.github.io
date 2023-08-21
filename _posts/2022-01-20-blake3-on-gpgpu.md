@@ -1,14 +1,9 @@
 ---
-layout: default
+layout: post
 title: BLAKE3 on GPGPU
 subtitle: In depth analysis of multiple SIMD variants for BLAKE3 parallel implementation targeting multi-core CPUs, GPGPUs using heterogeneous programming API SYCL
+author: Anjan Roy
 permalink: /pages/blake3-on-gpgpu
----
-
-# BLAKE3 on GPGPU
-
-Created: January 20, 2022 
-
 ---
 
 Last week I implemented multiple variants of highly parallelizable cryptographic hash function BLAKE3 using SYCL and today I'd like to present my collective understanding, which I gained while implementing/ benchmarking BLAKE3, targeting heterogeneous accelerator platform(s). BLAKE3 cryptographic hash function easily lends itself well to data parallel execution environments like SYCL/ OpenCL. Speaking from high level design point of view, it consists of following two steps.

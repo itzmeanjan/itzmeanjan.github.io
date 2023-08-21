@@ -1,14 +1,9 @@
 ---
-layout: default
+layout: post
 title: Sound of Heartbeat over TCP
 subtitle: Incorporating heartbeat over TCP in Pub/Sub System
+author: Anjan Roy
 permalink: /pages/sound-of-heartbeat-over-tcp
----
-
-# Sound of Heartbeat over TCP
-
-Created : June 06, 2021
-
 ---
 
 Few weeks back I started working on `pub0sub` - Fast, Light-weight, Ordered Pub/Sub System, leveraging power of kernel event loop, addressing C10K while running on a consumer grade machine.
