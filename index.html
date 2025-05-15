@@ -13,7 +13,8 @@
   <meta prefix="og: http://ogp.me/ns#" property="og:description" content="My Thoughts, Experiments & Experiences">
   <meta prefix="og: http://ogp.me/ns#" property="og:url" content="https://itzmeanjan.in">
   <meta prefix="og: http://ogp.me/ns#" property="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
-  <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url" content="https://itzmeanjan.in/images/myImage.jpg">
+  <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url"
+    content="https://itzmeanjan.in/images/myImage.jpg">
   <meta prefix="og: http://ogp.me/ns#" property="og:image:width" content="950">
   <meta prefix="og: http://ogp.me/ns#" property="og:image:height" content="735">
   <meta name="description" content="My Thoughts, Experiments & Experiences">
@@ -39,7 +40,7 @@
         <a class="navLink" href="/"><big>H</big>ome</a> |
         <a class="navLink" href="https://github.com/itzmeanjan" target="_blank"><big>P</big>rojects</a> |
         <a class="navLink" href="https://gist.github.com/itzmeanjan" target="_blank"><big>G</big>ists</a> |
-        <a class = "navLink" href="/pages/blog.html"><big>B</big>log</a> |
+        <a class="navLink" href="/pages/blog.html"><big>B</big>log</a> |
         <a class="navLink" href="/pages/contact.html"><big>C</big>ontact</a>
       </nav>
     </div>
@@ -49,15 +50,20 @@
           about
         </h1>
         <p>
-          Hello 👋, my name is <span class="noteText">Anjan Roy</span> and I am a Software Engineer, originally from <span class="noteText">India</span>.
-          In 2018, after completing my under-graduate in Computer Science, I started practising software development while
-          continuing post-graduate study in Computer Science. In 2020, after earning M.Sc. in Computer Science, I moved to industry full-time.
+          Hello 👋, my name is <span class="noteText">Anjan Roy</span> and I am a Programmer, living in
+          <span class="noteText">UAE</span>, originally from <span class="noteText">India</span>.
+          In 2018, after completing my under-graduate in Computer Science, I started practising software development
+          while
+          continuing post-graduate study in Computer Science. In 2020, after earning M.Sc. in Computer Science, I moved
+          to industry full-time.
           <br>
           <br>
-          I'm working as a Senior Cryptography Engineer @ <a class="simpleLink" href="https://tii.ae/cryptography" target="_blank">Cryptography Research Center, Technology Innovation Institute, Abu Dhabi.</a>.
+          I'm working as a Senior Cryptography Engineer @ <a class="simpleLink" href="https://tii.ae"
+            target="_blank">Cryptography Research Center, Technology Innovation Institute, Abu Dhabi.</a>.
           <br>
           <br>
-          Currently I practise <span class="noteText">applied cryptography</span>. Being an avid open source contributor, I maintain some
+          Currently I practise <span class="noteText">applied cryptography</span>. Being an avid open source
+          contributor, I maintain some
           open source projects. See <a class="simpleLink" href="https://github.com/itzmeanjan" target="_blank">this</a>.
         </p>
       </article>
@@ -68,8 +74,10 @@
           education
         </h1>
         <p>
-          I did my <span class="noteText">B.Sc. & M.Sc. in Computer Science</span> from Dept. of Computer & System Sciences, 
-          <a class="simpleLink" href="https://visvabharati.ac.in/index.html" target="_blank">Visva-Bharati, Santiniketan, India</a>,.
+          I did my <span class="noteText">B.Sc. & M.Sc. in Computer Science</span> from Dept. of Computer & System
+          Sciences,
+          <a class="simpleLink" href="https://visvabharati.ac.in/index.html" target="_blank">Visva-Bharati,
+            Santiniketan, India</a>,.
           <br>
           <br>
           You may be interested in taking a look at my <a class="simpleLink" href="cv/myCV.pdf" target="_blank">CV</a>.
@@ -92,9 +100,6 @@
                 <small>Golang, Python, JavaScript (NodeJS)</small>
               </li>
               <li>
-                <small>Solidity, Miden VM Assembly</small>
-              </li>
-              <li>
                 <small>Bash</small>
               </li>
               <li>
@@ -113,6 +118,9 @@
               </li>
               <li>
                 <small>Vectorization : AVX, AVX2, AVX512 and NEON intrinsics</small>
+              </li>
+              <li>
+                <small>GPU Compute: OpenCL, SYCL and Vulkan Compute</small>
               </li>
               <li>
                 <small>Profiling : GNU/Linux Kernel's Perf Tool</small>
@@ -153,50 +161,58 @@
         </h1>
         <ol>
           <li>
-            Senior Cryptography Engineer @ Cryptography Research Center, Technology Innovation Institute, Abu Dhabi [ <span class="noteText">June, 2023 - Present</span> ]
+            Senior Cryptography Engineer @ Cryptography Research Center, Technology Innovation Institute, Abu Dhabi [
+            <span class="noteText">June, 2023 - Present</span> ]
             <ul>
-              <li>
-                <small>Working with Symmetric/ Asymmetric (non Post-Quantum) Cryptography Team</small>
+              <li><small>Leading development, testing and release of the whole light-weight symmetric key cryptography
+                  library in C.</small></li>
+              <li><small>Used bit-interleaving with ARM NEON ISA, achieving >30% throughput boost over baseline.</small>
               </li>
+              <li><small>Used AVX, ARM NEON for vectorized Ascon, SHA3 and TurboSHAKE implementation in C, for use in
+                  PQC schemes.</small></li>
+              <li><small>Developing post-quantum cryptographic primitives like ML-KEM, ML-DSA, SLH-DSA, Falcon etc. from
+                  scratch, in C.</small></li>
+              <li><small>Developed fastest known LWE -based Private Information Retrieval library in Rust, awaiting
+                  deployment.</small></li>
+              <li><small>Offloaded LWE -based PIR Server-Setup Phase to GPU, using Vulkan Compute, achieving 60x
+                  performance boost.</small></li>
             </ul>
           </li>
           <li>
-            Blockchain Engineer @ Polygon (Previously Matic Network) [ <span class="noteText">July, 2020 - May, 2023</span> ]
+            Blockchain Engineer @ Polygon (Previously Matic Network) [ <span class="noteText">July, 2020 - May,
+              2023</span> ]
             <ul>
-              <li>
-                <small>Majorly contributed to the implementation of various symmetric and asymmetric cryptographic primitives in Miden VM</small>
-              </li>
-              <li>
-                <small>Helped in building light-client for KZG polynomial commitment based data availability blockchain, using Rust and Substrate</small>
-              </li>
-              <li>
-                <small>Wrote and maintained Solidity smart contracts, powering L1 <-> L2 asset transfer -- which once secured > $7B assets</small>
-              </li>
-              <li>
-                <small>Developed simple and reliable micro-service based cross-blockchain transaction life-cycle tracker</small>
-              </li>
-              <li>
-                <small>Designed and developed fast-finality, cross-blockchain, trusted asset transfer bridge, for one ecosystem project</small>
-              </li>
+              <li><small>Implemented symmetric, asymmetric cryptographic primitives in zkSTARK -based Miden VM using
+                  WASM like assembly.</small></li>
+              <li><small>Fastest Merklization with Blake3 and Rescue Prime hash functions, using SYCL and OpenCL, for a
+                  wide range of targets.</small></li>
+              <li><small>Helped in building light-client for KZG commitment-based Data Availability blockchain Avail,
+                  using Rust.</small></li>
+              <li><small>Wrote and maintained Solidity contracts, powering L1 <-> L2 asset transfer - secured > $7B back
+                    then.</small></li>
+              <li><small>Developed simple and reliable micro-service based cross-blockchain transaction life-cycle
+                  tracker, in Go.</small></li>
+              <li><small>Designed and developed fast-finality, cross-blockchain, trusted asset transfer bridge for
+                  ecosystem project, in Go.</small></li>
             </ul>
           </li>
           <li>
             Freelancer [ <span class="noteText">July, 2018 - June, 2020</span> ]
             <ul>
               <li>
-                <small>Wrote custom ERC20 contract (with locking, staking) for leading marketplace</small>
+                <small>Wrote custom ERC20 contract (with locking, staking) for leading marketplace.</small>
               </li>
               <li>
-                <small>Reduced latency by 53% after introducing Memcached, Redis in existing service</small>
+                <small>Reduced latency by 53% after introducing Memcached, Redis in existing service.</small>
               </li>
               <li>
-                <small>Built JSON-RPC/ REST services with ExpressJS, PostgreSQL</small>
+                <small>Built JSON-RPC/ REST services with ExpressJS, PostgreSQL.</small>
               </li>
               <li>
-                <small>Helped researcher explore large dataset using Matplotlib, Seaborn, Numpy</small>
+                <small>Helped researcher explore large dataset using Matplotlib, Seaborn, Numpy.</small>
               </li>
               <li>
-                <small>Helped client target large user base by building multi-platform app in Flutter</small>
+                <small>Helped client target large user base by building multi-platform app in Flutter.</small>
               </li>
             </ul>
           </li>
@@ -209,17 +225,18 @@
           interest
         </h1>
         <p>
-          <ul>
-            <li>
-              Gossip protocols over large scale P2P network
-            </li>
-            <li>
-              Applied Cryptography - Symmetric, Public Key ( mostly Post-Quantum )
-            </li>
-            <li>
-              Highly Concurrent Systems
-            </li>
-          </ul>
+        <ul>
+          <li>
+            Applied Cryptography - Post-Quantum Cryptography and Light-Weight Cryptography
+          </li>
+          <li>
+            Homomorphic Encryption, Private Information Retrieval, Private Set Intersection and Private Nearest
+            Neighbour Search
+          </li>
+          <li>
+            Gossip protocols over large scale p2p network
+          </li>
+        </ul>
         </p>
       </article>
     </div>
@@ -229,7 +246,8 @@
           hobby
         </h1>
         <p>
-          During offtime, I love to watch movies, tv series. Sometimes I read books or write blog posts --- sharing my thoughts.
+          If I've free time I go for bicycling. Other than that, I love to watch movies, tv series.
+          Sometimes I read books or work on some of my side projects on Github.
         </p>
       </article>
     </div>
@@ -237,7 +255,8 @@
   <div id="footerDiv">
     <footer>
       <p id="footerText">
-        &copy <a href="https://github.com/itzmeanjan/itzmeanjan.github.io" id="footerLink" target="_blank"><big>A</big>njan
+        &copy <a href="https://github.com/itzmeanjan/itzmeanjan.github.io" id="footerLink"
+          target="_blank"><big>A</big>njan
           Roy</a> ( <big>M</big>IT Licensed )
       </p>
     </footer>
