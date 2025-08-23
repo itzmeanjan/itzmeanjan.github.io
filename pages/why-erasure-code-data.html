@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<!--
+  Author: Anjan Roy<hello@itzmeanjan.in>
+-->
+<html>
+
+<head>
+    <title>
+        Why Erasure-Code Data?
+    </title>
+    <meta prefix="og: http://ogp.me/ns#" property="og:type" content="website">
+    <meta prefix="og: http://ogp.me/ns#" property="og:title" content="Why Erasure-Code Data?">
+    <meta prefix="og: http://ogp.me/ns#" property="og:description"
+        content="Example driven explanation of why we erasure-code data.">
+    <meta prefix="og: http://ogp.me/ns#" property="og:url" content="https://itzmeanjan.in">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url"
+        content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:width" content="950">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:height" content="735">
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://itzmeanjan.in/">
+    <meta property="twitter:title" content="Why Erasure-Code Data?">
+    <meta property="twitter:description" content="Example driven explanation of why we erasure-code data.">
+    <meta property="twitter:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta property="twitter:site" content="@meanjanry">
+    <meta name="description" content="Example driven explanation of why we erasure-code data.">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="author" content="Anjan Roy">
+    <meta name="keywords"
+        content="erasure-coding, network-coding, eli5, rlnc, reed-solomon, redundancy, reliability, distributed-systems, data-in-transit, data-at-rest">
+    <meta name="theme-color" content="darkslategrey">
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" type="text/css" href="../styles/index.css">
+    <script src="../styles/code.js"></script>
+</head>
+
+<body>
+    <div id="parentDiv">
+        <div id="navBar">
+            <nav>
+                <a class="navLink" href="/"><big>H</big>ome</a> |
+                <a class="navLink" href="https://github.com/itzmeanjan" target="_blank"><big>P</big>rojects</a> |
+                <a class="navLink" href="/pages/blog.html"><big>B</big>log</a> |
+                <a class="navLink" href="/pages/contact.html"><big>C</big>ontact</a>
+            </nav>
+        </div>
+        <div class="childDiv">
+            <article>
+                <h1 class="blogHeader">
+                    Why Erasure-Code Data?
+                </h1>
+                <h3>Created : August 23, 2025</h3>
+            </article>
+        </div>
+        <div class="childDiv">
+            <article>
+                <p class="blogText">
+                    Couple of years ago, I <a class="blogLink" href="/pages/rlnc-in-depth.html">wrote</a> about a
+                    specific type of erasure-coding technique called, Random Linear Network Coding or in short RLNC.
+                    But today I'd like to use an example to explain how erasure-coding can be useful.
+                </p>
+                <p class="blogText">
+                    Imagine you have a book with 10 chapters, and you want your friend to read that book.
+                    You can mail the book to your friend. But the mail delivery company limits the number of words
+                    per mail. So we split the book chapter-wise - sending 10 mails, each for one chapter.
+                    This works, but now imagine, the mail service is known for being unreliable - they often loose
+                    or misplace mails, send one's mail to another one - in short it can be messy.
+                </p>
+                <p class="blogText">
+                    To solve this problem, we can send each chapter twice, resulting in a total of 2*10 = 20 mails.
+                    It should work as we have introduced redundancy. But there is still another problem, what if
+                    the mail service provider looses two mails such that they are for the same chapter, then your
+                    friend will receive 18 mails, which is more than ideal (10 mails), and still not be able to read
+                    the book, missing a chapter.
+                </p>
+                <p class="blogText">
+                    We can try to solve this problem by using erasure-coding. We take 10 chapters of the book
+                    and combine them such that each resulting erasure-coded mail (let's call it ec-mail) contains
+                    contribution from all the 10 chapters. Now we will send 20 ec-mails to your friend.
+                    As long as any 10 of those ec-mails make it to your friend, they should be able to
+                    reconstruct back the whole book. It means each of 20 ec-mails have exactly equal
+                    significance. So we don't anymore place trust on the mail delivery company to reliably
+                    deliver all the mails, rather we bake-in redundancy in our mails such that they actually
+                    become failure proof to a certain extent.
+                </p>
+                <dl class="blogText">
+                    <dt class="highlight">
+                        Q: Do we have to send 20 ec-mails to get this level of reliability? Can not we send lesser, say
+                        15 or 18?
+                    </dt>
+                    <dd class="highlight">
+                        A: Sure, as long as we send >=10 ec-mails and our friend receives 10 of them, they should be
+                        able to recover the whole book. Exact choice of parameter is domain specific.
+                    </dd>
+                </dl>
+                <p class="blogText">
+                    This is how erasure-coding is useful in data-in-transit domain. We can extend it to data-at-rest
+                    domain with another example.
+                </p>
+                <p class="blogText">
+                    Let's take a book, which has some sacred knowledge, that we want to protect at any cost.
+                    We won't just keep a single copy of the book in a single place, right? We will make 10 copies
+                    of the book and place them in different locations - no single point of failure. That should be
+                    reliable.
+                    No thief should be able break into all 10 of those bookshelves to steal that sacred book, right?
+                    Yeah pretty much.
+                </p>
+                <p class="blogText">
+                    But think of another problem, bookworms are real and they love to feed on those tasty
+                    knowledge-filled pages
+                    of the books. In some lunar phase, the same chapter in all those 10 books got eaten by bookworms.
+                    Or worse, those bookworms were very hungry and they just ate the whole book, in all those 10
+                    locations.
+                    You come back couple weeks later and find one chapter of knowledge is missing or worse
+                    the whole book is missing. What are you going to do now? The sacred knowledge is gone. What a bad
+                    luck!
+                </p>
+                <p class="blogText">
+                    Again we can try to protect the sacred book, by using erasure-coding. Let's break the book
+                    down to 10 chapters, then combine them such that each of the resulting erasure-coded book
+                    (let's call it ec-book) contains contribution from all the 10 chapters. We make 20 such ec-books.
+                    We keep them in separate locations like before. As long as any 10 ec-books are unharmed,
+                    we can recover back our sacred book. If bookworms collaborate and decide to harm more
+                    than 10 ec-books, we can't recover our sacred book. We have again lost the knowledge.
+                    Instead of 20 ec-books, we can make 100 and place them in 100 different locations around the world.
+                    Costlier, but more reliable than before.
+                </p>
+                <div class="microlight">
+Simply put, the more redundancy you introduce, the more is the cost, but the benefit is reliability.
+Whether it is worth bearing the cost, depends on the gravity of the problem you are trying to solve.
+                </div>
+                <p class="blogText">
+                    Random Linear Network Coding, or RLNC in short, is one such advanced erasure-coding technique.
+                    Why advanced ? Because it's simple and flexible, with two interesting properties.
+                    <br>
+                    <br>
+                <ol>
+                    <li>
+                        Combining chapters of the book by random sampling coefficients without any coordination
+                        among participating parties such as you and your friend. A good fit for decentralized systems.
+                    </li>
+                    <li>
+                        Given your mail goes though a couple of hops, some of which are reliable and known for
+                        being there when they need to be. Those reliable hops can create new ec-mails by combining
+                        the ec-mails they received from their peers and redistribute new ec-mails to other peers who
+                        are reading the same book, without first decoding it back to original book. This is called
+                        recoding.
+                    </li>
+                </ol>
+                </p>
+                <p class="blogText">
+                    Convinced? Have a look @ <a class="blogLink" href="https://github.com/itzmeanjan/rlnc"
+                        target="_blank">https://github.com/itzmeanjan/rlnc</a>, where we are developing a blazing fast
+                    Rust library crate implementing RLNC.
+                </p>
+            </article>
+        </div>
+    </div>
+    <div id="footerDiv">
+        <footer>
+            <p id="footerText">
+                &copy <a href="https://github.com/itzmeanjan/itzmeanjan.github.io" id="footerLink"
+                    target="_blank"><big>A</big>njan Roy</a> ( <big>M</big>IT Licensed )
+            </p>
+        </footer>
+    </div>
+</body>
+
+</html>
