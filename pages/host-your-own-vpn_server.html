@@ -53,23 +53,24 @@
         <div class="childDiv">
             <article>
                 <p class="blogText">
-                    In this short guide, I will walk you through the process of setting up a personal WireGuard VPN Server on a $5/month AWS Lightsail instance.
-                    Setting up a WireGuard server, generating client configuration file and connecting client to the tunnel should not take more than 5 minutes.
+                    In this short guide, I will walk you through the process of setting up a personal WireGuard (WG) VPN Server on a $5/month AWS Lightsail instance.
+                    Setting up a WireGuard server, generating client configuration file and connecting client to the WG server via a secure tunnel should not take more than 5 minutes.
                     I'm going to use AWS Lightsail for purpose of this demonstration. But you can go ahead and choose your favourite cloud service provider. Or you
                     can setup a WireGuard server on your Raspberry Pi, running inside your home network. You need a static IPv4 address for the following process to work.
-                    I'm going to use Ubuntu 24.04 LTS, but the script should work on older versions of Ubuntu too. In case you are on a very old release of Ubuntu,
+                    I'm going to use Ubuntu 24.04 LTS, but the script should work on older and hopefully future versions of Ubuntu too. In case you are on a *very* old release of Ubuntu,
                     I request you to upgrade and enjoy both better features and security.
                 </p>
                 <p class="blogText">
                     First, let's go to AWS Lightsail console and create a $5/month instance, running Ubuntu 24.04 LTS. AWS Lightsail console is accessible at <a class="blogLink" href="https://lightsail.aws.amazon.com" target="_blank">https://lightsail.aws.amazon.com</a>.
                     When creating the instance, AWS will ask you to specify geographic location, where this instance will be hosted. I'm browsing from India, so I prefer to choose Singapore or Frankfurt.
                     My personal reason for using a VPN is establishing an encrypted tunnel from my device (be that laptop or mobile) to a remote box, sitting in a data center in Singapore or Frankfurt.
-                    And then passing all traffic, including DNS lookups, over that encrypted tunnel. So even when I'm on public wifi, I can access the Web with a peace of mind.
-                    Based on your reason for using a VPN, you might want to choose a different location for hosting your Virtual Private Server (VPS).
+                    And then passing all the traffic, including DNS lookups, over that encrypted tunnel. So even when I'm on public wifi, I can access the Web with a peace of mind.
+                    Based on your geographic location and reason for using a VPN, you might want to choose a different location for hosting your Virtual Private Server (VPS).
                     <br>
                     <br>
-                    On AWS Lightsail, I prefer to stick to default dual stack networking (IPv4 + IPv6). I also attach a static IPv4 address to the instance. If you don't do that, your instance IPv4 address will probably
-                    change after you restart the instance. You can attach a static IPv4 to the instance, from the networking tab, once the instance is running. On this date of writing, the $5/month VPS on AWS Lightsail comes with following offerings.
+                    On AWS Lightsail, I prefer to stick to default dual stack networking (IPv4 + IPv6). I also attach a static IPv4 address to the instance. If you don't do that, your instance IPv4 address will change,
+                    after you restart the instance. You can attach a static IPv4 address to the instance, from the networking tab, once the instance is running. On this date of writing, the $5/month VPS on AWS Lightsail comes with following offerings.
+                    In my experience this is enough to support 3-5 moderate load WireGuard clients.
                     <ul>
                         <li>2 vCPUs Compute</li>
                         <li>512MB RAM Memory</li>
@@ -79,20 +80,20 @@
                 </p>
                 <p class="blogText">
                     Let's log into the VPS over SSH. Check for updates and install, if any are due. Restart the machine if new Kernel is waiting to be installed. It's *generally* better to be on the latest version of any software you use.
-                    *Generally*, because, software supply chain attack is really concerning. And they are getting sophisticated. But I don't want to digress.
+                    *Generally*, because, software supply chain attack is really concerning. And they are getting sophisticated. That's why the advice might seem like a double-edged sword. But I don't want to digress.
                 </p>
                 <div class="microlight">
 ssh __LIGHTSAIL__
 
-sudo apt update
-sudo apt full-upgrade -y
-sudo apt autoremove -y
+sudo apt-get update
+sudo apt-get upgrade -y
+sudo apt-get autoremove -y
 
 sudo systemctl reboot # Optional
                 </div>
                 <p class="blogText">
-                    In case you reboot the VPS instance, let's SSH into it again. Clone the repository <a class="blogLink" href="https://github.com/itzmeanjan/setup-wireguard-vpn" target="_blank">https://github.com/itzmeanjan/setup-wireguard-vpn</a>
-                    where I'm maintaining a BASH script, which will setup WireGuard server on our VPS. Run the only script in that repository, named "setup_wireguard_server.sh", with <span class="highlight">sudo</span>.
+                    In case you reboot the VPS instance, let's SSH into it, again. Clone the repository <a class="blogLink" href="https://github.com/itzmeanjan/setup-wireguard-vpn" target="_blank">https://github.com/itzmeanjan/setup-wireguard-vpn</a>
+                    where I'm maintaining a BASH script, which will setup WireGuard server on our VPS. Run the only script in that repository, named <span class="highlight">setup_wireguard_server.sh</span>, with <span class="highlight">sudo</span>.
                 </p>
                 <div class="microlight">
 ssh __LIGHTSAIL__
@@ -104,9 +105,9 @@ sudo ./setup_wireguard_server.sh
                 <p class="blogText">
                     A successful execution of WireGuard server setup BASH script should output a console log like below. In following log, we can clearly see our WireGuard server
                     is up and running. It is identified by the public key <span class="highlight">weYbu1QZrajysq4FSJCEw0PzZEm6T0MhbV38/2hsCg4=</span>. We have configured the network stack of the VPS
-                    to forward any IPv4 and IPv6 traffic. And the WireGuard server is accepting new tunnel requests on port <span class="highlight">51820</span>.
+                    to forward any IPv4 and IPv6 traffic. And the WireGuard server is expecting new tunnel requests on port <span class="highlight">51820</span>.
                     We have to go to AWS Lightsail console, find networking tab of the instance, add firewall rule, so that it can accept any protocol traffic on any port - the most generic configuration.
-                    But you may not want that, you need to only open port 51820, for both IPv4 and IPv6 network stacks, and VPN tunneling should work.
+                    But you may not want that. You need to open only port 51820, for both IPv4 and IPv6 network stacks, and VPN tunneling should work.
                 </p>
                 <div class="microlight">
 [+] This BASH script helps you setup WireGuard VPN server and clients.                                                                         
@@ -241,7 +242,7 @@ $ sudo ./setup_wireguard_client.sh
                     Executing the WireGuard client setup script produced a client configuration file, named <span class="highlight">peer2.conf</span>.
                     The generated WireGuard peer configuration file is as below. Notice the public key of the peer, in following snippet. It is same as the public key
                     identifier of the WireGuard server, we noted earlier. In WireGuard terminology, there is a secure tunnel between two peers, each identified by their
-                    public keys. These public keys are used for establishing the secure tunnel. Public Key Encryption helps each peer derive a shared secret.
+                    corresponding public keys. These public keys are used for establishing the secure tunnel. Public Key Encryption helps each peer derive a shared secret.
                     Now this shared secret can be used in some symmetric key construction for fast authenticated encryption or longer key derivation or time-to-time ratcheting.
                 </p>
                 <div class="microlight">
@@ -259,10 +260,10 @@ Endpoint = 43.205.124.63:51820
 PersistentKeepalive = 25
                 </div>
                 <p class="blogText">
-                    Now we can transfer the WireGuard peer configuration file <span class="highlight">peer2.conf</span> to our local machine. I will rename it <span class="highlight">mumbai.conf</span> for clarity.
-                    It can be imported into Ubuntu desktop for connecting to the tunnel. Simply go to settings, find network and click on import VPN configuration from a file, select the <span class="highlight">mumbai.conf</span>.
-                    Enable the VPN connection and check your machine IP address by running following command. Notice the IP address below, it is same as the endpoint address listed in the WireGuard peer configuration file. As our
-                    publicly visible IP address has changed, we say, VPN tunneling is working.
+                    Now we can transfer the WireGuard peer configuration file <span class="highlight">peer2.conf</span> to our local machine. I will rename it to <span class="highlight">mumbai.conf</span> for clarity.
+                    It can be imported into Ubuntu desktop for connecting to the tunnel. Simply go to Ubuntu Desktop settings, find network and click on import VPN configuration from a file, select the <span class="highlight">mumbai.conf</span>.
+                    Enable the VPN connection and check your machine IP address by running the following command. Notice the IP address below, it is same as the endpoint address listed in the WireGuard peer configuration file. As our
+                    publicly visible IP address has changed, we can say, VPN tunneling is working.
                 </p>
                 <div class="microlight">
 $ curl -s https://ipinfo.io | jq
@@ -287,7 +288,7 @@ $ curl -s https://ipinfo.io | jq
                     Now that we have setup a WireGuard server and connected a client to it, we can see how easily we can setup more peers. The script allows you to have
                     a maximum of 253 peers, connected to a single WireGuard server. Let's log back into the VPS, where the WireGuard server is running. We have to open
                     the <span class="highlight">setup_wireguard_client.sh</span> file, find a BASH variable <span class="highlight">PEER_ID</span>, increment its value by 1,
-                    and save the script. Execute the script, just like we did before, with  <span class="highlight">sudo</span>. It  should produce a WireGuard peer configuration file
+                    and save the script. Execute the script, just like we did before, with  <span class="highlight">sudo</span>. It  should produce a WireGuard peer configuration file,
                     named <span class="highlight">peer3.conf</span>. Now you can go ahead and use this configuration file in another WireGuard client. In short, after the first peer,
                     for every new peer you want to setup for this WireGuard server, you must increment the <span class="highlight">PEER_ID</span>, otherwise things won't work as expected.
                     <span class="highlight">PEER_ID</span> can take a maximum value of 254.
@@ -295,11 +296,10 @@ $ curl -s https://ipinfo.io | jq
                     <br>
                     Everytime you add a new peer, the <span class="highlight">setup_wireguard_client.sh</span> script, adds public key identity of the peer to the WireGuard server.
                     If not done, the WireGuard server won't accept connection from that peer. It means, even though we are running a WireGuard server on public Internet, with relatively
-                    loose firewall rules, our WireGuard server will only accept connection from known peers. I'd like to end this walk-through, with a snippet, showing status of WireGuard
-                    server, running on the VPS.
+                    loose firewall rules, our WireGuard server will only accept connection from known peers. Following snippet shows status of the WireGuard server, running on the VPS.
                 </p>
                 <div class="microlight">
-$ sudo wg # Notice, the WG server has two peers, which we setup earlier
+$ sudo wg # Notice, the WG server has two peers, which we setup earlier. It will accept connection, only from them.
 interface: wg0
   public key: weYbu1QZrajysq4FSJCEw0PzZEm6T0MhbV38/2hsCg4=
   private key: (hidden)
@@ -315,8 +315,18 @@ peer: 4PbebAIQZJu8cF0fqwkvZOXqXOCP/bpJRYsMh+bj5Cg=
   allowed ips: 10.8.0.3/32, fd58:c8d6:d02e::3/128
                 </div>
                 <p class="blogText">
-                    I hope this guide inspires you to run your own VPN server, on a $5/month VPS or your Raspberry Pi. Let me know if you stumbled
-                    upon problems, while setting up WireGuard. Cheers.
+                    I'd like to end this walk-through with one important reminder. From time to time, you should go ahead and check for OS updates in the VPS, running WireGuard server.
+                    And if, any are pending, you should install them. You might have to restart the system. If you do, ensure that you run following command to reload, IPv4 and IPv6 packet
+                    forwarding configuration from <span class="highlight">/etc/sysctl.conf</span>, post reboot. This configuration was added by the server setup script.
+                </p>
+                <div class="microlight">
+sudo sysctl -p # Is there any way to automatically trigger reloading of /etc/sysctl.conf, post system reboot?
+                </div>
+                <p class="blogText">
+                    I hope this guide inspires you to run your own VPN server, on a $5/month VPS or your Raspberry Pi. I found a blog post by DigitalOcean, titled "How To Set Up WireGuard on Ubuntu 20.04",
+                    helpful when setting up my first WireGuard VPN server. The BASH script, we just used for setting up the WG server, is an attempt to ease the process of setting up WireGuard. The inspiration blog
+                    from DigitalOcean is accessible at <a class="blogLink" href="https://www.digitalocean.com/community/tutorials/how-to-set-up-wireguard-on-ubuntu-20-04" target="_blank">https://www.digitalocean.com/community/tutorials/how-to-set-up-wireguard-on-ubuntu-20-04</a>.
+                    Let me know if you stumbled upon any problems, while setting up WireGuard. Cheers.
                 </p>
             </article>
         </div>
