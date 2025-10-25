@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<!--
+  Author: Anjan Roy<hello@itzmeanjan.in>
+-->
+<html>
+
+<head>
+    <title>
+        Faster Post-Quantum Cryptography with BLAKE3
+    </title>
+    <meta prefix="og: http://ogp.me/ns#" property="og:type" content="website">
+    <meta prefix="og: http://ogp.me/ns#" property="og:title" content="Faster Post-Quantum Cryptography with BLAKE3">
+    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="Switch to BLAKE3 for much faster hashing in NIST standardized post-quantum cryptography suite ML-KEM and ML-DSA provides us with better software performance">
+    <meta prefix="og: http://ogp.me/ns#" property="og:url" content="https://itzmeanjan.in">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:width" content="950">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:height" content="735">
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://itzmeanjan.in/">
+    <meta property="twitter:title" content="Faster Post-Quantum Cryptography with BLAKE3">
+    <meta property="twitter:description" content="Switch to BLAKE3 for much faster hashing in NIST standardized post-quantum cryptography suite ML-KEM and ML-DSA provides us with better software performance">
+    <meta property="twitter:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta property="twitter:site" content="@meanjanroy">
+    <meta name="description" content="Switch to BLAKE3 for much faster hashing in NIST standardized post-quantum cryptography suite ML-KEM and ML-DSA provides us with better software performance">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="author" content="Anjan Roy">
+    <meta name="keywords" content="nist post-quantum cryptography, nist pqc, ml-kem, ml-dsa, blake3, sha3, TurboSHAKE, switch to BLAKE3, faster PQC, PQC-B suite">
+    <meta name="theme-color" content="darkslategrey">
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" type="text/css" href="../styles/index.css">
+    <script src="../styles/code.js"></script>
+</head>
+
+<body>
+    <div id="parentDiv">
+        <div id="navBar">
+            <nav>
+                <a class="navLink" href="/"><big>H</big>ome</a> |
+                <a class="navLink" href="https://github.com/itzmeanjan" target="_blank"><big>P</big>rojects</a> |
+                <a class="navLink" href="/pages/blog.html"><big>B</big>log</a> |
+                <a class="navLink" href="/pages/contact.html"><big>C</big>ontact</a>
+            </nav>
+        </div>
+        <div class="childDiv">
+            <article>
+                <h1 class="blogHeader">
+                    Faster Post-Quantum Cryptography with BLAKE3
+                </h1>
+                <h3>Created : October 27, 2025</h3>
+            </article>
+        </div>
+        <div class="childDiv">
+            <article>
+                <p class="blogText">
+                    In the following writing, we try to figure out speedup gain in software implementation of NIST standardized post-quantum cryptography (PQC) suite,
+                    by switching to BLAKE3, for faster hashing. We will look at two (recently) NIST standardized PQC schemes - ML-KEM (FIPS 203) and ML-DSA (FIPS 204).
+                    ML-KEM is a next generation key encapsulation mechanism (KEM), designed to resist attackers with access to quantum computer.
+                    Its hardness assumption is based on a lattice problem. ML-KEM allows two peers to agree on a shared-secret, while
+                    communicating over an insecure channel. The agreed upon shared-secret key can then be used with any symmetric-key construction for
+                    faster encrypted and authenticated communication. ML-KEM standard is accessible @ <a class="blogLink" href="https://doi.org/10.6028/NIST.FIPS.203" target="_blank">https://doi.org/10.6028/NIST.FIPS.203</a>.
+                    <br>
+                    <br>
+                    On other hand, ML-DSA is a NIST standardized digital signature algorithm (DSA), designed to replace currently used ECDSA and EdDSA, which are based on the
+                    hardness of discrete logarithm problem (DLP) in context of elliptic curves. ML-DSA's hardness assumption is also based on a similar kind of lattice problem.
+                    ML-DSA helps in establishing the authenticity and integrity of a message. It also prevents the signer from denying that they signed a message, anytime in future.
+                    ML-DSA standard is accessible @ <a class="blogLink" href="https://doi.org/10.6028/NIST.FIPS.204" target="_blank">https://doi.org/10.6028/NIST.FIPS.204</a>.
+                    These two algorithms are very important for future of encrypted communication, specially in a world with Cryptographically Relevant Quantum Computer (CRQC).
+                    <br>
+                    <br>
+                    By design, both ML-KEM and ML-DSA uses NIST standardized hash functions from SHA3 i.e. FIPS 202. SHA3 hash functions offer excellent security
+                    margin. They are based on keccak-p[1600; 24] - 24-rounds keccak permutation, applied on 1600-bit wide state.
+                    Though they are not as much performant as we would ideally want them to be, in software. Hence, we swap out SHA3-based hashing with BLAKE3, for much faster hashing in NIST PQC schemes.
+                    In following section, we wil observe that a huge chunk of compute time during ML-KEM and ML-DSA execution is spent just on hashing. We hope to reduce
+                    end-to-end latency of NIST PQC algorithms by switching to faster hash function like BLAKE3. BLAKE3 is known for being the fastest cryptographic hash function.
+                    There are two main reasons for BLAKE3 being that.
+                </p>
+                <ol>
+                    <li>Merklized tree hashing mode, scales BLAKE3's performance, using both SIMD and/or multi-core parallelism, when hashing large input.</li>
+                    <li>BLAKE3 reduces number of rounds to 7, from BLAKE2's 10 and BLAKE's 14, still offering 256-bit of preimage resistance security.</li>
+                </ol>
+                <p class="blogText">
+                    Let's begin with ML-KEM. For sake of this experimentation, we will use C++ header-only library implementation of ML-KEM @ <a class="blogLink" href="https://github.com/itzmeanjan/ml-kem.git" target="_blank">https://github.com/itzmeanjan/ml-kem.git</a> (commit id: <span class="highlight">0d7996dad0e8ef343fb957eb58e58d861cffc938</span>).
+                    In this modular implementation, we use a separate module for SHA3 hashing. ML-KEM library uses <a class="blogLink" href="https://github.com/itzmeanjan/sha3.git", target="_blank">https://github.com/itzmeanjan/sha3.git</a> as git submodule based dependency for hashing.
+                    For understanding if it's worth replacing SHA3-based hashing with much faster BLAKE3-based hashing, we will use Linux performance analysis tool <span class="highlight">perf</span>, when benchmarking ML-KEM.
+                    <br>
+                    <br>
+                    Following screen capture demonstrates, during ML-KEM encapsulation and decapsulation, 33.19% time is spent in <span class="highlight">generate_matrix()</span> function.
+                    <span class="highlight">generate_matrix()</span> simply generates a matrix, using the method of rejection sampling, given a seeded eXtendable Output Function (XOF) such as SHAKE128.
+                    Another big compute time consumer is <span class="highlight">generate_vector()</span> function, costing us 5.91% of time.
+                    <span class="highlight">generate_vector()</span> also samples a vector of polynomials, from a seeded SHAKE256 XOF instance.
+                    These two functions, mainly absorbs bytes into keccak[1600] permutation state; permutes using 24-rounds keccak permutation
+                    and squeezes arbitrary many bytes out of the keccak[1600] instance. This costs us 39.1% of time during ML-KEM encapsulation and decapsulation - spent just on hashing.
+                    We can try to optimize ML-KEM, by using faster hash function like BLAKE3.
+                </p>
+                <img class="imgCenter" src="../images/faster-pqc-with-blake3-time-spent-hashing-in-ml-kem.png">
+                <p class="blogText">
+                    Let's begin by setting up BLAKE3 C implementation. BLAKE3 team maintains an optimized C implementation @ <a class="blogLink" href="https://github.com/BLAKE3-team/BLAKE3/tree/1.8.2/c" target="_blank">https://github.com/BLAKE3-team/BLAKE3/tree/1.8.2/c</a>.
+                    As our ML-KEM and ML-DSA libraries are implemented as C++ header-only libraries, we can simply wrap BLAKE3 API as sponge like functions in a C++ class. Like shown below. We will replace any use of SHA3 hash functions, with following interface.
+                </p>
+                <div class="microlight">
+#pragma once
+#include "blake3.h"
+#include &lt;cstring&gt;
+#include &lt;span&gt;
+
+namespace ml_kem_hashing {
+
+// BLAKE3 hashing wrapper, behaving like an eXtendable Output Function (XOF).
+//
+// C++ class wrapper on top of API definition
+// @ https://github.com/BLAKE3-team/BLAKE3/blob/e0b1d91410fd0a344beda6ee0e6f1972ad04be08/c/README.md#api
+struct blake3_hasher_t
+{
+private:
+  blake3_hasher internal_hasher;
+  bool finalized;
+  size_t squeeze_from;
+
+public:
+  // Initialize BLAKE3 hasher context.
+  blake3_hasher_t()
+  {
+    blake3_hasher_init(&this->internal_hasher);
+    this->finalized = false;
+    this->squeeze_from = 0;
+  };
+
+  // Absorb arbitrary length message into BLAKE3 hasher context. 
+  // Invoke it as many times needed before hasher is finalized.
+  void absorb(std::span<const uint8_t> msg)
+  {
+    if (!this->finalized) {
+      blake3_hasher_update(&this->internal_hasher, msg.data(), msg.size());
+    }
+  }
+
+  // After absorbing full message, finalize hasher, so that it can be used for squeezing output.
+  // Once finalized, hasher instance can't be used for further absorption.
+  void finalize()
+  {
+    if (!this->finalized) {
+      blake3_hasher_finalize(&this->internal_hasher, nullptr, 0);
+      this->finalized = true;
+    }
+  }
+
+  // After finalizing hasher, start squeezing arbitrary sized output, as many times needed.
+  void squeeze(std::span<uint8_t> dig)
+  {
+    if (this->finalized) {
+      blake3_hasher_finalize_seek(&this->internal_hasher, this->squeeze_from, dig.data(), dig.size());
+      this->squeeze_from += dig.size();
+    }
+  }
+
+  // Resets hasher to post-init state. After reseting, the hasher is ready for 
+  // another round of absorb -> finalize -> squeeze cycle.
+  void reset()
+  {
+    blake3_hasher_reset(&this->internal_hasher);
+    this->finalized = false;
+    this->squeeze_from = 0;
+  }
+};
+
+}
+                </div>
+                <p class="blogText">
+                    NIST standard for ML-KEM i.e. FIPS 203 proposes parameters for three security levels. For this demonstration, we will
+                    only focus on ML-KEM-768, offering 192-bit of security. Let's run the benchmarks on an Intel x86_64 desktop machine,
+                    running Linux 6.17.0-5-generic kernel. The benchmark executable is compiled using GCC 15.2.0, with flags <span class="highlight">-O3 -march=native</span>.
+                </p>
+                <div class="microlight">
+$ git clone https://github.com/itzmeanjan/ml-kem.git
+$ pushd ml-kem
+$ git checkout 0d7996dad0e8ef343fb957eb58e58d861cffc938 # HEAD of `master` branch, at the time of writing
+$ make benchmark                                        # Or run `make perf` if you have google-benchmark with libPFM
+$ popd
+                </div>
+                <img class="imgCenter" src="../images/faster-pqc-with-blake3-ml-kem-768-perf.png">
+                <p class="blogText">
+                    Important numbers to note down. For ML-KEM-768, on Intel x86_64 Alderlake architecture, keygen, encaps and decaps take following median time to execute.
+                </p>
+                <table class="centeredTable">
+                    <tr>
+                        <th>ML-KEM Algorithm</th>
+                        <th>Median Time to Execute</th>
+                    </tr>
+                    <tr>
+                        <td>Key Generation</td>
+                        <td>21.9 us</td>
+                    </tr>
+                    <tr>
+                        <td>Encapsulation</td>
+                        <td>25.9 us</td>
+                    </tr>
+                    <tr>
+                        <td>Decapsulation</td>
+                        <td>31.5 us</td>
+                    </tr>
+                </table>
+                <p class="blogText">
+                    Now we can swap out hashing with SHA3 and switch to BLAKE3 hasher API, we just defined above. We will call these instances of ML-KEM as ML-KEM-B.
+                    The necessary patch for ML-KEM-B lives @ <a class="blogLink" href="https://github.com/itzmeanjan/ml-kem/tree/ml-kem-b" target="_blank">https://github.com/itzmeanjan/ml-kem/tree/ml-kem-b</a> (commit id: <span class="highlight">03ca3cd1febfd16486324a882f44c93b3dbcab51</span>).
+                    Benchmarking on same the machine, gives us following result.
+                </p>
+                <div class="microlight">
+$ git clone https://github.com/itzmeanjan/ml-kem.git
+$ pushd ml-kem
+$ git checkout ml-kem-b # HEAD of `ml-kem-b` branch, commit id: 03ca3cd1febfd16486324a882f44c93b3dbcab51
+$ make benchmark        # Or run `make perf` if you have google-benchmark with libPFM
+$ popd
+                </div>
+                <img class="imgCenter" src="../images/faster-pqc-with-blake3-ml-kem-768-blake3-perf.png">
+                <p class="blogText">
+                    Let's note down median time to execute ML-KEM-768-with-BLAKE3 keygen, encaps and decaps.
+                </p>
+                <table class="centeredTable">
+                    <tr>
+                        <th>ML-KEM-B Algorithm</th>
+                        <th>Median Time to Execute</th>
+                    </tr>
+                    <tr>
+                        <td>Key Generation</td>
+                        <td>17.9 us</td>
+                    </tr>
+                    <tr>
+                        <td>Encapsulation</td>
+                        <td>21.4 us</td>
+                    </tr>
+                    <tr>
+                        <td>Decapsulation</td>
+                        <td>27.5 us</td>
+                    </tr>
+                </table>
+                <p class="blogText">
+                    Comparing ML-KEM performance metrics table with ML-KEM-B table, shows a clear advantage in choosing BLAKE3 for hashing purposes, in ML-KEM.
+                    <br>
+                    <br>
+                    On a side note, we are using google-benchmark for benchmarking ML-KEM functions. And google-benchmark comes with a nice tool for comparing
+                    benchmark results. We can use that to produce a nice tabular report, showing performance improvement or degradation by choosing to use BLAKE3 for hashing in ML-KEM algorithms.
+                    How to use google-benchmark comparison tool is described in a guide @ <a class="blogLink" href="https://github.com/google/benchmark/blob/v1.9.4/docs/tools.md" target="_blank">https://github.com/google/benchmark/blob/v1.9.4/docs/tools.md</a>.
+                    Using the benchmark comparison tool for comparing performance of ML-KEM vs. ML-KEM-B, on x86_64, gives us following result.
+                    In short, by switching to BLAKE3, ML-KEM-768 reduces latency in all three algorithms.
+                </p>
+                <ul>
+                    <li>Key generation is taking 24.06% less time.</li>
+                    <li>Encapsulation is taking 23.32% less time.</li>
+                    <li>Decapsulation is taking 17.21% less time.</li>
+                </ul>
+                <img class="imgCenter" src="../images/faster-pqc-with-blake3-ml-kem-768-vs-ml-kem-768-blake3-on-x86_64.png">
+                <p class="blogText">
+                    Now if we use Linux kernel's perf tool to inspect performance bottleneck in the ML-KEM-B variant, we notice that only 7.14% time is spent in <span class="highlight">generate_matrix()</span>, much lesser than ML-KEM variant.
+                    Instead now <span class="highlight">blake3_compress_xof_sse41()</span> is taking 18.86% of encapsulation and decapsulation compute time. It clearly show BLAKE3 C implementation intelligently finds
+                    optimized code path and executes it based on available CPU features. That's exactly what <span class="highlight">get_cpu_features()</span> is for, in following perf report.
+                    Our SHA3 C++ header-only library implementation lacks this feature. Also note that, SHA3 hash functions are not tree hashing mode - there are less SIMD parallelism opportunities to exploit for faster hashing in SHA3.
+                    Ignoring that fact, BLAKE3 has reduced latency in ML-KEM function's running time. A clear win.
+                </p>
+                <img class="imgCenter" src="../images/faster-pqc-with-blake3-time-spent-hashing-in-ml-kem-blake3.png">
+                <p class="blogText">
+                    For sake of completeness, we run ML-KEM vs. ML-KEM-BLAKE3 benchmark comparison on an aarch64 server-grade CPU i.e. AWS <span class="highlight">c8g.large</span> instance, featuring a Graviton4 CPU.
+                    More resources on AWS <span class="highlight">c8g.large</span> instance @ <a class="blogLink" href="https://aws.amazon.com/ec2/instance-types/c8g" target="_blank">https://aws.amazon.com/ec2/instance-types/c8g</a>.
+                    To our complete surprise, ML-KEM-BLAKE3 turns out to be multiple times slower compared to the base version i.e. NIST ML-KEM.
+                    We suspect it is because of some sort of compile-time misconfiguration or issues with runtime CPU feature detection, in BLAKE3 C implementation.
+                </p>
+                <img class="imgCenter" src="../images/faster-pqc-with-blake3-ml-kem-768-vs-ml-kem-768-blake3-on-aarch64.png">
+
+
+                <hr style="border-style: dashed;" />
+                <br>
+
+
+                <p class="blogText">
+                    In the rest of the post, we will focus on ML-DSA and see how does its performance characteristics change by switching to BLAKE3.
+                    NIST standard for ML-DSA i.e. FIPS 204 recommends using hash functions and extendable output functions from SHA3 standard i.e. FIPS 202.
+                    In this experiment, we use ML-DSA C++ header-only library implementation @ <a class="blogLink" href="https://github.com/itzmeanjan/ml-dsa.git" target="_blank">https://github.com/itzmeanjan/ml-dsa.git</a> (commit id: <span class="highlight">dfb9b0fa187fa73d5d239f92b9625f3d7738da4c</span>).
+                    ML-DSA standard proposes parameters for three security levels. In following experiment, we choose to work with only ML-DSA-65 i.e. the parameter set providing us with 192-bit security.
+                    To begin with, we will use Linux kernel's perf tool to find performance bottleneck in ML-DSA-65 keygen, sign and verify, separately.
+                </p>
+                <p class="blogText">
+                    In the following screen capture of <span class="highlight">$ perf report</span> command output of ML-DSA-65 key generation algorithm, we see
+                    49.67% time is spent on <span class="highlight">expand_a()</span>. What <span class="highlight">expand_a()</span> does is, it takes a seed to initialize
+                    a SHAKE128 XOF instance, from which it deterministically samples a public matrix A, using the method of rejection sampling. Below that, two invocations of
+                    <span class="highlight">expand_s()</span>, consuming upto 7.15% and 6.37% of time spent during key generation. <span class="highlight">expand_s()</span>
+                    similarly samples LWE secret vector s, from a seeded SHAKE256 XOF instance. These three function calls combined, takes up a whopping 63.19% of total
+                    execution time of ML-DSA key generation algorithm. And it's all basically hashing using XOFs, defined in SHA3 standard.
+                </p>
+                <img class="imgCenter" src="../images/faster-pqc-with-blake3-time-spent-hashing-in-ml-dsa-65-keygen.png">
+                <p class="blogText">
+                    In following screen capture, we find main bottlenecks in ML-DSA-65 signing execution. Like in key generation, we have to invoke <span class="highlight">expand_a()</span>
+                    to deterministically sample public matrix A, from a seeded SHAKE128 XOF instance. It takes up 7.55% of total execution time.
+                    Both <span class="highlight">expand_mask()</span> and <span class="highlight">sample_in_ball()</span> sample from a seeded SHAKE256 XOF instance.
+                    <span class="highlight">expand_mask()</span> costs 7.52% of execution time of sign algorithm. During ML-DSA signing, we end up spending 15.7% of total time in just hashing using SHA3.
+                </p>
+                <img class="imgCenter" src="../images/faster-pqc-with-blake3-time-spent-hashing-in-ml-dsa-65-sign.png">
+                <p class="blogText">
+                    And finally, in the following screen capture, we find performance bottleneck in ML-DSA signature verification flow. We again encounter <span class="highlight">expand_a()</span>,
+                    taking up a whopping 46.98% of execution time of verify algorithm. It absorbs a fixed length seed into the keccak[1600] permutation state; permutes the state using 24-rounds keccak permutation
+                    and finally squeezes bytes out of the keccak[1600] permutation state, for rejection sampling coefficients of public matrix A. That's a huge chunk of verification algorithm's compute time, being occupied in just hashing.
+                    It's quite evident that switching to a faster hash function should improve performance.
+                </p>
+                <img class="imgCenter" src="../images/faster-pqc-with-blake3-time-spent-hashing-in-ml-dsa-65-verify.png">
+                <p class="blogText">
+                    Let's run the benchmarks on an Intel x86_64 Alderlake mobile CPU, running Linux 6.17.0-5-generic kernel. Benchmark executable is compiled with GCC 15.2.0, with flags <span class="highlight">-O3 -march=native</span>.
+                </p>
+                <div class="microlight">
+$ git clone https://github.com/itzmeanjan/ml-dsa.git
+$ pushd ml-dsa
+$ git checkout dfb9b0fa187fa73d5d239f92b9625f3d7738da4c # HEAD of `master` branch, at the time of writing
+$ make benchmark                                        # Or run `make perf` if you have google-benchmark with libPFM
+$ popd
+                </div>                
+                <img class="imgCenter" src="../images/faster-pqc-with-blake3-ml-dsa-65-perf.png">
+                <p class="blogText">
+                    Important numbers to note down, from above screen capture - median time to execute ML-DSA-65 key generation, signing and verification.
+                    Note, when benchmarking signing and verification, we work with fixed size 32-bytes message.
+                </p>
+                <table class="centeredTable">
+                    <tr>
+                        <th>ML-DSA Algorithm</th>
+                        <th>Median Time to Execute</th>
+                    </tr>
+                    <tr>
+                        <td>Key Generation</td>
+                        <td>94.6 us</td>
+                    </tr>
+                    <tr>
+                        <td>Signing</td>
+                        <td>637 us</td>
+                    </tr>
+                    <tr>
+                        <td>Verification</td>
+                        <td>100 us</td>
+                    </tr>
+                </table>
+                <p class="blogText">
+                    It's time to replace hashing with SHA3, by BLAKE3 hasher. We will call these instances of ML-DSA as ML-DSA-B i.e. ML-DSA with BLAKE3.
+                    The necessary patch for ML-DSA-B lives @ <a class="blogLink" href="https://github.com/itzmeanjan/ml-dsa/tree/ml-dsa-b" target="_blank">https://github.com/itzmeanjan/ml-dsa/tree/ml-dsa-b</a> (commit id: <span class="highlight">29204af36d7d873efeaa41db4980a4126097621c</span>).
+                    Benchmarking on the same machine, gives us following result. For reproducing benchmark results of ML-DSA-B, run following commands.
+                </p>
+                <div class="microlight">
+$ git clone https://github.com/itzmeanjan/ml-dsa.git
+$ pushd ml-dsa
+$ git checkout ml-dsa-b # Branch holding ML-KEM-B implementation, commit id: 29204af36d7d873efeaa41db4980a4126097621c
+$ make benchmark        # Or run `make perf` if you have google-benchmark with libPFM
+$ popd
+                </div>
+                <img class="imgCenter" src="../images/faster-pqc-with-blake3-ml-dsa-65-blake3-perf.png">
+                <p class="blogText">
+                    Let's note down median time to execute key generation, signing and verification, for ML-DSA-65 with BLAKE3 for hashing.
+                </p>
+                <table class="centeredTable">
+                    <tr>
+                        <th>ML-DSA-B Algorithm</th>
+                        <th>Median Time to Execute</th>
+                    </tr>
+                    <tr>
+                        <td>Key Generation</td>
+                        <td>71.4 us</td>
+                    </tr>
+                    <tr>
+                        <td>Signing</td>
+                        <td>143 us</td>
+                    </tr>
+                    <tr>
+                        <td>Verification</td>
+                        <td>78.3 us</td>
+                    </tr>
+                </table>
+                <p class="blogText">
+                    Comparing above two tables, clearly shows switching to BLAKE3, is advantageous, in case of ML-DSA too.
+                    For all three algorithms, ML-DSA-B shows a strong upperhand over NIST ML-DSA, from software performance point of view.
+                    Let's use google-benchmark's comparison tool to get a nice tabular output of performance comparison between ML-DSA-65 and ML-DSA-65-BLAKE3.
+                    In following screen capture, we see, by choosing to use BLAKE3 for hashing in ML-DSA-65, we are saving a substantial amount of execution time.
+                </p>
+                <ul>
+                    <li>Key generation is taking 24.55% lesser time.</li>
+                    <li>Message signing is taking 77.52% lesser time.</li>
+                    <li>Signature verification is taking 21.79% lesser time.</li>
+                </ul>
+                <img class="imgCenter" src="../images/faster-pqc-with-blake3-ml-dsa-65-vs-ml-dsa-65-blake3-on-x86_64.png">
+                <p class="blogText">
+                    The performance improvement in message signing looks <span class="highlight">too good to be true</span>. And we have an explanation for it. It doesn't just come by switching to BLAKE3.
+                    ML-DSA is a digital signature scheme of "Fiat-Shamir with Aborts" paradigm - simply put, when signing a message, it may need to abort and restart again,
+                    multiple times, based on what message is being signed or what random seed is being used for default "hedged" signing mode.
+                    To reduce influence of cryptographically secure pseudo-random number generator (CSPRNG), we fix the seed. A CSPRNG, initialized with a fixed seed, is used
+                    for sampling message and seed, when benchmarking ML-DSA and ML-DSA-B sign algorithm. But note, due to the use of different hash functions in ML-DSA and ML-DSA-B,
+                    we end up deriving different matrices and vectors, from SHA3 and BLAKE3 hasher, respectively. That injects different pseudo-randomness in ML-DSA-B, than in ML-DSA.
+                    As a result of it, we encounter this <span class="highlight">too good to be true</span> performance boost.
+                    <br>
+                    <br>
+                    We roughly estimate, if ML-DSA didn't require abort in middle of signing, performance gain by switching to BLAKE3 would be more
+                    consistent with others - in the range of 20-30%, on x86_64. That will be on par with ML-DSA keygen and verify. Even ML-KEM shows similar kind of performance boost by switching to BLAKE3.
+                </p>
+                <p class="blogText">
+                    After applying ML-DSA-B patch, we analyse changes in performance bottleneck for ML-DSA-65-BLAKE3 keygen, sign and verify.
+                    Let's begin with ML-DSA-65-BLAKE3 key generation. In following screen capture, we see BLAKE3 function <span class="highlight">blake3_compress_xof_sse41()</span>
+                    taking up 33.06% of execution time during key generation. Several small chunks of execution time is also occupied by other BLAKE3 functions such as compression or finalization.
+                    The call to <span class="highlight">get_cpu_features()</span> shows BLAKE3 C implementation is inspecting supported hardware features at runtime and executing best code path
+                    for faster SIMD parallel hashing. The <span class="highlight">expand_a()</span> function, which was occupying 49.67% time, when hashing with SHA3, is nowhere to be seen.
+                </p>
+                <img class="imgCenter" src="../images/faster-pqc-with-blake3-time-spent-hashing-in-ml-dsa-65-blake3-keygen.png">
+                <p class="blogText">
+                    In following screen capture, we look for bottleneck in execution of signing algorithm with ML-DSA-B. The bottleneck has shifted from <span class="highlight">expand_a()</span> or <span class="highlight">expand_mask()</span>
+                    to our familiar <span class="highlight">blake3_compress_xof_sse41()</span>. We are still spending a minimum of 16.68% time in compressing BLAKE3 chunks (read hashing),
+                    but overall it's taking us lesser time, due to faster running time of BLAKE3, in software.
+                </p>
+                <img class="imgCenter" src="../images/faster-pqc-with-blake3-time-spent-hashing-in-ml-dsa-65-blake3-sign.png">
+                <p class="blogText">
+                    Finally we look at the current state of performance bottleneck in signature verification algorithm, with ML-DSA-B. And again, as expected, <span class="highlight">expand_a()</span>,
+                    which was occupying 49.67% of execution time, with standard ML-DSA-65, is nowhere to be seen as a bottleneck. Instead we find that, we are spending 28.1% of execution time in compressing
+                    BLAKE3 chunks, invoking <span class="highlight">blake3_compress_xof_sse41()</span>, exploiting SSE4.1-based SIMD parallelism.
+                </p>
+                <img class="imgCenter" src="../images/faster-pqc-with-blake3-time-spent-hashing-in-ml-dsa-65-blake3-verify.png">
+                <p class="blogText">
+                    For sake of completeness in our analysis, we run performance comparison of ML-DSA vs. ML-DSA-B, on an aarch64 server-grade CPU i.e. AWS <span class="highlight">c8g.large</span> instance,
+                    featuring a Graviton4 CPU. Same as ML-KEM, ML-DSA-B turns out to be several times slower than ML-DSA, on aarch64 target.
+                    Our suspicion is, it is due to some sort of compile-time misconfiguration or issues with runtime CPU feature detection, in BLAKE3 C implementation, when targeting aarch64.
+                </p>
+                <img class="imgCenter" src="../images/faster-pqc-with-blake3-ml-dsa-65-vs-ml-dsa-65-blake3-on-aarch64.png">
+                <p class="blogText">
+                    With this, we finish our analysis on <span class="highlight">"Is there any advantage of switching to BLAKE3 for faster hashing in NIST PQC standards?"</span>.
+                    We answer affirmatively. We analyzed 192-bit security parameter for both ML-KEM and ML-DSA. For sake of experimentation, we chose to use C++ header-only library implementation
+                    of ML-KEM <span class="highlight">https://github.com/itzmeanjan/ml-kem.git</span> and ML-DSA <span class="highlight">https://github.com/itzmeanjan/ml-dsa.git</span>, as baseline.
+                    Both of them use SHA3 C++ header-only implementation @ <span class="highlight">https://github.com/itzmeanjan/sha3.git</span>, as git submodule based dependency.
+                    We replace hashing with SHA3 by BLAKE3 C implementation @ <span class="highlight">https://github.com/BLAKE3-team/BLAKE3/tree/1.8.2/c</span>.
+                    By switching to BLAKE3, we observe quite substantial performance gain for both ML-KEM and ML-DSA, on x86_64 target.
+                    ML-KEM-B keygen() is 24.06% faster, encaps() is 23.32% faster and decaps() is 17.21% faster, compared to standard ML-KEM.
+                    ML-DSA-B keygen() is 24.55% faster, sign() is 77.52% faster and verify() is 21.79% faster, compared to standard ML-DSA.
+                    <br>
+                    <br>
+                    Last but not least. In this writing, we have established that switching to BLAKE3 for faster hashing can be overall good for NIST PQC standard ML-KEM and ML-DSA.
+                    But we must mention, that is not the only way to speed up ML-KEM and ML-DSA. Recall that, we mentioned SHA3 hash functions and extendable output functions provide
+                    us with an excellent security margin - as they are backed by keccak-p[1600, 24] i.e. 24-rounds keccak permutation on 1600-bit wide state. But this is quite a conservative
+                    parameterization. We can halve the number of rounds to 12 and we get TurboSHAKE, which was formally specified in <a class="blogLink" href="https://eprint.iacr.org/2023/342" target="_blank">https://eprint.iacr.org/2023/342</a>.
+                    A Rust library implementation of TurboSHAKE @ <a class="blogLink" href="https://github.com/itzmeanjan/turboshake/tree/v0.5.0" target="_blank">https://github.com/itzmeanjan/turboshake/tree/v0.5.0</a>,
+                    shows interesting performance characteristics. It almost doubles the throughput of hashing, powered by the same keccak permutation. A future work will be to experiment with using TurboSHAKE instances for faster
+                    hashing in NIST PQC suite. That will allow us to compare performance gain, in NIST PQC suite, by switching to BLAKE3 vs. TurboSHAKE.
+                </p>
+            </article>
+        </div>
+    </div>
+    <div id="footerDiv">
+        <footer>
+            <p id="footerText">
+                &copy <a href="https://github.com/itzmeanjan/itzmeanjan.github.io" id="footerLink"
+                    target="_blank"><big>A</big>njan Roy</a> ( <big>M</big>IT Licensed )
+            </p>
+        </footer>
+    </div>
+</body>
+
+</html>
