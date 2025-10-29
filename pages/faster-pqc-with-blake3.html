@@ -25,7 +25,7 @@
     <meta name="description" content="Switch to BLAKE3 for much faster hashing in NIST standardized post-quantum cryptography suite ML-KEM and ML-DSA provides us with better software performance">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="author" content="Anjan Roy">
-    <meta name="keywords" content="nist post-quantum cryptography, nist pqc, ml-kem, ml-dsa, blake3, sha3, TurboSHAKE, switch to BLAKE3, faster PQC, PQC-B suite">
+    <meta name="keywords" content="faster pqc with blake3, nist post-quantum cryptography, nist pqc, ml-kem, ml-dsa, blake3, sha3, TurboSHAKE, switch to BLAKE3, faster PQC, PQC-B suite">
     <meta name="theme-color" content="darkslategrey">
     <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
     <link rel="stylesheet" type="text/css" href="../styles/index.css">
@@ -381,18 +381,53 @@ $ popd
                 </ul>
                 <img class="imgCenter" src="../images/faster-pqc-with-blake3-ml-dsa-65-vs-ml-dsa-65-blake3-on-x86_64.png">
                 <p class="blogText">
-                    The performance improvement in message signing looks <span class="highlight">too good to be true</span>. And we have an explanation for it. It doesn't just come by switching to BLAKE3.
+                    The performance improvement in message signing looks <span class="highlight">too good to be true</span>. It's not consistent with keygen and verify. And we have an explanation for it.
                     ML-DSA is a digital signature scheme of "Fiat-Shamir with Aborts" paradigm - simply put, when signing a message, it may need to abort and restart again,
-                    multiple times, based on what message is being signed or what random seed is being used for default "hedged" signing mode.
-                    To reduce influence of cryptographically secure pseudo-random number generator (CSPRNG), we fix the seed. A CSPRNG, initialized with a fixed seed, is used
-                    for sampling message and seed, when benchmarking ML-DSA and ML-DSA-B sign algorithm. But note, due to the use of different hash functions in ML-DSA and ML-DSA-B,
-                    we end up deriving different matrices and vectors, from SHA3 and BLAKE3 hasher, respectively. That injects different pseudo-randomness in ML-DSA-B, than in ML-DSA.
-                    As a result of it, we encounter this <span class="highlight">too good to be true</span> performance boost.
-                    <br>
-                    <br>
-                    We roughly estimate, if ML-DSA didn't require abort in middle of signing, performance gain by switching to BLAKE3 would be more
-                    consistent with others - in the range of 20-30%, on x86_64. That will be on par with ML-DSA keygen and verify. Even ML-KEM shows similar kind of performance boost by switching to BLAKE3.
+                    multiple times, based on what message is being signed or what random seed is being used for the default "hedged" signing mode.
+                    To reduce the influence of sampling from a cryptographically secure pseudo-random number generator (CSPRNG), we fix the seed. A CSPRNG, initialized with a fixed seed, is used
+                    for sampling ML-DSA inputs i.e. message, context and seed, when benchmarking ML-DSA and ML-DSA-B sign algorithm. But note, due to the use of different hash functions in ML-DSA and ML-DSA-B,
+                    we end up deriving different matrices and vectors, from SHA3 and BLAKE3 hasher, respectively. Both BLAKE3 and SHA3 hasher gets initialized with the same input and they produce different output - as expected.
+                    During the execution of <span class="highlight">sign_internal()</span>, ML-DSA-B receives different pseudo-randomness, than baseline ML-DSA. As a result of it, signing procedure takes different number of attempts (read aborts-then-restarts) 
+                    to succeed for ML-DSA vs. ML-DSA-B, even when all the inputs are same. That's exactly why we encounter this <span class="highlight">too good to be true</span> performance boost.
+                    We roughly estimate, if ML-DSA didn't require abort in middle of signing, performance gain by switching to BLAKE3 would be more consistent with others - in the range of 20-30%, on x86_64.
+                    That will be on par with ML-DSA keygen and verify. Even ML-KEM shows similar kind of performance boost by switching to BLAKE3.
                 </p>
+                <p class="blogText">
+                    To get a better idea of BLAKE3's contribution, in ML-DSA message signing and signature verification performance, we experiment with variable sized messages.
+                    We choose to benchmark with random messages of following six sizes: 32B, 1kB, 32kB, 1MB, 32MB and 1GB. Notice, each input size is separated from its neighbour by a distance of 32x.
+                    We benchmark compare them inside the same environment. To limit the effect of intermittent abort during signing a message with ML-DSA, we fix the seed for CSPRNG, from where all the inputs are sampled.
+                    Hence we benchmark <span class="highlight">sign()</span>, with exactly the same mesasge and context for both ML-DSA and ML-DSA-B. This is the best we could come up with to limit noise.
+                </p>
+                <img class="imgCenter" src="../images/faster-pqc-with-blake3-hash-message-to-get-mu.png">
+                <p class="blogText">
+                    When signing a 32B message, ML-DSA-B turns out to be 76.74% faster than baseline ML-DSA. When we sign a 1kB message,
+                    the performance gain by switching to ML-DSA-B doesn't get pronounced that well - only 12.82% faster than baseline. And signing a 32kB message, with ML-DSA-B is 23.87% faster than baseline.
+                    We can already see the inconsistency in performance gain.
+                    As we move towards even longer messages, such as 1MB, we see BLAKE3's upperhand in hashing longer messages, starts to kick in. We see a whopping ~83% improvement in latency when signing 1MB, 32MB and 1GB message.
+                    As we sign longer messages, those messages first need to get compressed into a shorter 64-bytes value <span class="highlight">mu (μ)</span>, using BLAKE3 or SHA3.
+                    In line 330 of above screen capture, BLAKE3 really shines compared to SHA3. Thanks to SIMD parallel tree hashing mode. For long messages, line 330 is the actual bottleneck.
+                    ML-DSA sign algorithm itself is not anymore stopping us from signing faster.
+                </p>
+                <p class="blogText">
+                    It's fairly hard to exactly pinpoint how fast we can sign a message with ML-DSA-B, compared to baseline ML-DSA, because of ML-DSA being a digital signature scheme of "Fiat-Shamir With Aborts" paradigm.
+                    In following benchmark comparison, we see the result being inconsistent for various message sizes. The performance improvement when signing a message with ML-DSA-B,
+                    ranges from (12-85)%, for the input message size ranging from 32B to 1GB. But we conclude, with certainty, that when signing really long messages (say >=1MB), we will always benefit from SIMD parallel BLAKE3 hashing.
+                    SHA3 won't beat it. As the bottleneck moves from signing to preparing material for signing i.e. hashing message, to compute <span class="highlight">mu</span>.
+                    <br>
+                    <br>
+                    BLAKE3 compresses chunks of 1kB, in parallel. Each chunk of 1kB is compressed into a short chaining-value (CV), which is a leaf of a Merkle Tree.
+                    If we have many chunks which are ready to be absorbed into BLAKE3 permutation state, then we benefit the most from SIMD parallelism, by compressing 4x, 8x or even 16x
+                    of these chunks, in parallel. Each <span class="highlight">hasher.absorb()</span> call in above screen capture, makes a call to the underlying C implementation's <span class="highlight">blake3_hasher_update()</span>.
+                    In line 330 of above screen capture, BLAKE3 will have most number of 1kB chunks ready to be compressed, when message to be signed is long.
+                </p>
+                <img class="imgCenter" src="../images/faster-pqc-with-blake3-ml-dsa-65-sign-benchcmp-variable-sized-msg.png">
+                <p class="blogText">
+                    When verifying a signature, ML-DSA-B is moderately faster than baseline ML-DSA for short and mid-sized messages. For messages, in range of 32B to 1kB, ML-DSA-B has 18% lower latency than baseline. This result is consistent with gain in keygen.
+                    As number of BLAKE3 chunks increase i.e. we verify signature over message of 32kB, we see performance boost of upto 40%. As we continue increasing message size, even further to 1MB, then 32MB and finally 1GB, the comparative cost of signature verification drops significantly, even upto 85%.
+                    Majority of the compute time is spent in hashing the message to compute <span class="highlight">mu</span>, which gets signed, by <span class="highlight">ML-DSA.sign_internal()</span>. For very long messages, signature verification itself is not anymore a bottleneck.
+                    Rather we spent a lot of time preparing material which was signed i.e. <span class="highlight">mu</span>. This behaviour is same as what we just observed with signing.
+                </p>
+                <img class="imgCenter" src="../images/faster-pqc-with-blake3-ml-dsa-65-verify-benchcmp-variable-sized-msg.png">
                 <p class="blogText">
                     After applying ML-DSA-B patch, we analyse changes in performance bottleneck for ML-DSA-65-BLAKE3 keygen, sign and verify.
                     Let's begin with ML-DSA-65-BLAKE3 key generation. In following screen capture, we see BLAKE3 function <span class="highlight">blake3_compress_xof_sse41()</span>
