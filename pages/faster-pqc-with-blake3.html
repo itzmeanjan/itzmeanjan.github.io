@@ -47,44 +47,83 @@
                 <h1 class="blogHeader">
                     Faster Post-Quantum Cryptography with BLAKE3
                 </h1>
-                <h3>Created : October 27, 2025</h3>
+                <h3>Created : October 30, 2025</h3>
             </article>
         </div>
         <div class="childDiv">
             <article>
+                <p class="highlight">
+                    We thank Jack O'Connor (<a class="blogLink" href="https://github.com/oconnor663" target="_blank">https://github.com/oconnor663</a>) and
+                    Project 11 team (<a class="blogLink" href="https://github.com/PQC-Suite-B" target="_blank">https://github.com/PQC-Suite-B</a>) for fruitful discussions and suggestions on improving following writing.
+                </p>
                 <p class="blogText">
                     In the following writing, we try to figure out speedup gain in software implementation of NIST standardized post-quantum cryptography (PQC) suite,
                     by switching to BLAKE3, for faster hashing. We will look at two (recently) NIST standardized PQC schemes - ML-KEM (FIPS 203) and ML-DSA (FIPS 204).
                     ML-KEM is a next generation key encapsulation mechanism (KEM), designed to resist attackers with access to quantum computer.
-                    Its hardness assumption is based on a lattice problem. ML-KEM allows two peers to agree on a shared-secret, while
+                    Its hardness assumption is based on a lattice problem, which is also deeemed to be hard for quantum computers. ML-KEM allows two peers to agree on a shared-secret, while
                     communicating over an insecure channel. The agreed upon shared-secret key can then be used with any symmetric-key construction for
                     faster encrypted and authenticated communication. ML-KEM standard is accessible @ <a class="blogLink" href="https://doi.org/10.6028/NIST.FIPS.203" target="_blank">https://doi.org/10.6028/NIST.FIPS.203</a>.
                     <br>
                     <br>
                     On other hand, ML-DSA is a NIST standardized digital signature algorithm (DSA), designed to replace currently used ECDSA and EdDSA, which are based on the
-                    hardness of discrete logarithm problem (DLP) in context of elliptic curves. ML-DSA's hardness assumption is also based on a similar kind of lattice problem.
+                    hardness of discrete logarithm problem (DLP), over elliptic curves. ML-DSA's hardness assumption is also based on a similar kind of lattice problem.
                     ML-DSA helps in establishing the authenticity and integrity of a message. It also prevents the signer from denying that they signed a message, anytime in future.
                     ML-DSA standard is accessible @ <a class="blogLink" href="https://doi.org/10.6028/NIST.FIPS.204" target="_blank">https://doi.org/10.6028/NIST.FIPS.204</a>.
                     These two algorithms are very important for future of encrypted communication, specially in a world with Cryptographically Relevant Quantum Computer (CRQC).
                     <br>
                     <br>
-                    By design, both ML-KEM and ML-DSA uses NIST standardized hash functions from SHA3 i.e. FIPS 202. SHA3 hash functions offer excellent security
-                    margin. They are based on keccak-p[1600; 24] - 24-rounds keccak permutation, applied on 1600-bit wide state.
+                    By design, both ML-KEM and ML-DSA use NIST standardized hash functions from SHA3 i.e. FIPS 202. SHA3 hash functions offer excellent security
+                    margin. They are based on keccak-p[1600, 24] - 24-rounds keccak permutation, applied on a 1600-bit wide state.
                     Though they are not as much performant as we would ideally want them to be, in software. Hence, we swap out SHA3-based hashing with BLAKE3, for much faster hashing in NIST PQC schemes.
                     In following section, we wil observe that a huge chunk of compute time during ML-KEM and ML-DSA execution is spent just on hashing. We hope to reduce
-                    end-to-end latency of NIST PQC algorithms by switching to faster hash function like BLAKE3. BLAKE3 is known for being the fastest cryptographic hash function.
+                    end-to-end latency of NIST PQC algorithms by switching to a faster hash function like BLAKE3. BLAKE3 is known for being the fastest cryptographic hash function.
                     There are two main reasons for BLAKE3 being that.
                 </p>
                 <ol>
-                    <li>Merklized tree hashing mode, scales BLAKE3's performance, using both SIMD and/or multi-core parallelism, when hashing large input.</li>
+                    <li>Merklized tree hashing mode, scales BLAKE3's performance, using both SIMD and/or multi-core parallelism, when hashing large input. Large in the sense multiple chunks s.t. each chunk is 1kB.</li>
                     <li>BLAKE3 reduces number of rounds to 7, from BLAKE2's 10 and BLAKE's 14, still offering 256-bit of preimage resistance security.</li>
                 </ol>
                 <p class="blogText">
-                    Let's begin with ML-KEM. For sake of this experimentation, we will use C++ header-only library implementation of ML-KEM @ <a class="blogLink" href="https://github.com/itzmeanjan/ml-kem.git" target="_blank">https://github.com/itzmeanjan/ml-kem.git</a> (commit id: <span class="highlight">0d7996dad0e8ef343fb957eb58e58d861cffc938</span>).
-                    In this modular implementation, we use a separate module for SHA3 hashing. ML-KEM library uses <a class="blogLink" href="https://github.com/itzmeanjan/sha3.git", target="_blank">https://github.com/itzmeanjan/sha3.git</a> as git submodule based dependency for hashing.
+                    In both ML-KEM and ML-DSA, we use a separate module for SHA3 hashing. Both of the libraries use <a class="blogLink" href="https://github.com/itzmeanjan/sha3.git", target="_blank">https://github.com/itzmeanjan/sha3.git</a> as git submodule-based dependency.
+                    Note, this SHA3 implementation is a portable C++20 constexpr, header-only library, without any platform specific optimizations. It features compiler-specific pragmas,
+                    for auto-vectorization and loop unrolling optimization. It's designed to be simple, readable yet as much performant as possible. This library is also <span class="highlight">constexpr</span> - meaning, one can evaluate
+                    "SHA3_*" hash of a message and compute digest in program compile-time itself. It obviously requires the input message to be known at program compile-time.
+                    In following sections, we compare change in performance of NIST PQC schemes by switching to BLAKE3. BLAKE3 team maintains an optimized C implementation @ <a class="blogLink" href="https://github.com/BLAKE3-team/BLAKE3/tree/1.8.2/c" target="_blank">https://github.com/BLAKE3-team/BLAKE3/tree/1.8.2/c</a>.
+                    But again note, BLAKE3 C implementation features platform specific code. For example, on x86_64 target, it can use SSE4.1 or AVX2 or AVX512, based on detected CPU features at runtime.
+                    While on aarch64 target, it can use NEON intrinsics for faster SIMD parallel hashing. Hence, it won't be fair to compare change in performance, by using highly optimized BLAKE3 C implementation, as contender,
+                    while the baseline is platform-agnostic SHA3 C++ header-only library. For sake of ease in performing following benchmark comparison, while touching the interface of hasher module
+                    as little as possible, we stick to portable SHA3 C++ header-only library. But we report a benchmark comparison on the same machine, for SHA3 C++ library vs. XKCP's SHA3 C implementation.
+                    XKCP is the official implementation of SHA3 suite, from the Keccak team. It also features a lot of other constructions built on top of keccak permutation.
+                    XKCP features many platform specific optimizations, even including handwritten assembly. To make the comparison fair against BLAKE3, we present a performance comparison between our portable C++20 SHA3 library and XKCP.
+                    This will show how much off we are from XKCP - the state of the art for keccak permutation based hashing.
+                    We use XKCP from <a class="blogLink" href="https://github.com/XKCP/XKCP.git" target="_blank">https://github.com/XKCP/XKCP.git</a> (commit id: <span class="highlight">e7a08f7baa3d43d64f5c21e641cb18fe292f2b75</span>).
+                    For portable SHA3 C++20 header-only library, we pin to git commit id <span class="highlight">5b3641593ec4fbd18d1ce79157f7a0d230580c14</span>.
+                    We begin by setting up XKCP. Building it from source.
+                </p>
+                <div class="microlight">
+$ git clone https://github.com/XKCP/XKCP.git
+$ git checkout e7a08f7baa3d43d64f5c21e641cb18fe292f2b75
+$ git submodule update --init
+$ make x86-64/libXKCP.a -j  # Optimize for x86_64. Compile-time CPU feature flag detection.
+$ ls bin/x86-64/            # List XKCP static library archive and headers
+                </div>
+                <p class="blogText">
+                    In the following screen capture, we run a performance comparison, on Intel x86_64 Alderlake machine, for portable SHA3 C++ library vs. XKCP C library implementation.
+                    We choose to benchmark SHAKE128 eXtendable Output Function (XOF), for variable length input messages such as 32B, 1kB, 32kB, 1MB, 32MB and 1GB. And we sqeeuze 64-bytes out of SHAKE128 instance.
+                    For smaller messages, till 1kB, portable C++ SHA3 implementation performs better than XKCP. From about 32kB to 32MB, we see almost no difference in their performance.
+                    For the final parameter i.e. 1GB, we see XKCP beating our portable SHA3 C++ implementation, by about a margin of 2%.
+                </p>
+                <img class="imgCenter" src="../images/faster-pqc-with-blake3-benchcmp-portable-shake128-vs-xkcp-shake128.png">
+                <p class="blogText">
+                    And in the following one, we benchmark SHAKE256 XOF, with variable length input messages and fixed length ouptut digest.
+                    We see almost similar performance characteristics. For small messages, till 1kB, XKCP is relatively slower compared to portable implementation.
+                    As the message length continues to increase, XKCP starts to beat portable C++ implementation. With these two benchmark comparisons in mind,
+                    we begin our exploration of switching to BLAKE3 for faster hashing in NIST PQC schemes.
+                </p>
+                <img class="imgCenter" src="../images/faster-pqc-with-blake3-benchcmp-portable-shake256-vs-xkcp-shake256.png">
+                <p class="blogText">
+                    Let's start with ML-KEM. For sake of this experimentation, we will use C++ header-only library implementation of ML-KEM @ <a class="blogLink" href="https://github.com/itzmeanjan/ml-kem.git" target="_blank">https://github.com/itzmeanjan/ml-kem.git</a> (commit id: <span class="highlight">0d7996dad0e8ef343fb957eb58e58d861cffc938</span>).
                     For understanding if it's worth replacing SHA3-based hashing with much faster BLAKE3-based hashing, we will use Linux performance analysis tool <span class="highlight">perf</span>, when benchmarking ML-KEM.
-                    <br>
-                    <br>
                     Following screen capture demonstrates, during ML-KEM encapsulation and decapsulation, 33.19% time is spent in <span class="highlight">generate_matrix()</span> function.
                     <span class="highlight">generate_matrix()</span> simply generates a matrix, using the method of rejection sampling, given a seeded eXtendable Output Function (XOF) such as SHAKE128.
                     Another big compute time consumer is <span class="highlight">generate_vector()</span> function, costing us 5.91% of time.
@@ -95,8 +134,8 @@
                 </p>
                 <img class="imgCenter" src="../images/faster-pqc-with-blake3-time-spent-hashing-in-ml-kem.png">
                 <p class="blogText">
-                    Let's begin by setting up BLAKE3 C implementation. BLAKE3 team maintains an optimized C implementation @ <a class="blogLink" href="https://github.com/BLAKE3-team/BLAKE3/tree/1.8.2/c" target="_blank">https://github.com/BLAKE3-team/BLAKE3/tree/1.8.2/c</a>.
-                    As our ML-KEM and ML-DSA libraries are implemented as C++ header-only libraries, we can simply wrap BLAKE3 API as sponge like functions in a C++ class. Like shown below. We will replace any use of SHA3 hash functions, with following interface.
+                    We prepare BLAKE3 C implementation to be used with ML-KEM and ML-DSA. As both ML-KEM and ML-DSA libraries are implemented as C++ header-only libraries, we can simply wrap BLAKE3 C API as sponge like functions in a C++ class.
+                    Like shown below. We will replace any use of SHA3 hash functions and xofs, with following interface.
                 </p>
                 <div class="microlight">
 #pragma once
