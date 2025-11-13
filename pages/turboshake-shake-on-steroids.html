@@ -10,7 +10,7 @@
     </title>
     <meta prefix="og: http://ogp.me/ns#" property="og:type" content="website">
     <meta prefix="og: http://ogp.me/ns#" property="og:title" content="TurboSHAKE: SHAKE on Steroids">
-    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="TurboSHAKE offers much faster hashing than SHAKE, based on round reduced keccak-p[1600, 12] permutation. It is defined in RFC 9861.">
+    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="TurboSHAKE offers much faster hashing performance than SHAKE, based on round-reduced keccak-p[1600, 12] permutation. It is defined in RFC 9861.">
     <meta prefix="og: http://ogp.me/ns#" property="og:url" content="https://itzmeanjan.in">
     <meta prefix="og: http://ogp.me/ns#" property="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
     <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url" content="https://itzmeanjan.in/images/myImage.jpg">
@@ -19,13 +19,13 @@
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="https://itzmeanjan.in/">
     <meta property="twitter:title" content="TurboSHAKE: SHAKE on Steroids">
-    <meta property="twitter:description" content="TurboSHAKE offers much faster hashing than SHAKE, based on round reduced keccak-p[1600, 12] permutation. It is defined in RFC 9861.">
+    <meta property="twitter:description" content="TurboSHAKE offers much faster hashing performance than SHAKE, based on round-reduced keccak-p[1600, 12] permutation. It is defined in RFC 9861.">
     <meta property="twitter:image" content="https://itzmeanjan.in/images/myImage.jpg">
     <meta property="twitter:site" content="@meanjanroy">
-    <meta name="description" content="TurboSHAKE offers much faster hashing than SHAKE, based on round reduced keccak-p[1600, 12] permutation. It is defined in RFC 9861.">
+    <meta name="description" content="TurboSHAKE offers much faster hashing performance than SHAKE, based on round-reduced keccak-p[1600, 12] permutation. It is defined in RFC 9861.">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="author" content="Anjan Roy">
-    <meta name="keywords" content="---">
+    <meta name="keywords" content="TurboSHAKE, eXtendable Output Function, XOF, SHAKE, SHA3 standard, NIST FIPS 202, round-reduced keccak-p[1600, 12] permutation, 12-rounds keccak, XKCP">
     <meta name="theme-color" content="darkslategrey">
     <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
     <link rel="stylesheet" type="text/css" href="../styles/index.css">
@@ -55,17 +55,17 @@
         <div class="childDiv">
             <article>
                 <p class="blogText">
-                    NIST's SHA3 standard <a class="blogLink" href="https://doi.org/10.6028/NIST.FIPS.202" target="_blank">FIPS 202</a>, which defines four hash functions and two eXtendable Output Functions (XOFs),
-                    based on 24-rounds keccak-p[1600] permutation, offers an excellent security margin. Keccak permutation and sponge mode of operation has been extensively studied for more than a decade now.
+                    NIST's SHA3 standard <a class="blogLink" href="https://doi.org/10.6028/NIST.FIPS.202" target="_blank">FIPS 202</a>, which defines four cryptographic hash functions and two eXtendable Output Functions (XOFs),
+                    based on 24-rounds keccak-p[1600, 24] permutation, offers an excellent security margin. Keccak permutation and sponge mode of operation has been extensively studied in public, for more than a decade now.
                     And the cryptanalysis community largely agrees that using 24-rounds keccak permutation is an overkill. SHA3 is known for being relatively slow in software, though it is performant in hardware.
-                    And 24-rounds keccak permutation eats a large pie from SHA3's software performance. To make keccak permutation based hashing faster in software, keccak team has written up <a class="blogLink" href="https://www.rfc-editor.org/info/rfc9861" target="_blank">RFC 9861</a>,
-                    which proposes two families of XOFs - TurboSHAKE and KangarooTwelve. TurboSHAKE is simply SHAKE (from FIPS 202), just powered by 12-rounds keccak-p[1600] permutation. While KangarooTwelve builds a tree hashing
-                    mode on top of TurboSHAKE for much faster SIMD and/or multi-threaded parallel hashing. KangarooTwelve shines on modern multi-core, multi-CPU machines, where each CPU features several SIMD registers, offering GB/s of throughput.
+                    And 24-rounds keccak permutation eats a large pie from SHA3's software performance. To make keccak permutation-based hashing faster in software, keccak team has written up <a class="blogLink" href="https://www.rfc-editor.org/info/rfc9861" target="_blank">RFC 9861</a>,
+                    which proposes two families of XOFs - TurboSHAKE and KangarooTwelve. TurboSHAKE is simply SHAKE (from FIPS 202), just powered by 12-rounds keccak-p[1600, 12] permutation. While KangarooTwelve builds a tree hashing
+                    mode on top of TurboSHAKE for much faster SIMD and/or multi-threaded parallel hashing. KangarooTwelve shines on modern multi-core, multi-CPU machines, where each CPU features several SIMD registers, offering GB/s of hashing throughput.
                     In this writing, we will just focus on TurboSHAKE - which is a good fit for replacing SHAKE XOF.
                 </p>
                 <p class="blogText">
-                    In SHA3 standard FIPS 202, two XOFs are defined - SHAKE128 and SHAKE256. SHAKE behaves like a flexible hash function. Usually a cryptographic hash function produces a fixed length message digest. For example,
-                    SHA3-256, is a hash function defined in FIPS 202, which produces a 32-bytes message digest for any arbitrary length input it consumes. While SHAKE128, can absorb an arbitrary length message, just like a hash function, though on the other side,
+                    In SHA3 standard FIPS 202, two XOFs are defined - SHAKE128 and SHAKE256. SHAKE behaves like a flexible hash function. Usually a cryptographic hash function produces a fixed length message digest, after consuming an arbitrary length message.
+                    For example, SHA3-256, is a hash function defined in FIPS 202, which produces a 32-bytes message digest for any arbitrary length input it consumes. While SHAKE128, can absorb an arbitrary length message, just like a hash function, though on the other side,
                     it can produce an arbitrary length output i.e. message digest. An extendable output function (XOF) behaves like a sponge - it can absorb arbitrary long message, then it can be squeezed to produce as long output is required.
                     The flexibility that SHAKE offers, makes it a really good fit for producing a long pseudo-random stream of bytes. All the post-quantum cryptographic schemes, be that key encapsulation mechanism (KEM) or digital signature algorithm (DSA),
                     use a XOF to expand a fixed seed to a matrix or vector. A XOF can be seeded with entropy sampled from non-deterministic sources to build a cryptographically secure psuedo-random number generator (CSPRNG), coupled with occasional ratcheting.
@@ -75,10 +75,10 @@
                 <p class="blogText">
                     In rest of the writing, we will focus on <span class="highlight">sha3</span> - a fully constexpr, portable, C++ header-only library implementation of SHA3 suite of hash functions.
                     The library is available @ <a class="blogLink" href="https://github.com/itzmeanjan/sha3" target="_blank">https://github.com/itzmeanjan/sha3</a>. Being a header-only library, it's very easy to
-                    get started with. XKCP is the state-of-the-art C library implementation of everything keccak permutation based. It's available @ <a class="blogLink" href="https://github.com/XKCP/XKCP" target="_blank">https://github.com/XKCP/XKCP</a>.
-                    On the other hand, <span class="highlight">sha3</span> is not optimized for any specific platform, it is portable and uses modern C++ language and standard library features to offer an easy-to-drive feel.
+                    get started with. Though <span class="highlight">sha3</span> is not optimized for any specific platform, it is portable and it uses modern C++ language and standard library features to offer an easy-to-drive feel, without stepping on the
+                    realm of undefined behaviour. On the other hand, XKCP is the state-of-the-art C library implementation of everything based on keccak permutation. It's available @ <a class="blogLink" href="https://github.com/XKCP/XKCP" target="_blank">https://github.com/XKCP/XKCP</a>.
                     One competitive advantage <span class="highlight">sha3</span> has over XKCP is, it's fully constexpr - meaning, given the input message is known at program compile-time, it should be possible to compute message digest (MD) using any of
-                    the SHA3 algorithms, in program compile-time itself.
+                    the SHA3 algorithms, in program compile-time itself. The computed MD value can either be embedded as a constant or used further for compile-time computation.
                 </p>
                 <div class="microlight">
 #include "sha3/sha3_256.hpp"
@@ -120,7 +120,7 @@ main()
                     We can use <span class="highlight">sha3</span> header-only C++ library to compute message digest of this string at program compile-time and embed the MD
                     as a constant in program. Each of the SHA3 functions are implemented as <span class="highlight">constexpr</span> function. It's a modern C++ language feature.
                     It allows some functions to be executed by the compiler, to pre-compute the result or sub-result, given that the input is known at compile-time.
-                    It is a really useful feature because one can run a <span class="highlight">static_assert(...)</span> against the compiler computed value to enforce free correctness check.
+                    It is also a really useful feature because one can run a <span class="highlight">static_assert(...)</span> against the compiler computed value to enforce "free" correctness check.
                     Just to show that the compile-time computed SHA3-256 digest, in above code snippet, is correct, we present following Python REPL output.
                 </p>
                 <div class="microlight">
@@ -212,9 +212,9 @@ main()
                     Time to run a benchmark comparison, to see how fast TurboSHAKE128 is compared to SHAKE128, on a x86_64 machine of Intel Alderlake architecture,
                     running Linux kernel <span class="highlight">6.17.0-6-generic</span>. We compiled the benchmark executable with GCC 15.2.0, while turning on full
                     optimization by passing <span class="highlight">-O3 -march=native -flto</span>. Following benchmark comparison clearly shows, TurboSHAKE128 has
-                    ~45% lesser latency compared to SHAKE128, for all input sizes. This matches our expectation. Both SHAKE128 and TurboSHAKE128 have exact same sponge
-                    parameters i.e. same rate and capacity. Just the difference is in which permutation is used. In TurboSHAKE128, we are using faster 12-rounds keccak-p[1600, 12]
-                    permutation, compared to full round keccak-p[1600, 24] permutation in SHAKE128.
+                    ~45% lesser latency requirement compared to SHAKE128, for all input sizes. This matches our expectation. Both SHAKE128 and TurboSHAKE128 have exact same sponge
+                    parameters i.e. same rate and capacity over the same permutation state size. Just the difference is in number of permutation rounds. In TurboSHAKE128,
+                    we are using faster 12-rounds keccak-p[1600, 12] permutation, compared to full (=24) round keccak-p[1600, 24] permutation in SHAKE128.
                 </p>
                 <img class="imgCenter" src="../images/turboshake-shake-on-steroids-benchcmp-shake128-vs-turboshake128-on-x86_64.png">
                 <p class="blogText">
@@ -224,7 +224,7 @@ main()
                 <img class="imgCenter" src="../images/turboshake-shake-on-steroids-keccak-permutation-perf-on-x86_64.png">
                 <p class="blogText">
                     TurboSHAKE's choice of using 12-rounds keccak permutation for faster hashing still provides us with sufficient cryptographic security margin.
-                    And given the performance gain that comes from switching to TurboSHAKE from SHAKE is a strong indicator to adopt TurboSHAKE and enjoy the cake.
+                    And given the performance gain that comes from switching to TurboSHAKE from SHAKE, is a strong indicator to adopt TurboSHAKE and enjoy the cake.
                     <br>
                     <br>
                     Before finishing off, we want to run a performance comparison between TurboSHAKE implementation in <span class="highlight">sha3</span> vs.
@@ -243,11 +243,11 @@ main()
                 <img class="imgCenter" src="../images/turboshake-shake-on-steroids-benchcmp-turboshake128-portable-vs-xkcp-on-x86_64.png">
                 <p class="blogText">
                     This behaviour of <span class="highlight"><b>portable-turboshake</b></span> being 10-15% slower compared to the state-of-the-art <span class="highlight"><b>xkcp-turboshake</b></span>
-                    is also consistent in case of TurboSHAKE256.
+                    is also consistent in case of TurboSHAKE256, on x86_64 target.
                 </p>
                 <img class="imgCenter" src="../images/turboshake-shake-on-steroids-benchcmp-turboshake256-portable-vs-xkcp-on-x86_64.png">
                 <p class="blogText">
-                    For aarch64, we choose to use server-grade CPU on AWS EC2 <span class="highlight"><i>c8g.large</i></span>, featuring Graviton4 CPU, running Linux kernel <span class="highlight">6.14.0-1015-aws</span>.
+                    For aarch64, we choose to benchmark on a server-grade CPU on AWS EC2 <span class="highlight"><i>c8g.large</i></span>, featuring Graviton4 CPU, running Linux kernel <span class="highlight">6.14.0-1015-aws</span>.
                     The benchmark executable is compiled with GCC 13.3.0, while turning on all optimizations, by passing <span class="highlight">-O3 -march=native -flto</span>.
                     We run the performance comparison using <span class="highlight"><b>xkcp-turboshake</b></span> as baseline, while <span class="highlight"><b>portable-turboshake</b></span> is the contender.
                     Similar trend is clearly noticable, in following screen-captures, on aarch64 target. Both TurboSHAKE128 and TurboSHAKE256 from <span class="highlight"><b>portable-turboshake</b></span>
@@ -259,14 +259,15 @@ main()
                     We conclude that switching to TurboSHAKE for faster extendable output hashing is worth it. Enjoy almost double the throughput of SHAKE XOF.
                     While staying well within the security margin of very much publicly scrutinized keccak-p[1600] permutation and sponge mode of operation.
                     This is a clear indication that we should adopt TurboSHAKE more. To choose which library to use for fast hashing with TurboSHAKE, we can't recommend
-                    XKCP enough. If performance for a wide range of targets is what you seek, XKCP is the best choice for anything keccak permutation based. It's maintained
-                    by the keccak team itself. But if you are looking for a low footprint, portable, header-only, C++ library which makes use of modern C++ features such that <span class="highlight">constexpr</span> i.e. compile-time evaluable hash functions,
+                    XKCP enough. If performance on a wide range of targets is what you seek, XKCP is the best choice for anything keccak permutation-based. It's maintained
+                    by the Keccak team itself. But if you are looking for a low footprint, portable, header-only, C++ library which makes use of modern C++ features such that <span class="highlight">constexpr</span> i.e. compile-time evaluable hash functions,
                     <span class="highlight">concepts</span> i.e. compile-time constraint enforcement using keccak sponge parameters and <span class="highlight">std::span</span> instead of traditional raw pointer + size-based interface, you are welcome to look into
                     <span class="highlight">sha3</span> @ <a class="blogLink" href="https://github.com/itzmeanjan/sha3" target="_blank">https://github.com/itzmeanjan/sha3</a>.
-                    It's only 1096 lines of code (LOC), implementing full NIST SHA3 standard FIPS 202, with two additional XOFs from RFC 9861 i.e. TurboSHAKE128 and TurboSHAKE256.
-                    Now that we have TurboSHAKE ready to use, it's good time to experiment - replace SHAKE with TurboSHAKE in NIST post-quantum cryptography standards. We explored a similar path with BLAKE3
-                    and saw a performance boost of roughly 20% in ML-KEM and ML-DSA, using BLAKE3 for faster hashing instead of SHA3. It will be nice to see how close to that we can reach with TurboSHAKE.
-                    Because sticking to keccak-p[1600] permutation + sponge mode of operation for faster hashing, is no doubt more reassuring than using something completely different.
+                    It's only 1096 lines of code (LOC), implementing full NIST SHA3 standard FIPS 202, with two additional XOFs specified in RFC 9861 i.e. TurboSHAKE128 and TurboSHAKE256.
+                    Now that we have TurboSHAKE ready to use, it's good time to experiment - replace SHAKE with TurboSHAKE in NIST post-quantum cryptography standards. Recently, we explored a similar path with BLAKE3
+                    and saw a performance boost of roughly 20% in ML-KEM and ML-DSA, by switching to BLAKE3 for faster hashing. Detailed writing @ <a class="blogLink" href="./faster-pqc-with-blake3.html" target="_blank">"Faster Post-Quantum Cryptography with BLAKE3"</a>.                    
+                    It will be nice to see how close to that we can reach with TurboSHAKE. Because sticking to keccak-p[1600] permutation + sponge mode of operation for faster hashing, is no doubt more reassuring than basing our cryptographic security assumptions off
+                    something completely different.
                 </p>
             </article>
         </div>
