@@ -127,7 +127,12 @@ table, th, td {
   white-space : pre;
   background-color : #3b4550;
   color            : #deebee;
+  overflow-x: auto;
+  border-radius: 6px;
+  padding: 0.8vw 1vw;
 }
+
+pre > code.microlight { display: block; }
 
 #navBar{
   background-color: #437070;

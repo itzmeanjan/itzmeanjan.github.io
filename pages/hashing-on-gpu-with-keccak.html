@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<!--
+  Author: Anjan Roy<hello@itzmeanjan.in>
+-->
+<html>
+
+<head>
+    <title>
+        Hashing on GPU with Keccak
+    </title>
+    <meta prefix="og: http://ogp.me/ns#" property="og:type" content="website">
+    <meta prefix="og: http://ogp.me/ns#" property="og:title" content="Hashing on GPU with Keccak">
+    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="">
+    <meta prefix="og: http://ogp.me/ns#" property="og:url" content="https://itzmeanjan.in">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:width" content="950">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:height" content="735">
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://itzmeanjan.in/">
+    <meta property="twitter:title" content="Hashing on GPU with Keccak">
+    <meta property="twitter:description" content="">
+    <meta property="twitter:image" content="https://itzmeanjan.in/images/myImage.jpg">
+    <meta property="twitter:site" content="@meanjanroy">
+    <meta name="description" content="">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="author" content="Anjan Roy">
+    <meta name="keywords" content="">
+    <meta name="theme-color" content="darkslategrey">
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" type="text/css" href="../styles/index.css">
+    <script src="../styles/code.js"></script>
+</head>
+
+<body>
+    <div id="parentDiv">
+        <div id="navBar">
+            <nav>
+                <a class="navLink" href="/"><big>H</big>ome</a> |
+                <a class="navLink" href="https://github.com/itzmeanjan" target="_blank"><big>P</big>rojects</a> |
+                <a class="navLink" href="https://gist.github.com/itzmeanjan" target="_blank"><big>G</big>ists</a> |
+                <a class="navLink" href="/pages/blog.html"><big>B</big>log</a> |
+                <a class="navLink" href="/pages/talks.html"><big>T</big>alks</a> |
+                <a class="navLink" href="/pages/contact.html"><big>C</big>ontact</a>
+            </nav>
+        </div>
+        <div class="childDiv">
+            <article>
+                <h1 class="blogHeader">
+                    Hashing on GPU with Keccak
+                </h1>
+                <h3>Created : July 24, 2026</h3>
+            </article>
+        </div>
+        <div class="childDiv">
+            <article>
+                <p class="blogText">
+                    <i>Special thanks to Dr. Gilles Van Assche for discussion.</i>
+                </p>
+                <p class="blogText">
+                    In this article we discuss implementation techniques for high throughput hashing with KangarooTwelve family of extendable output functions (XOFs) on a graphics processing unit (GPU).
+                    KangarooTwelve is a family of XOFs, specified in <a class="blogLink" href="https://www.ietf.org/rfc/rfc9861" target="_blank">RFC 9861</a>.
+                    It offers two extendable output functions, named <b>KT128</b> and <b>KT256</b>.
+                    An extendable output function is a hash function which allows squeezing arbitrary long output instead of producing a fixed size digest.
+                    It is more flexible.
+                    SHA3-256 is a hash function because it produces a 256-bit (32-byte) digest.
+                    SHAKE128 is a XOF because it can be squeezed for producing as much output is needed.
+                    SHA3 family of hash functions and XOFs are specified in <a class="blogLink" href="https://doi.org/10.6028/NIST.FIPS.202" target="_blank">FIPS 202</a>, published by NIST.
+                    <br>
+                    Most standardized hash functions, which are commonly used, say SHA1, SHA2 or SHA3, are not parallel by design.
+                    They can not effectively make use of modern multi-core and multi-threaded compute systems.
+                    CPUs provide one more parallelism axis - single instructions multiple data (SIMD) instructions.
+                    Think SSE, AVX2 and AVX512 instructions on x86_64 CPU architecture.
+                    And NEON and SVE instructions on arm64 CPU architecture.
+                    Due to their design most hash functions do not get to exploit SIMD parallelism too.
+                    Then there are GPUs, which are massively parallel.
+                    Hashing a long message, say 1GiB, on a GPU, with SHA3 functions would result in massive under utilization of resources.
+                    <br>
+                    Most of the commonly used hash functions absorb the input message in sequentially ordered blocks of fixed size.
+                    Meaning block<sub>(i+1)</sub> can not be touched until block<sub>i</sub> has been processed, s.t., i >= 0.
+                    This creates a data dependency chain among consecutive message blocks.
+                    The way to solve it is using a hierarchical structure.
+                    Input message to be hashed is split into chunks of fixed size.
+                    Each chunk can be processed in parallel.
+                    Meaning we can spawn N many threads to process a total of M many chunks, s.t., M >= N.
+                    Processing each chunk produces a short digest, call it a chaining value (CV).
+                    Those M many CVs are chained together by building a tree like structure above them.
+                    The tree reduces M chunks into a single root CV, which can be squeezed for producing arbitrary long output stream.
+                    The way to design a sound tree hashing mode is specified in paper named <a class="blogLink" href="https://eprint.iacr.org/2009/210" target="_blank">"Sufficient conditions for sound tree and sequential hashing modes"</a>.
+                    Then came the paper <a class="blogLink" href="https://eprint.iacr.org/2013/231" target="_blank">"Sakura: a flexible coding for tree hashing"</a>, which specified how to format and domain separate message chunks and CVs correctly to avoid any clash between different tree building strategies such as choice of tree arity.
+                    <br>
+                    KangarooTwelve, our topic of discussion, builds on these foundations.
+                    It is a parallel hash function designed for high throughput absorption of arbitrary long messages.
+                    For processing message chunks it uses an internal hash function - TurboSHAKE128 for KT128 and TurboSHAKE256 for KT256.
+                    TurboSHAKE is another XOF, which is SHAKE alike, with the striking difference of halved Keccak-p[1600] permutation rounds - just 12 rounds, instead of usual 24.
+                    One can think of TurboSHAKE as faster SHAKE, which is exactly what the name suggests.
+                    TurboSHAKE128 doubles its throughput compared to SHAKE128, without any loss of cryptographic security, harnessing the cryptanalytic advantage of Keccak permutation.
+                    Couple of years ago I wrote a Rust library crate for <a class="blogLink" href="https://github.com/itzmeanjan/turboshake" target="_blank">TurboSHAKE</a>.
+                    <br>
+                    KangarooTwelve also has couple of implementations available in different programming languages.
+                    But none of them supports hashing on GPU, until the one I maintain added it.
+                    I'm happy to announce that my Rust library crate <a class="blogLink" href="https://github.com/itzmeanjan/kangarootwelve" target="_blank">kangarootwelve</a> supports absorbing message on a NVIDIA GPU.
+                    Starting from <a class="blogLink" href="https://crates.io/crates/kangarootwelve/0.1.3" target="_blank">v0.1.3</a> of kangarootwelve crate one can offload hashing to NVIDIA GPUs.
+                    It is feature-gated behind <span class="highlight">"cuda"</span> feature.
+                    For now GPU hashing support is limited to NVIDIA GPUs, because of having only CUDA backend.
+                    In future I will make it portable using cross-platform programming interface like <a class="blogLink" href="https://wgpu.rs" target="_blank">WebGPU</a>.
+                    For the rest of the article we will focus on implementation techniques for squeezing as much performance possible from a massively parallel compute platform like a GPU.
+                </p>
+                <p class="blogText">
+                    Let us begin with a short primer on KangarooTwelve.
+                    KangarooTwelve takes two inputs - a message M and a customization string C.
+                    Both of them can be of arbitrary length, including zero.
+                    It splits the concatenated and padded input into N many chunks, s.t., the last chunk can be partial.
+                    The padding rule ensures there will be at least one chunk.
+                    Chunk size is specified to be 8KiB.
+                    Last chunk can be smaller.
+                    KangarooTwelve builds a single level tree over the leaf chunks.
+                    Each leaf chunk is independently compressed into a fixed size chaining value using an instance of TurboSHAKE hasher.
+                    An exception is the first chunk.
+                    It gets promoted to the root level.
+                    Chaining values are fixed to 32 bytes for KT128 and 64 bytes for KT256.
+                    In the root level of the KangarooTwelve hash tree, we have the first chunk and (N-1) many CVs.
+                    Simply put, the root level TurboSHAKE hasher absorbs the concatenation of the first chunk and an ordered list of CVs.
+                    In reality there exists padding and length encoding requirements for sound hashing, as mandated in the Sakura coding paper.
+                    The root level TurboSHAKE sponge, once finalized, lets us squeeze arbitrary long output.
+                    The squeezing part of KangarooTwelve stays sequential - same as SHAKE.
+                    The absorption part of KangarooTwelve has massive parallelization opportunity.
+                    Obviously with caveats, encountered only after you implement and benchmark hashing throughput.
+                </p>
+                <img class="imgCenter" src="../images/hashing-on-gpu-with-keccak-kangarootwelve-tree.svg" alt="KangarooTwelve Hash Tree">
+                <p class="blogText">
+                    A first attempt in implementing KangarooTwelve would be as following.
+                </p>
+<pre>
+<code class="microlight">
+Input: Message M and Customization string C
+Steps:
+    - Concatenate and pad input, get S
+    - Split S into N many chunks
+    - Parallel-For chunk index i = 1 to (N-1)
+        - CV_i = TurboSHAKE(chunk_i)
+        - promote CV_i to root level
+    - root-sponge = TurboSHAKE(chunk_0 || CV_1 || ... || CV_(N-1))
+    - Allow squeezing from root-sponge
+</code>
+</pre>
+                <p class="blogText">
+                    This will exploit the multi-threading parallelism model.
+                    GPUs implement a multi-threading model which is different than CPUs.
+                    We refer to it as single instruction multiple threads (SIMT).
+                    A single instruction gets streamed into a group of threads, each executing that instruction on different piece of data.
+                    It is obviously grossly simplified.
+                    In reality the model leaves room for more flexibility.
+                    For example, the same instruction does not strictly need to be executed by the group of threads in lock-step.
+                    Different threads, part of the same group, can branch and execute different instructions.
+                    The question we want to ask, <span class="highlight">"does this implementation technique let us utilize the hardware resource most efficiently?"</span>.
+                    And the answer is NO.
+                    <br>
+                    The main problem with the previous implementation is, we wait for all dispatched threads to finish computing the CV for their assigned leaf chunk.
+                    Note, KangarooTwelve builds a single level tree structure over leaves.
+                    If it would have built a Merkle Tree-like structure, we could have exploited parallelism for each level of the tree.
+                    Obviously with Merkle Tree the opportunity to parallelize diminishes as we gradually approach the root level.
+                    The number of nodes per level gets reduced by <b>t</b> for a t-ary Merkle Tree.
+                    Then there is an obvious data-dependency among the levels themselves.
+                    <br>
+                    For KT128, the root level TurboSHAKE128 sponge needs to absorb 8KiB, followed by (N-1) x 32-bytes of chaining values.
+                    Assuming we are absorbing a 1GiB message, it splits into ~2<sup>17</sup> chunks.
+                    Leaving the first one out, which gets directly promoted to the root level, there are (2<sup>17</sup>-1) chunks to be compressed independently, using TurboSHAKE128.
+                    It will produce ~2<sup>22</sup> bytes, i.e., 4MiB of ordered and concatenated CVs, need to be absorbed by the root level sponge.
+                    Root level TurboSHAKE128 absorbs roughly 8KiB + 4MiB of message.
+                    TurboSHAKE128 has a rate of 168 bytes, resulting in ~25015 Keccak-p[1600] permutation calls, after each block absorption.
+                    And this is all sequential.
+                    The only good part is, we are using TurboSHAKE, so just 12-rounds of Keccak-p[1600].
+                    The worse part is to realize that GPU, which is a massively parallel computing platform, has to execute this root level TurboSHAKE128 sponge absorption in a single thread.
+                    That is a great way to waste compute capability of a GPU.
+                    Instead we can transfer the CVs to the host CPU.
+                    Not an issue for systems featuring unified memory, accessible at high bandwidth by both CPU and GPU.
+                    But it is more common to see PCIe or NVLink connecting host CPU with guest GPU.
+                    That has lower bandwidth compared to GPU memory.
+                    It negatively impacts the performance achievable by KT128.
+                    <br>
+                    To summarise, we have recognized three problems.
+                </p>
+                <ol>
+                    <li>Waiting for all threads to finish computing their CVs before root level TurboSHAKE absorption begins, is a blocking data-dependency.</li>
+                    <li>On GPU single-threaded execution of the root level TurboSHAKE absorption is wasteful.</li>
+                    <li>Copying CVs from guest GPU memory to host CPU memory over PCIe interface is a bottleneck.</li>
+                </ol>
+                <p class="blogText">
+                    It would be unfair to not recognize another important problem.
+                    We would like to be able to hash a message residing on either CPU memory or GPU memory.
+                    In case the message is not already GPU memory-resident, it needs to be copied to GPU memory over the PCIe bottleneck.
+                    For sake of simplification, we will assume the data to be hashed by KangarooTwelve is ready, sitting right on GPU memory.
+                    That way we can focus on engineering an efficient parallel hashing technique and not on input preparation and availability.
+                </p>
+                <p class="blogText">
+                    We can reduce the impact of the data-dependency problem, i.e., KangarooTwelve root level sponge is waiting for leaves to finish computing their CVs, by introducing <span class="highlight">"pipeline stages"</span>.
+                    To understand it better we recall how a CPU works.
+                    A CPU has pipeline stages through which instructions flow.
+                    In a simplified model, there are three stages - fetch, decode and execute.
+                    Say instruction<sub>i</sub> gets fetched, at that moment in time other two stages are idle.
+                    As soon as instruction<sub>i</sub> gets decoded, instruction<sub>(i+1)</sub> gets fetched.
+                    At this moment in time, execution stage is still sitting idle.
+                    As instruction<sub>i</sub> gets executed, and instruction<sub>(i+1)</sub> gets decoded, instruction<sub>(i+2)</sub> gets  fetched.
+                    After instruction<sub>i</sub> retires, i.e., execution unit finishes its execution, instruction<sub>(i+1)</sub> and instruction<sub>(i+2)</sub> reach execution and decoding stage, respectively.
+                    At the same time the fetcher is working on instruction<sub>(i+3)</sub>.
+                    We stop chasing instructions now.
+                    Pipeline staging opens up a degree of parallelism even for a sequential process like executing an ordered set of instructions.
+                    The goal is to keep these pipeline stages always busy, without blocking.
+                    In context of processing instructions, it is often referred to as instruction level parallelism (ILP).
+                    We will introduce pipeline stages for hashing with KangarooTwelve.
+                    KangarooTwelve hashing pipeline need to have three stages - compute CV, transfer CV to host CPU memory and absorb CV into root sponge.
+                    <br>
+                    A single GPU thread computes chaining value for a single leaf chunk.
+                    Following the SIMT model of GPU, we will dispatch N many threads for computing N many CVs.
+                    We call it a "batch" with size of N.
+                    The whole message to be hashed is split into M many batches, s.t., roughly (N x M) many chunks.
+                    We will pass M batches through these three stages of the pipeline.
+                    Practically speaking, the last batch may not have N number of active threads and the last active thread of the last batch may process a smaller chunk, i.e., &lt; 8KiB.
+                    When batch<sub>i</sub>, i.e., 0 <= i < M, finishes its computation of N many CVs, it is pushed to second stage, where it copies those N x 32 bytes (for KT128) or N x 64 bytes (for KT256) to host CPU.
+                    At that time batch<sub>(i+1)</sub> starts computing leaf CVs.
+                    As copying CVs for batch<sub>i</sub> finishes, those CVs are ready to be absorbed into the root level TurboSHAKE sponge - last stage of the pipeline.
+                    Here I'm assuming the root level sponge has already absorbed the first leaf chunk, which gets directly promoted to the root level.
+                    That itself can run concurrently after the first batch was enqueued for execution on GPU.
+                    As soon as batch<sub>i</sub> retires, i.e., its chaining values has been absorbed into the root sponge, batch<sub>(i+1)</sub> can arrive in final stage.
+                    Batch<sub>(i+2)</sub>, if already finished computing its chaining values, can start copying them over to host CPU memory, as part of the second stage.
+                    At that same moment in time, batch<sub>(i+3)</sub> can start on first stage of the pipeline.
+                    We won't chase batches through these pipeline stages anymore.
+                    <br>
+                    One important observation, the final root sponge state always lives on host CPU memory.
+                    The leaf chunk CVs to be absorbed comes to it.
+                    After all the batches has retired from the pipeline stages, the root sponge can be finalized following TurboSHAKE specification.
+                    Now it can be used for squeezing arbitrary long output right on the host CPU, where the consumer supposedly lives.
+                </p>
+                <img class="imgCenter" src="../images/hashing-on-gpu-with-keccak-pipeline.svg" alt="Three stage pipelined hashing for KangarooTwelve on GPU">
+                <p class="blogText">
+                    I will end the article with a note the achieved performance.
+                    We benchmark the KT128 implementation of Rust crate <a class="blogLink" href="https://github.com/itzmeanjan/kangarootwelve" target="_blank">kangarootwelve</a> on a <a class="blogLink" href="https://www.nvidia.com/en-us/data-center/rtx-pro-6000-blackwell-server-edition" target="_blank">NVIDIA RTX PRO 6000 Blackwell Server Edition</a> GPU.
+                    It is a data center-grade GPU, featuring <a class="blogLink" href="https://developer.nvidia.com/cuda/gpus" target="_blank">compute capability (CC) 12.0</a>.
+                    It is available for rent on AWS EC2 instance <a class="blogLink" href="https://aws.amazon.com/ec2/instance-types/g7e" target="_blank">g7e.2xlarge</a>.
+                    KT128 achieves a message absorption throughput of ~215GiB/s on this GPU, saturating for messages of size >=16GiB.
+                    This measurement does not include the time to transfer input message to GPU.
+                    For really long messages, that itself can take a while, eating out of the total throughput.
+                    If the use case is hashing GPU resident data, the existing model works just fine.
+                    If the data is instead on disk or in host CPU memory, it needs to be transferred.
+                    But a naive memcpy would not suffice.
+                    Rather we can batch transfer them.
+                    Instead of having three stages in the hashing pipeline, there will be four stages.
+                    The first one will become transferring a batch of N leaf chunks to guest GPU memory.
+                    Rest of them - compute CVs for the batch of leaf chunks, transfer CVs to host CPU memory and absorb CVs into root sponge.
+                    As long as any one stage does not become a bottleneck, the pipeline should not be clogged.
+                    It lets a merely sequential set of stages - transfer the input message to the guest GPU memory, hash it in parallel using KangarooTwelve and transfer the root sponge state back to host CPU memory, to instead exploit parallelism.
+                    <br>
+                    The <span class="highlight">kangarootwelve</span> library crate allows you to hash both GPU memory-resident data and CPU memory-resident data.
+                    The technique I described in the previous paragraph on interleaving "transfer of leaf chunks to GPU memory" with "leaf chunk compression on GPU", is not yet implemented.
+                    The naive CUDA host to device memcpy is in-place for the time being.
+                    Even though it is a Rust library, the CUDA backend is implemented in C++, with a Rust wrapper.
+                    See the README in the git repository for how to use the underlying CUDA C++ API for hashing.
+                </p>
+            </article>
+        </div>
+    </div>
+    <div id="footerDiv">
+        <footer>
+            <p id="footerText">
+                &copy <a href="https://github.com/itzmeanjan/itzmeanjan.github.io" id="footerLink"
+                    target="_blank"><big>A</big>njan Roy</a> ( <big>M</big>IT Licensed )
+            </p>
+        </footer>
+    </div>
+</body>
+
+</html>
