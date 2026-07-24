@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 492" width="900" height="492" role="img" aria-labelledby="t d">
+  <title id="t">KangarooTwelve Hash Tree</title>
+  <desc id="d">Read bottom to top. The padded message is split into N chunks of 8 KiB. Chunk 0 is promoted directly to the root level. Chunks 1 to N-1 are each compressed by an independent TurboSHAKE instance into a chaining value. The root level TurboSHAKE sponge absorbs chunk 0 concatenated with the ordered list of chaining values, and is then squeezed sequentially.</desc>
+
+  <defs>
+    <style>
+      .ttl  { font: 600 16px "Segoe UI", Roboto, Helvetica, Arial, sans-serif; fill: #BCF5A9; }
+      .lbl  { font: 13px "Segoe UI", Roboto, Helvetica, Arial, sans-serif; fill: #dfeaee; }
+      .lblb { font: 600 14px "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+      .mono { font: 13px ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+      .tiny { font: 10px "Segoe UI", Roboto, Helvetica, Arial, sans-serif; fill: #93a7af; }
+      .note { font: 11px "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+      .op   { font: 12px "Segoe UI", Roboto, Helvetica, Arial, sans-serif; fill: #cfe8f2; }
+      .bx   { rx: 7; ry: 7; stroke-width: 1.5; }
+    </style>
+    <marker id="ah" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+      <path d="M0,0 L6.5,3 L0,6 z" fill="#8fa3ab"/>
+    </marker>
+    <marker id="ahb" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+      <path d="M0,0 L6.5,3 L0,6 z" fill="#79b8d6"/>
+    </marker>
+    <marker id="ahg" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+      <path d="M0,0 L6.5,3 L0,6 z" fill="#BCF5A9"/>
+    </marker>
+  </defs>
+
+  <text class="ttl" x="450" y="26" text-anchor="middle">KangarooTwelve Hash Tree</text>
+
+  <!-- ============ the parallelizable region : leaf chunks 1..N-1, their TurboSHAKE calls and CVs ============ -->
+  <rect x="212" y="238" width="640" height="218" rx="10" fill="#79b8d6" fill-opacity="0.045"
+        stroke="#79b8d6" stroke-width="1.8" stroke-dasharray="2 5" stroke-linecap="round"/>
+  <text class="op" x="532" y="475" text-anchor="middle" fill="#79b8d6">Parallelizable</text>
+
+  <!-- ============ squeeze : top of the tree ============ -->
+  <rect class="bx" x="300" y="60" width="300" height="32" fill="#333a40" stroke="#98a890" stroke-dasharray="6 4"/>
+  <text class="lbl" x="450" y="81" text-anchor="middle" fill="#c8d6cb" font-size="11.5">Squeeze arbitrary long output like SHAKE</text>
+
+  <line x1="450" y1="134" x2="450" y2="96" stroke="#8fa3ab" stroke-width="1.5" marker-end="url(#ah)"/>
+
+  <!-- ============ root sponge ============ -->
+  <rect class="bx" x="60" y="138" width="780" height="70" fill="#2f4a44" stroke="#7fd6c0" stroke-width="2"/>
+  <text class="lbl lblb" x="450" y="164" text-anchor="middle" fill="#cdeee6">Root</text>
+  <text class="mono" x="450" y="188" text-anchor="middle" fill="#a9d9cc">Absorbs   Chunk<tspan font-size="10" dy="4">0</tspan><tspan dy="-4"> ‖ CV</tspan><tspan font-size="10" dy="4">1</tspan><tspan dy="-4"> ‖ CV</tspan><tspan font-size="10" dy="4">2</tspan><tspan dy="-4"> ‖ ⋯ ‖ CV</tspan><tspan font-size="10" dy="4">N-1</tspan></text>
+
+  <!-- ============ CVs rise into the root ============ -->
+  <line x1="292" y1="246" x2="292" y2="212" stroke="#8fa3ab" stroke-width="1.5" marker-end="url(#ah)"/>
+  <line x1="450" y1="246" x2="450" y2="212" stroke="#8fa3ab" stroke-width="1.5" marker-end="url(#ah)"/>
+  <line x1="766" y1="246" x2="766" y2="212" stroke="#8fa3ab" stroke-width="1.5" marker-end="url(#ah)"/>
+
+  <!-- ============ chaining value row ============ -->
+  <rect class="bx" x="218" y="250" width="148" height="40" fill="#4a4331" stroke="#f0c979"/>
+  <text class="lbl lblb" x="292" y="275" text-anchor="middle" fill="#f7e6bf">CV<tspan font-size="10" dy="4">1</tspan></text>
+
+  <rect class="bx" x="376" y="250" width="148" height="40" fill="#4a4331" stroke="#f0c979"/>
+  <text class="lbl lblb" x="450" y="275" text-anchor="middle" fill="#f7e6bf">CV<tspan font-size="10" dy="4">2</tspan></text>
+
+  <text class="lbl" x="608" y="276" text-anchor="middle" fill="#8fa3ab">⋯</text>
+
+  <rect class="bx" x="692" y="250" width="148" height="40" fill="#4a4331" stroke="#f0c979"/>
+  <text class="lbl lblb" x="766" y="275" text-anchor="middle" fill="#f7e6bf">CV<tspan font-size="10" dy="4">N-1</tspan></text>
+
+  <!-- ============ each chunk is compressed by one TurboSHAKE ============ -->
+  <line x1="292" y1="396" x2="292" y2="294" stroke="#79b8d6" stroke-width="1.8" marker-end="url(#ahb)"/>
+  <line x1="450" y1="396" x2="450" y2="294" stroke="#79b8d6" stroke-width="1.8" marker-end="url(#ahb)"/>
+  <line x1="766" y1="396" x2="766" y2="294" stroke="#79b8d6" stroke-width="1.8" marker-end="url(#ahb)"/>
+
+  <text class="op" x="318" y="350" text-anchor="middle" transform="rotate(-90 318 350)">TurboSHAKE</text>
+  <text class="op" x="476" y="350" text-anchor="middle" transform="rotate(-90 476 350)">TurboSHAKE</text>
+  <text class="op" x="792" y="350" text-anchor="middle" transform="rotate(-90 792 350)">TurboSHAKE</text>
+
+  <!-- chunk 0 bypass : straight up to the root -->
+  <line x1="134" y1="396" x2="134" y2="212" stroke="#BCF5A9" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#ahg)"/>
+  <text class="note" x="124" y="304" text-anchor="middle" fill="#BCF5A9" transform="rotate(-90 124 304)">Promoted to the root level</text>
+
+  <!-- ============ message strip : base of the tree ============ -->
+  <rect class="bx" x="60"  y="400" width="148" height="44" fill="#2f4a3a" stroke="#BCF5A9"/>
+  <text class="lbl lblb" x="134" y="422" text-anchor="middle" fill="#d8f6c8">Chunk<tspan font-size="10" dy="4">0</tspan></text>
+  <text class="tiny" x="134" y="437" text-anchor="middle" fill="#a9d69a">8 KiB</text>
+
+  <rect class="bx" x="218" y="400" width="148" height="44" fill="#32424b" stroke="#79b8d6"/>
+  <text class="lbl lblb" x="292" y="422" text-anchor="middle" fill="#cfe8f2">Chunk<tspan font-size="10" dy="4">1</tspan></text>
+  <text class="tiny" x="292" y="437" text-anchor="middle">8 KiB</text>
+
+  <rect class="bx" x="376" y="400" width="148" height="44" fill="#32424b" stroke="#79b8d6"/>
+  <text class="lbl lblb" x="450" y="422" text-anchor="middle" fill="#cfe8f2">Chunk<tspan font-size="10" dy="4">2</tspan></text>
+  <text class="tiny" x="450" y="437" text-anchor="middle">8 KiB</text>
+
+  <rect class="bx" x="534" y="400" width="148" height="44" fill="#2c353b" stroke="#5d747d" stroke-dasharray="5 4"/>
+  <text class="lbl" x="608" y="428" text-anchor="middle" fill="#8fa3ab">⋯</text>
+
+  <rect class="bx" x="692" y="400" width="148" height="44" fill="#32424b" stroke="#79b8d6"/>
+  <text class="lbl lblb" x="766" y="422" text-anchor="middle" fill="#cfe8f2">Chunk<tspan font-size="10" dy="4">N-1</tspan></text>
+  <text class="tiny" x="766" y="437" text-anchor="middle">≤ 8 KiB</text>
+</svg>

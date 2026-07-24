@@ -127,6 +127,7 @@
                     The absorption part of KangarooTwelve has massive parallelization opportunity.
                     Obviously with caveats, encountered only after you implement and benchmark hashing throughput.
                 </p>
+                <img class="imgCenter" src="../images/hashing-on-gpu-with-keccak-kangarootwelve-tree.svg" alt="KangarooTwelve Hash Tree">
                 <p class="blogText">
                     A first attempt in implementing KangarooTwelve would be as following.
                 </p>
@@ -215,7 +216,7 @@ Steps:
                     We call it a "batch" with size of N.
                     The whole message to be hashed is split into M many batches, s.t., roughly (N x M) many chunks.
                     We will pass M batches through these three stages of the pipeline.
-                    Practically speaking, the last batch may not have N number of active threads and the last active thread of the last batch may process a smaller chunk, i.e., &lt8KiB.
+                    Practically speaking, the last batch may not have N number of active threads and the last active thread of the last batch may process a smaller chunk, i.e., &lt; 8KiB.
                     When batch<sub>i</sub>, i.e., 0 <= i < M, finishes its computation of N many CVs, it is pushed to second stage, where it copies those N x 32 bytes (for KT128) or N x 64 bytes (for KT256) to host CPU.
                     At that time batch<sub>(i+1)</sub> starts computing leaf CVs.
                     As copying CVs for batch<sub>i</sub> finishes, those CVs are ready to be absorbed into the root level TurboSHAKE sponge - last stage of the pipeline.
@@ -231,9 +232,10 @@ Steps:
                     After all the batches has retired from the pipeline stages, the root sponge can be finalized following TurboSHAKE specification.
                     Now it can be used for squeezing arbitrary long output right on the host CPU, where the consumer supposedly lives.
                 </p>
+                <img class="imgCenter" src="../images/hashing-on-gpu-with-keccak-pipeline.svg" alt="Three stage pipelined hashing for KangarooTwelve on GPU">
                 <p class="blogText">
                     I will end the article with a note the achieved performance.
-                    We benchmark the KT128 implementation of Rust crate <a class="blogLink" href="https://github.com/itzmeanjan/kangarootwelve" target="_blank">kangarootwelve</a> on a <span class="highlight">NVIDIA RTX PRO 6000 Blackwell Server Edition</span> GPU.
+                    We benchmark the KT128 implementation of Rust crate <a class="blogLink" href="https://github.com/itzmeanjan/kangarootwelve" target="_blank">kangarootwelve</a> on a <a class="blogLink" href="https://www.nvidia.com/en-us/data-center/rtx-pro-6000-blackwell-server-edition" target="_blank">NVIDIA RTX PRO 6000 Blackwell Server Edition</a> GPU.
                     It is a data center-grade GPU, featuring <a class="blogLink" href="https://developer.nvidia.com/cuda/gpus" target="_blank">compute capability (CC) 12.0</a>.
                     It is available for rent on AWS EC2 instance <a class="blogLink" href="https://aws.amazon.com/ec2/instance-types/g7e" target="_blank">g7e.2xlarge</a>.
                     KT128 achieves a message absorption throughput of ~215GiB/s on this GPU, saturating for messages of size >=16GiB.
@@ -252,7 +254,7 @@ Steps:
                     The <span class="highlight">kangarootwelve</span> library crate allows you to hash both GPU memory-resident data and CPU memory-resident data.
                     The technique I described in the previous paragraph on interleaving "transfer of leaf chunks to GPU memory" with "leaf chunk compression on GPU", is not yet implemented.
                     The naive CUDA host to device memcpy is in-place for the time being.
-                    Even though it is a Rust library the CUDA backend is mostly implemented in C++.
+                    Even though it is a Rust library, the CUDA backend is implemented in C++, with a Rust wrapper.
                     See the README in the git repository for how to use the underlying CUDA C++ API for hashing.
                 </p>
             </article>
