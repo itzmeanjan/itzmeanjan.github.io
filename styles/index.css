@@ -258,3 +258,20 @@ iframe {
   height: 545px;
   border-radius: 1.2vw;
 }
+
+/* giscus powered comments section, injected by styles/comments.js */
+
+#commentsDiv > article > .giscus {
+  width: auto;
+  margin: 1vw;
+}
+
+#commentsDiv .giscus-frame {
+  display: block;
+  margin: 0;
+  width: 100%;
+  height: auto;
+  border: none;
+  border-radius: 0;
+  color-scheme: dark;
+}
