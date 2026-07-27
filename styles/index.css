@@ -25,12 +25,27 @@ body::-webkit-scrollbar {
   background-color: #373e45;
   border-radius: 2vw;
   width: 92%;
-  padding-top: .1vw;
-  padding-bottom: .1vw;
+  padding-top: clamp(0.5rem, 1vw, 1.1rem);
+  padding-bottom: clamp(0.5rem, 1vw, 1.1rem);
   margin-left: auto;
   margin-right: auto;
-  margin-top: 1.4vw;
-  margin-bottom: 1.4vw;
+  margin-top: clamp(0.4rem, 1.4vw, 1.1rem);
+  margin-bottom: clamp(0.4rem, 1.4vw, 1.1rem);
+}
+
+.childDiv > article > :first-child { margin-top: 0; }
+.childDiv > article > :last-child { margin-bottom: 0; }
+
+.childDiv > article > h1:first-child { margin-bottom: 0.2em; }
+.childDiv > article > h1:has(> .blogLink) {
+  font-size: clamp(1.15rem, 1.7vw, 1.6rem);
+  line-height: 1.3;
+}
+
+.childDiv > article > h1 > .blogLink:link,
+.childDiv > article > h1 > .blogLink:visited,
+.childDiv > article > h1 > .blogLink:hover {
+  font-size: clamp(1.15rem, 1.7vw, 1.6rem);
 }
 
 h1 {
@@ -44,6 +59,7 @@ h3 {
   font-family: monospace;
   font-weight: lighter;
   text-align: center;
+  font-size: clamp(0.75rem, 1.2vw, 1rem);
 }
 
 p, li{
@@ -94,7 +110,7 @@ p, li{
 
 .blogHeader {
   text-align: center;
-  font-size: 2.0vw;
+  font-size: clamp(1.5rem, 2.0vw, 3rem);
 }
 
 .blogText {
