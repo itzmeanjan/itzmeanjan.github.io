@@ -69,6 +69,12 @@ p, li{
   font-size: small;
 }
 
+li {
+  margin-top: 0.25em;
+  margin-bottom: 0.25em;
+  font-size: medium;
+}
+
 .simpleLink:link{
   color: #BCF5A9;
   font-size: medium;
