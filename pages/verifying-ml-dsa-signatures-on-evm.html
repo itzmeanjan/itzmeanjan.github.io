@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<!--
+  Author: Anjan Roy<hello@itzmeanjan.in>
+-->
+<html>
+
+<head>
+    <title>
+        Verifying ML-DSA Signatures on EVM
+    </title>
+    <meta prefix="og: http://ogp.me/ns#" property="og:type" content="website">
+    <meta prefix="og: http://ogp.me/ns#" property="og:title" content="Verifying ML-DSA Signatures on EVM">
+    <meta prefix="og: http://ogp.me/ns#" property="og:description" content="NIST standardized FIPS 204 ML-DSA signature verification on Ethreum Virtual Machine for Account Abstraction use case, accompanied by new EVM-optimized instances of ML-DSA, featuring keccak256 precompile">
+    <meta prefix="og: http://ogp.me/ns#" property="og:url" content="https://itzmeanjan.in">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image" content="https://itzmeanjan.in/images/verifying-ml-dsa-signatures-on-evm-card.png">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:secure_url" content="https://itzmeanjan.in/images/verifying-ml-dsa-signatures-on-evm-card.png">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:width" content="1200">
+    <meta prefix="og: http://ogp.me/ns#" property="og:image:height" content="630">
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://itzmeanjan.in/">
+    <meta property="twitter:title" content="Verifying ML-DSA Signatures on EVM">
+    <meta property="twitter:description" content="NIST standardized FIPS 204 ML-DSA signature verification on Ethreum Virtual Machine for Account Abstraction use case, accompanied by new EVM-optimized instances of ML-DSA, featuring keccak256 precompile">
+    <meta property="twitter:image" content="https://itzmeanjan.in/images/verifying-ml-dsa-signatures-on-evm-card.png">
+    <meta property="twitter:site" content="@meanjanroy">
+    <meta name="description" content="NIST standardized FIPS 204 ML-DSA signature verification on Ethreum Virtual Machine for Account Abstraction use case, accompanied by new EVM-optimized instances of ML-DSA, featuring keccak256 precompile">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="author" content="Anjan Roy">
+    <meta name="keywords" content="nist fips 204, ml-dsa, ethereum virtual machine, solidity smart contracts, account abstraction, keccak256, turboshake, keccak256xofctr">
+    <meta name="theme-color" content="darkslategrey">
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" type="text/css" href="../styles/index.css">
+    <script src="../styles/code.js"></script>
+    <script src="../styles/comments.js" defer></script>
+</head>
+
+<body>
+    <div id="parentDiv">
+        <div id="navBar">
+            <nav>
+                <a class="navLink" href="/"><big>H</big>ome</a> |
+                <a class="navLink" href="https://github.com/itzmeanjan" target="_blank"><big>P</big>rojects</a> |
+                <a class="navLink" href="https://gist.github.com/itzmeanjan" target="_blank"><big>G</big>ists</a> |
+                <a class="navLink" href="/pages/blog.html"><big>B</big>log</a> |
+                <a class="navLink" href="/pages/talks.html"><big>T</big>alks</a> |
+                <a class="navLink" href="/pages/contact.html"><big>C</big>ontact</a>
+            </nav>
+        </div>
+        <div class="childDiv">
+            <article>
+                <h1 class="blogHeader">
+                    Verifying ML-DSA Signatures on EVM
+                </h1>
+                <h3>Created : July 31, 2026</h3>
+            </article>
+        </div>
+        <div class="childDiv">
+            <article>
+                <p class="blogText">
+                    In this article we discuss how to verify a digital signature produced with Module-Lattice-Based Digital Signature Algorithm (ML-DSA) on Ethereum Virtual Machine (EVM).
+                    ML-DSA has been standardized by the National Institute of Standards and Technology (<a class="blogLink" href="https://csrc.nist.gov/Projects/Cryptographic-Standards-and-Guidelines" target="_blank">NIST</a>) in <a class="blogLink" href="https://doi.org/10.6028/NIST.FIPS.204" target="_blank">FIPS 204</a> as a post-quantum cryptographic (PQC) scheme.
+                    It is expected to eventually replace existing elliptic-curve-based digital signature schemes such as ECDSA and EdDSA as cryptographically-relevant quantum computers (CRQCs) are on track to become practical.
+                    For our discussion, in the context of EVM, it is important to understand why we need to verify ML-DSA signatures inside an EVM program.
+                    When a smart contract on the Ethereum blockchain needs to verify signature over any arbitrary message, it uses the <span class="highlight">ecrecover</span> precompile.
+                    It allows recovering the signer's 20-byte Ethereum address, which lets one compare if the signature came from an expected party.
+                    It costs roughly 3000 gas to verify an ECDSA signature on EVM.
+                    It is cheap because the precompile exists.
+                    Otherwise it could have been prohibitively expensive &mdash; approximately couple hundred thousands of gas.
+                    Any computation on the EVM when deemed expensive is because of the metered gas cost being high.
+                    In recent times, there have been serious efforts undertaken to make the Internet post-quantum secure.
+                    Accordingly there is a need to make Ethereum post-quantum secure.
+                    In a fairly complex protocol stack like Ethereum, there are many places where cryptography needs to switch to its PQ counterparts.
+                    Our focus is on a small portion of that stack.
+                    Mainly for signatures on custom messages that a smart contract verifies inside EVM execution environment before it executes further business logic.
+                    It can also be extended to account abstraction (AA) model which lets one put custom transaction authentication logic for externally-owned accounts (EOAs).
+                    Today when one sends a transaction to Ethereum blockchain it must be signed using ECDSA over secp256k1 curve.
+                    The hardware or software wallet does much of the heavy lifting on key generation and signing front.
+                    Signing algorithm and choice of the curve is hardcoded in the Ethereum protocol itself.
+                    Imagine if one could change the transaction authentication logic for only their account without the protocol forcing everyone to migrate their accounts &mdash; that's the promise of the smart accounts.
+                    EOAs made "smart" using smart contracts.
+                    It allows gradual rollout of PQ secure authentication.
+                    For more on this line of development, I refer the reader to <a class="blogLink" href="https://eips.ethereum.org/EIPS/eip-4337" target="_blank">EIP 4337</a> and <a class="blogLink" href="https://eips.ethereum.org/EIPS/eip-7702" target="_blank">EIP 7702</a>.
+                    AA paves the path for using ML-DSA for authenticating transactions in purely opt-in basis.
+                    For the rest of the article we will focus on optimizing the cost of verifying ML-DSA signatures inside smart contracts running on the EVM.
+                </p>
+                <p class="blogText">
+                    FIPS 204 specifies three instances of ML-DSA &mdash; ML-DSA-44, ML-DSA-65 and ML-DSA-87.
+                    We choose to work with ML-DSA-65, which provides cryptographic security equivalent to "NIST Category 3".
+                    ML-DSA verification function takes public key, signature, message and an optional context string as input.
+                    ML-DSA-65 public key is 1952 bytes.
+                    ML-DSA-65 signature is 3309 bytes.
+                    Message can be arbitrary long.
+                    Optional context string is capped at 255 bytes.
+                    I won't explain the ML-DSA signature verification algorithm itself.
+                    Rather we will focus on its components, so that we know which parts are contributing how much to the overall verification cost.
+                    I will split ML-DSA verify into roughly following three steps.
+                </p>
+                <ul>
+                    <li>Decode and bound-check the compressed signature.</li>
+                    <li>Regenerate commitment inputs using SHAKE128 and SHAKE256 eXtendable Output Functions (XOFs).</li>
+                    <li>Reconstruct the commitment and compare.</li>
+                </ul>
+                <p class="blogText">
+                    Given a signature the ML-DSA verify function unpacks it, rejecting when hint bits encoding is invalid or infinity norm of the signature crosses parameterized bound.
+                    Decoding signature involves placing bits into coefficients of polynomials or vectors of polynomials.
+                    Those coefficients are members of a 23-bit prime field that ML-DSA is parameterized with.
+                    Regenerating the commitment inputs is dominated by hashing, with XOFs defined in <a class="blogLink" href="https://doi.org/10.6028/NIST.FIPS.202" target="_blank">FIPS 202</a>, aka SHA3 standard.
+                    It includes generating a public matrix A, by expanding a seed included in the public key, by means of "rejection sampling" the ouput of SHAKE128 XOF.
+                    Hashing with SHAKE256 XOF is used in a couple of places &mdash; for recomputing the challenge vector from the commitment hash which is embedded in the signature, computing 64-byte message representative, and computing the final commitment hash which is compared against the signature for acceptance or rejection decision.
+                    Reconstructing the commitment hash requires performing arithmetic over polynomials, in the number theoretic transform (NTT) domain.
+                    NTT evaluates a polynomial, replacing its coefficients with point values.
+                    This allows easy arithmetic over polynomials, i.e., <code>a x b</code> can be as easy as element-wise multiplication, s.t., <code>a</code> and <code>b</code> are two polynomials of degree <code>N</code>.
+                    Before recomputing the commitment hash the result polynomial is interpolated back to coefficient domain using inverse number theoretic transform (iNTT).
+                    Simply put, it involves linear algebra and NTT.
+                </p>
+                <p class="blogText">
+                    Now that we have a fairly good high-level mental map of the operations involved in verifying a ML-DSA signature, I want to focus on a specific part of it.
+                    <span class="highlight">The hashing</span>.
+                    It is more than 50% of the signature verification cost.
+                    Any hashing ML-DSA does is dominated by applying 24 rounds of Keccak-f[1600] permutation.
+                    The specific choice of XOF dictates sponge rate/ capacity and domain separator in use.
+                    ML-DSA uses two XOFs, SHAKE128 and SHAKE256.
+                    Roughly speaking SHAKE128 offers 128-bit collision resistance security and SHAKE256 offers 256-bit collision resistance security.
+                    For more precise explanation I refer the reader to Table 4, titled "Security strengths of the SHA-1, SHA-2, and SHA-3 functions", in section A.1 on page 23 of FIPS 202.
+                </p>
+                <p class="blogText">
+                    I won't bore you with code.
+                    You can find all of it in the <a class="blogLink" href="https://github.com/itzmeanjan/veripq.git" target="_blank">itzmeanjan/veripq</a> repository.
+                    It implements ML-DSA-65 signature verification algorithm as a Solidity library.
+                    <a class="blogLink" href="https://www.soliditylang.org" target="_blank">Solidity</a> is the most used programming language for writing smart contracts targeting EVM.
+                    The library is tested against the ACVP known answer test (KAT) vectors for ML-DSA-65 verify, to ensure functional correctness and conformance.
+                    NIST maintains ACVP test vectors in the <a class="blogLink" href="https://github.com/usnistgov/ACVP.git" target="_blank">usnistgov/ACVP</a> repository.
+                    I maintain a C++ library for the full suite of ML-DSA in <a class="blogLink" href="https://github.com/itzmeanjan/ml-dsa.git" target="_blank">itzmeanjan/ml-dsa</a>, which is used to generate new KATs for optimized instances of ML-DSA, I will propose in the rest of the article.
+                    To clarify expectations, <span class="highlight">we will optimize only the hashing part of ML-DSA</span>.
+                    We won't touch anything else in ML-DSA signature verification.
+                    Any change in the hash functions obviously changes the output of ML-DSA key generation and signing functions, given same input, i.e., seed, message or context string.
+                    All new test vectors are generated in reproducible manner by applying git patches.
+                    All ML-DSA-65 flavours are tested to be correct using KAT vectors.
+                    Simply put, any claim I make in the rest of the article on performance of ML-DSA-65 verify, can be reproduced using material in the accompanying repository.
+                </p>
+                <p class="blogText">
+                    <i>Verifying a ML-DSA-65 signature over a 2793-byte message and 183-byte context string costs <span class="highlight">15,432,417 gas</span> on EVM</i>.
+                    The message size is weirdly long because it is one of the NIST ACVP KAT vectors.
+                    Out of 15.4 million gas, 8,674,229 is spent just on hashing &mdash; that is a whopping 56%.
+                    A combination of 24-round Keccak-f[1600] permutation calls and sponge absorptions/ squeezings are behind it.
+                    The <code>ML-DSA-65.verify()</code> implementation we gas metered, employs a fairly well-known optimization for efficient hashing.
+                    For example, when rejection sampling the public matrix <code>A<sub>6 x 5</sub></code>, s.t. each cell is a polynomial of degree <code>N</code> (= 256), we use Single Instruction Multiple Data (SIMD) parallel SHAKE128 &mdash; better referred to as SHAKE128x4.
+                    <br>
+                    A mild digression.
+                    You may note, ML-DSA-65 is named so because of the dimension of the public matrix <code>A</code>.
+                    Following this you can figure out the dimension of the public matrix <code>A</code>, in other NIST-standardized instances of ML-DSA, such as ML-DSA-44 and ML-DSA-87.
+                    <br>
+                    A natural next question to ask is <span class="highlight">how does one get to exploit SIMD parallelism on EVM?</span>.
+                    EVM is a computer architecture featuring 256-bit native words.
+                    Like x86_64 or arm64 architecture features native word size of 64-bit.
+                    On x86_64, there are instruction extensions, named AVX2, which features 256-bit vector units.
+                    AVX2 extension lets one interpret a 256-bit vector unit as N many packed words, where each word is of bit width &isin; {8, 16, 32, 64, 128, 256} and operate over those N many words in parallel.
+                    That is SIMD parallelism crash-course in a handful of sentences.
+                    I used x86_64's AVX2 just as an example, there are other SIMD instruction extensions like x86_64's AVX512, arm64's NEON or SVE.
+                    Coming back to EVM.
+                    We can imagine EVM as a computer architecture featuring 256-bit wide SIMD vector units.
+                    The mighty Keccak-f[1600] permutation state is a matrix of dimension 5x5 with each cell being 64-bit wide &mdash; 25 lanes, each of 64-bit.
+                    If we implement SHAKE128 or SHAKE256 on EVM, each lane will anyway occupy a 256-bit native word.
+                    But only 64 bits will be of significance, resulting in waste of 192 bits, per lane.
+                    That is a massive under utilization of scarce resource &mdash; compute capability.
+                    In ML-DSA-65, four cells of the public matrix <code>A</code> can be sampled in parallel.
+                    By putting four 64-bit lanes from four different instances of SHAKE128 XOF onto single 256-bit EVM word, we can rejection sample four polynomials of matrix <code>A</code>, in parallel.
+                    How would that look like?
+                    Imagine, we are rejection sampling first four cells of the matrix <code>A<sub>6 x 5</sub></code>, i.e., matrix cells indexed as (0, 0), (0, 1), (0, 2) and (0, 3), in row-major order.
+                    In a naive way, each cell can instantiate a SHAKE128 XOF, seeded with a 32-byte seed string, followed by two bytes, encoding matrix cell index <code>(i, j)</code>, s.t., <code>0 &le; i &lt; 6</code> and <code>0 &le; j &lt; 5</code>.
+                    In a smarter way, lane<sub>0</sub> of Keccak-f[1600] permutation from four instances of SHAKE128 will occupy a full 256-bit word of EVM.
+                    We replicate it 24 more times to cover all 25 lanes of four SHAKE128 instances.
+                    Notice, in the naive way, on EVM, keeping the state of four SHAKE128 instances would have costed us 4 x 5 x 5 = 100 EVM words.
+                    The SIMD-packed representation lets us achieve the same at 1/4 of the cost.
+                    Obviously there are some limitations &mdash; both absorption and squeezing needs to be executed in lock-step, i.e., exactly N bytes needs to be absorbed by all four parallel SHAKE128 instances.
+                    Same applies for squeezing.
+                    In this specific context, absorption is fairly straightforward.
+                    Each of the <code>6 x 5 = 30</code> SHAKE128 instances will absorb exactly <code>32 + 2 = 34</code> bytes.
+                    The rate of the SHAKE128 sponge is 168-byte.
+                    Meaning absorption costs only a single Keccak-f[1600] permutation call.
+                    On the squeezing front, it employs rejection sampling.
+                    Because each SHAKE128 instance absorbs diversified input seed, their output stream will be completely different.
+                    Thanks to the avalanche property of a cryptographic hash function.
+                    Meaning four SHAKE128 instances running in parallel might squeeze inequal length of output.
+                    This inconvenience is solved at the cost squeezing exactly 168-byte rate-sized blocks from all four SHAKE128 instances, even though some of them may not need it anymore because all 256 coefficients of the polynomial has already been sampled.
+                    It is not that bad.
+                    Couple of observations based on what we know so far.
+                </p>
+                <ol>
+                    <li>
+                        ML-DSA-65 needs to sample 30 polynomials &mdash; it does not cleanly divide by 4, i.e., the degree of SIMD parallelism.
+                        Again we trade performance for the last partial batch &mdash; after first 7 invocations of SHAKE128x4, we dispatch another full batch, just ignoring the result for two placeholders.
+                    </li>
+                    <li>
+                        EVM features a precompile for computing Keccak256 digest of an arbitrary long message, but Keccak256 is not same as SHAKE128 or SHAKE256.
+                        Due to different domain separation bits, they produce completely different output.
+                        EVM does not expose the raw Keccak-f[1600] permutation as a precompile.
+                        The benefit of having a precompile is it would always be "orders of magnitude" cheaper, in terms of gas cost, compared to the most optimized implementation of Keccak one can come up with.
+                    </li>
+                </ol>
+                <p class="blogText">
+                    <i>To reduce the cost of hashing in ML-DSA-65, we can halve the number of Keccak-f[1600] permutation rounds</i>.
+                    24 becomes 12.
+                    But we loose compatibility with ML-DSA-65, as specified in FIPS 204.
+                    Replace use of SHAKE128 and SHAKE256 in ML-DSA-65 with their Turbo equivalents, i.e., TurboSHAKE128 and TurboSHAKE256, respectively.
+                    TurboSHAKE is specified in <a class="blogLink" href="https://www.ietf.org/rfc/rfc9861" target="_blank">RFC 9861</a>.
+                    It is such a simple solution to halve the cost of Keccak-f[1600] permutation without loosing any cryptanalytic advantage of it.
+                    We refer to this instance of ML-DSA-65 as <span class="highlight">TurboML-DSA-65</span>.
+                    <i>Verifying a TurboML-DSA-65 signature for the same message and context string costs <span class="highlight">12,366,017 gas</span> on the EVM</i>.
+                    At the cost of loosing compatibility with FIPS 204 ML-DSA-65, we save <span class="highlight">~19.8% in gas cost</span> of verifying a post-quantum ML-DSA signature on EVM.
+                    That does not say much.
+                    Only part of ML-DSA we have touched to build TurboML-DSA is hashing.
+                    TurboML-DSA-65 spends 5,602,105 gas just on hashing &mdash; that is still a whopping 45.3% of the total 12.3 million gas spending.
+                    Compared to FIPS 204 ML-DSA-65, the hashing cost has reduced by roughly 35.4%, while the overall signature verification cost has reduced by roughly 20%.
+                    A natural next question to ask, <span class="highlight">why did not the cost of hashing just drop by half when we halved number of rounds in Keccak-f[1600] permutation?</span>.
+                    It is important to note, hashing with SHAKE or its Turbo variants is not just applying Keccak-f[1600] permutation.
+                    Obviously that is a dominating cost.
+                    There are sponge operations which exists regardless of the number of rounds halving in permutation.
+                    That's why verifying TurboML-DSA-65 signature still costs ~12.3 million gas.
+                    At the time of writing, when Fusaka upgrade is in place on Ethereum, the block gas limit is capped at 60 million.
+                    For more details on past and future Ethereum upgrades, I refer you to their <a class="blogLink" href="https://ethereum.org/roadmap" target="_blank">roadmap</a>.
+                    <span class="highlight">Today we can verify only three ML-DSA-65 signatures and four TurboML-DSA-65 signatures on Ethereum per block.</span>
+                    Not practical.
+                </p>
+                <p class="blogText">
+                    Let's go one step further.
+                    Reduce the cost of hashing in ML-DSA even further.
+                    EVM offers a precompile for <span class="highlight">keccak256</span>.
+                    It has an one-shot hashing interface which allows absorption of arbitrary long message and produces a 32-byte digest.
+                    If I could have used Keccak256 for all hashing needs in ML-DSA, I would have.
+                    That is not possible because ML-DSA often needs more than 32 bytes of digest.
+                    That's why it uses a flexible hash function aka XOF to squeeze arbitrary long digest.
+                    But I can always build a keccak256 precompile-accelerated XOF.
+                    <span class="highlight">An eXtendable Output Function built on top of Keccak256 hash function.</span>
+                    What would that look like?
+                </p>
+<pre>
+<code class="microlight">
+Keccak256XofCtr: A Keccak256-based eXtendable Output Function in counter mode
+
+absorb(msg):
+    - Append msg to an internal buffer
+
+finalize():
+    - Apply keccak256() on the internal buffer holding concatenated absorbed messages
+    - Set state <- keccak256(buffer)
+    - Set counter <- 0
+
+squeeze(out):
+    - Produce a 32-byte block and increment counter for squeezing next block
+    - Produce as many blocks required to fill output buffer
+    - Buffer rest, if any, in an internal buffer
+    - Set buffer <- keccak256(state || counter)
+    - Set counter <- counter + 1
+</code>
+</pre>
+                <p class="blogText">
+                    Simply put, to expose a sponge-like XOF interface, keep concatenating input message bytes in a buffer until the sponge is ready to be finalized, i.e., ready to produce output stream.
+                    Absorption is nothing but applying keccak256 precompile on concatenated stream of message bytes.
+                    It produces a 32-byte digest, which becomes the "state" of the sponge, for the rest of its life cycle.
+                    To support squeezing arbitrary long output stream, counter mode comes to rescue.
+                    A zero-initialized "counter" is kept as part of the Keccak256XofCtr state.
+                    A squeezed block is keccak256 digest of concatenation of "state" and "counter".
+                    After squeezing a 32-byte block, the counter is incremented by 1.
+                    The counter is 256-bit wide.
+                    The native word size on EVM.
+                    Keccak256XofCtr, allows squeezing at max 32 * 2<sup>256</sup> bytes, i.e., 2<sup>261</sup> bytes.
+                    Such an unimaginably high bound.
+                </p>
+                <p class="blogText">
+                    <i>Keccak256XofCtrML-DSA-65, a flavour of ML-DSA-65, featuring Keccak256XofCtr XOF, replacing both SHAKE128 and SHAKE256, scores <span class="highlight">8,792,483</span>, in signature verification gas cost.</i>                    
+                    A 28.9% reduction in signature verification gas cost, compared to last optimization attempt &mdash; Turbo instance of ML-DSA-65.
+                    Compared to FIPS 204 ML-DSA-65, it is a 43% reduction in gas cost.
+                    Speaking of only hashing, the cost comes down to 2,118,015 gas &mdash; down to 24.1% of total verification cost.
+                    <span class="highlight">A gradual improvement from spending 56% of verification gas cost on hashing to 45% and finally down to 24%.</span>
+                    Choosing a custom XOF, built over Keccak256 hash function, at the cost of loosing compatibility with the standard, enables us in verifying up to six signatures per block of Ethereum.
+                    That doubles the capacity compared to FIPS 204 ML-DSA-65.
+                    Is it ready to adopt at scale?
+                    No.
+                </p>
+                <p class="blogText">
+                    Observation, the decision of replacing both SHAKE128 and SHAKE256 in ML-DSA with Keccak256XofCtr can be concerning.
+                    Keccak256 is a sponge, with a capacity of 512 bits, i.e., it can offer up to 128-bit collision resistance security.
+                    For this specific parameter of ML-DSA, i.e., ML-DSA-65, which offers "Category 3" security, which is at least as secure as AES-192 block cipher, the choice of hash function does not provide sufficient level of security.
+                    Replacing the use of SHAKE128 with Keccak256XofCtr is fine from cryptographic security point of view.
+                    Though it does not hold in case of SHAKE256.
+                </p>
+                <p class="blogText">
+                    What else can we do to make ML-DSA practical on EVM?
+                    We need precompiles for accelerating ML-DSA verification on EVM.
+                    For example, number theoretic transform can be heavily optimized, bringing down the signature verification cost.
+                    <span class="highlight">Exposing a Keccak-f[1600] permutation precompile, with paremeterizable number of rounds, will be immensely helpful.</span>
+                    It could open the door for supporting other gas-optimized Keccak-f[1600] based hash functions and XOFs.
+                    Accelerated prime field arithmetic, using Montgomery representation and lazy modulo reduction can obviously help.
+                    Though it won't be general purpose, because the specific 23-bit prime field ML-DSA uses may not be useful for other PQ digital signature schemes.
+                    Good news is there is already a draft proposal, <a class="blogLink" href="https://eips-wg.github.io/EIPs/8051" target="_blank">EIP 8051</a>, for adding ML-DSA precompile to EVM.
+                </p>
+            </article>
+        </div>
+    </div>
+    <div id="footerDiv">
+        <footer>
+            <p id="footerText">
+                &copy; <a href="https://github.com/itzmeanjan/itzmeanjan.github.io" id="footerLink"
+                    target="_blank"><big>A</big>njan Roy</a> ( <big>M</big>IT Licensed )
+            </p>
+        </footer>
+    </div>
+</body>
+
+</html>
